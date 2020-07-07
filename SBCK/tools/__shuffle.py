@@ -83,175 +83,207 @@
 ##################################################################################
 ##################################################################################
 
+##################################################################################
+##################################################################################
+##                                                                              ##
+## Original authors : Mathieu Vrac and Soulivanh Thao                           ##
+## Contact          : mathieu.vrac@lsce.ipsl.fr                                 ##
+## Contact          : soulivanh.thao@lsce.ipsl.fr                               ##
+##                                                                              ##
+## Notes   : SchaakeShuffleRef is the re-implementation of the rank shuffle     ##
+##           funtions of R package "R2D2" developped by Mathieu Vrac and        ##
+##           Soulivanh Thao, available at                                       ##
+##                                                                              ##
+##           This code is governed by the CeCILL-C license with the             ##
+##           authorization of Mathieu Vrac                                      ##
+##                                                                              ##
+##################################################################################
+##################################################################################
 
 ###############
 ## Libraries ##
 ###############
 
-import sys,os
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import setuptools
+import numpy       as np
+import scipy.stats as sc
 
 
-#####################
-## User Eigen path ##
-#####################
+#############
+## Classes ##
+#############
 
-eigen_usr_include = ""
-
-i_eigen = -1
-for i,arg in enumerate(sys.argv):
-	if arg[:5] == "eigen":
-		eigen_usr_include = arg[6:]
-		i_eigen = i
-
-if i_eigen > -1:
-	del sys.argv[i_eigen]
-
-
-################################################################
-## Some class and function to compile with Eigen and pybind11 ##
-################################################################
-
-class get_pybind_include(object):##{{{
-	"""Helper class to determine the pybind11 include path
-	The purpose of this class is to postpone importing pybind11
-	until it is actually installed, so that the ``get_include()``
-	method can be invoked. """
-	
-	def __init__(self, user=False):
-		self.user = user
-	
-	def __str__(self):
-		import pybind11
-		return pybind11.get_include(self.user)
-##}}}
-
-def get_eigen_include( propose_path = "" ):##{{{
-	
-	possible_path = [ propose_path , "/usr/include/" , "/usr/local/include/" ]
-	if os.environ.get("HOME") is not None:
-		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
-	
-	for path in possible_path:
-		
-		
-		eigen_include = os.path.join( path , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return path
-		
-		eigen_include = os.path.join( path , "eigen3" , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return os.path.join( path , "eigen3" )
-	
-	return ""
-##}}}
-
-def has_flag(compiler, flagname):##{{{
-	"""Return a boolean indicating whether a flag name is supported on
-	the specified compiler.
+class SchaakeShuffle:##{{{
 	"""
-	import tempfile
-	with tempfile.NamedTemporaryFile('w', suffix='.cpp') as f:
-		f.write('int main (int argc, char **argv) { return 0; }')
-		try:
-			compiler.compile([f.name], extra_postargs=[flagname])
-		except setuptools.distutils.errors.CompileError:
-			return False
-	return True
-##}}}
-
-def cpp_flag(compiler):##{{{
-	"""Return the -std=c++[11/14] compiler flag.
-	The c++14 is prefered over c++11 (when it is available).
+	SBCK.tools.SchaakeShuffle
+	=========================
+	Match the rank structure of X with them of Y by reordering X. Work in multivariate case, but rank  of each 
+	features are reordered independantly.
 	"""
-	if has_flag(compiler, '-std=c++14'):
-		return '-std=c++14'
-	elif has_flag(compiler, '-std=c++11'):
-		return '-std=c++11'
-	else:
-		raise RuntimeError( 'Unsupported compiler -- at least C++11 support is needed!' )
+	
+	def __init__( self , Y0 = None ):##{{{
+		"""
+		Initialization
+		
+		Parameters
+		----------
+		Y0 : np.array[n_samples,n_features] or None
+			The target dataset, use fit function if Y0 is None
+		"""
+		self._Y0 = None
+		if Y0 is not None: self.fit(Y0)
+	##}}}
+	
+	def fit( self , Y0 ):##{{{
+		"""
+		Definine the reference ranks structure
+		
+		Parameters
+		----------
+		Y0 : np.array[n_samples,n_features]
+			The target dataset
+		"""
+		self._Y0 = Y0
+		if self._Y0.ndim == 1: self._Y0 = self._Y0.reshape(-1,1)
+	##}}}
+	
+	def _predict( self , Y0 , X0 ):##{{{
+		X0 = X0.squeeze()
+		Y0 = Y0.squeeze()
+		
+		rank_X0 = sc.rankdata( X0 , method = "ordinal" )
+		rank_Y0 = sc.rankdata( Y0 , method = "ordinal" )
+		
+		arank_X0 = np.argsort(rank_X0)
+		Z0 = X0[arank_X0][rank_Y0-1]
+		
+		return Z0
+	##}}}
+	
+	def predict( self , X0 ):##{{{
+		"""
+		Apply the rank structure to X0
+		
+		Parameters
+		----------
+		X0 : np.array[n_samples,n_features]
+			The dataset to reorder
+		
+		Returns
+		-------
+		Z0 : np.array[n_samples,n_features]
+			Reordered dataset
+		"""
+		if X0.ndim == 1: X0 = X0.reshape(-1,1)
+		
+		## If n_samples of X/Y differs, we complet the sequence by drawing uniformly in X/Y to have the same shape.
+		if self._Y0.shape[0] < X0.shape[0]:
+				YY = np.zeros_like(X0)
+				YY[:self._Y0.shape[0],:] = self._Y0
+				YY[self._Y0.shape[0]:,:] = self._Y0[np.random.choice( self._Y0.shape[0] , X0.shape[0] - self._Y0.shape[0] , replace = True ),:]
+				XX = X0
+		elif X0.shape[0] < self._Y0.shape[0]:
+			XX = np.zeros_like(self._Y0)
+			XX[:X0.shape[0],:] = X0
+			XX[X0.shape[0]:,:] = X0[np.random.choice( X0.shape[0] , self._Y0.shape[0] - X0.shape[0] , replace = True ),:]
+			YY = self._Y0
+		else:
+			XX,YY = X0,self._Y0
+		
+		n_features = X0.shape[1]
+		ZZ = np.zeros_like(XX)
+		for i in range(n_features):
+			ZZ[:,i] = self._predict( YY[:,i] , XX[:,i] )
+		
+		Z0 = ZZ[:X0.shape[0],:]
+		
+		return Z0
+	##}}}
 ##}}}
 
-class BuildExt(build_ext):##{{{
-	"""A custom build extension for adding compiler-specific options."""
-	c_opts = {
-		'msvc': ['/EHsc'],
-		'unix': [],
-	}
+def schaake_shuffle( Y0 , X0 ):##{{{
+	"""
+	SBCK.tools.schaake_shuffle
+	==========================
+	Match the rank structure of X0 with them of Y0 by reordering X0. Work in multivariate case, but ranks of each 
+	features are reordered independantly.
 	
-	if sys.platform == 'darwin':
-		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+	Note: This function just call the class SBCK.tools.SchaakeShuffle
 	
-	def build_extensions(self):
-		ct = self.compiler.compiler_type
-		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
-		if ct == 'unix':
-			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
-			opts.append(cpp_flag(self.compiler))
-			if has_flag(self.compiler, '-fvisibility=hidden'):
-				opts.append('-fvisibility=hidden')
-		elif ct == 'msvc':
-			opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
-		for ext in self.extensions:
-			ext.extra_compile_args = opts
-		build_ext.build_extensions(self)
+	Parameters
+	----------
+	X0 : np.array[n_samples,n_features]
+		The dataset to reorder
+	Y0 : np.array[n_samples,n_features]
+		The target dataset
+	
+	Returns
+	-------
+	Z0 : np.array[n_samples,n_features]
+		Reordered dataset
+	
+	"""
+	ss = SchaakeShuffle(Y0)
+	return ss.predict(X0)
 ##}}}
 
-
-##########################
-## Extension to compile ##
-##########################
-
-ext_modules = [
-	Extension(
-		'SBCK.tools.__tools_cpp',
-		['SBCK/tools/src/tools.cpp'],
-		include_dirs=[
-			# Path to pybind11 headers
-			get_eigen_include(eigen_usr_include),
-			get_pybind_include(),
-			get_pybind_include(user=True)
-		],
-		language='c++',
-		depends = [
-			"SBCK/tools/src/SparseHist.hpp"
-			"SBCK/tools/src/NetworkSimplex.hpp"
-			"SBCK/tools/src/NetworkSimplexLemon.hpp"
-			]
-	),
-]
-
-
-#################
-## Compilation ##
-#################
-
-list_packages = [
-	"SBCK",
-	"SBCK.tools",
-	"SBCK.metrics",
-	"SBCK.datasets"
-]
-
-
-setup(
-	name = "SBCK" ,
-	description = "Statistical Bias Correction Kit" ,
-	version = "0.2.2" ,
-	author = "Yoann Robin" ,
-	author_email = "yoann.robin.k@gmail.com" ,
-	license = "CeCILL-C" ,
-	platforms = [ "linux" , "macosx" ] ,
-	requires = [ "numpy" , "scipy" , "matplotlib" ],
-	ext_modules = ext_modules,
-	install_requires = ['pybind11>=2.2'],
-	cmdclass = {'build_ext': BuildExt},
-	zip_safe = False,
-	packages = list_packages,
-	package_dir = { "SBCK" : "SBCK" }
-)
+class SchaakeShuffleRef(SchaakeShuffle):##{{{
+	"""
+	SBCK.tools.SchaakeShuffleRef
+	============================
+	Match the rank structure of X with them of Y by reordering X, but fix one features to keep the structure of X.
+	"""
+	
+	def __init__( self , ref , Y0 = None ):##{{{
+		"""
+		Initialization
+		
+		Parameters
+		----------
+		ref : int
+			features kept.
+		Y0 : np.array[n_samples,n_features] or None
+			The target dataset, use fit function if Y0 is None
+		"""
+		self._ref = ref
+		SchaakeShuffle.__init__( self , Y0 )
+	##}}}
+	
+	def fit( self , Y0 ):##{{{
+		"""
+		Definine the reference ranks structure
+		
+		Parameters
+		----------
+		Y0 : np.array[n_samples,n_features]
+			The target dataset
+		"""
+		SchaakeShuffle.fit( self , Y0 )
+	##}}}
+	
+	def predict( self , X0 ):##{{{
+		"""
+		Apply the rank structure to X0
+		
+		Parameters
+		----------
+		X0 : np.array[n_samples,n_features]
+			The dataset to reorder
+		
+		Returns
+		-------
+		Z0 : np.array[n_samples,n_features]
+			Reordered dataset
+		"""
+		if X0.ndim == 1: X0 = X0.reshape(-1,1)
+		Z0 = SchaakeShuffle.predict( self , X0 )
+		
+		rank_ref_X0  = sc.rankdata( X0[:,self._ref] , method = "ordinal" )
+		rank_ref_Z0  = sc.rankdata( Z0[:,self._ref] , method = "ordinal" )
+		arank_ref_Z0 = np.argsort(rank_ref_Z0)
+		Z0 = Z0[arank_ref_Z0,:][rank_ref_X0-1,:]
+		
+		return Z0
+	##}}}
+##}}}
 
 

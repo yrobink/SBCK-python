@@ -83,175 +83,144 @@
 ##################################################################################
 ##################################################################################
 
-
 ###############
 ## Libraries ##
 ###############
 
-import sys,os
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import setuptools
+import numpy as np
+import sklearn.datasets as skd
 
+###############
+## Functions ##
+###############
 
-#####################
-## User Eigen path ##
-#####################
-
-eigen_usr_include = ""
-
-i_eigen = -1
-for i,arg in enumerate(sys.argv):
-	if arg[:5] == "eigen":
-		eigen_usr_include = arg[6:]
-		i_eigen = i
-
-if i_eigen > -1:
-	del sys.argv[i_eigen]
-
-
-################################################################
-## Some class and function to compile with Eigen and pybind11 ##
-################################################################
-
-class get_pybind_include(object):##{{{
-	"""Helper class to determine the pybind11 include path
-	The purpose of this class is to postpone importing pybind11
-	until it is actually installed, so that the ``get_include()``
-	method can be invoked. """
-	
-	def __init__(self, user=False):
-		self.user = user
-	
-	def __str__(self):
-		import pybind11
-		return pybind11.get_include(self.user)
-##}}}
-
-def get_eigen_include( propose_path = "" ):##{{{
-	
-	possible_path = [ propose_path , "/usr/include/" , "/usr/local/include/" ]
-	if os.environ.get("HOME") is not None:
-		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
-	
-	for path in possible_path:
-		
-		
-		eigen_include = os.path.join( path , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return path
-		
-		eigen_include = os.path.join( path , "eigen3" , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return os.path.join( path , "eigen3" )
-	
-	return ""
-##}}}
-
-def has_flag(compiler, flagname):##{{{
-	"""Return a boolean indicating whether a flag name is supported on
-	the specified compiler.
+def gaussian_exp_2d(n_samples):##{{{
 	"""
-	import tempfile
-	with tempfile.NamedTemporaryFile('w', suffix='.cpp') as f:
-		f.write('int main (int argc, char **argv) { return 0; }')
-		try:
-			compiler.compile([f.name], extra_postargs=[flagname])
-		except setuptools.distutils.errors.CompileError:
-			return False
-	return True
-##}}}
-
-def cpp_flag(compiler):##{{{
-	"""Return the -std=c++[11/14] compiler flag.
-	The c++14 is prefered over c++11 (when it is available).
+	SBCK.datasets.gaussian_exp_2d
+	=============================
+	
+	Build a bivariate test dataset.
+	
+	Parameters
+	----------
+	n_samples : integer
+		Number of samples in X0, X1 and Y0
+	
+	Returns
+	-------
+	Y0,X0,X1 : tuple
+		- Y0 reference dataset in calibration period, exp x norm
+		- X0 biased dataset in calibration period, norm x exp
+		- X1 biased dataset in projection period, (norm + 5) x exp
 	"""
-	if has_flag(compiler, '-std=c++14'):
-		return '-std=c++14'
-	elif has_flag(compiler, '-std=c++11'):
-		return '-std=c++11'
-	else:
-		raise RuntimeError( 'Unsupported compiler -- at least C++11 support is needed!' )
+	X0 = np.hstack( ( np.random.normal( size = (n_samples,1) )           , np.random.exponential( size = (n_samples,1)  ) ) )
+	Y0 = np.hstack( ( np.random.exponential( size = (n_samples,1)  )     , np.random.normal( size = (n_samples,1) ) ) )
+	X1 = np.hstack( ( np.random.normal( size = (n_samples,1) , loc = 5 ) , np.random.exponential( size = (n_samples,1)  ) ) )
+	
+	return Y0,X0,X1
 ##}}}
 
-class BuildExt(build_ext):##{{{
-	"""A custom build extension for adding compiler-specific options."""
-	c_opts = {
-		'msvc': ['/EHsc'],
-		'unix': [],
-	}
+def gaussian_L_2d( n_samples ):##{{{
+	"""
+	SBCK.datasets.gaussian_L_2d
+	===========================
 	
-	if sys.platform == 'darwin':
-		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+	Build a bivariate test dataset.
 	
-	def build_extensions(self):
-		ct = self.compiler.compiler_type
-		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
-		if ct == 'unix':
-			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
-			opts.append(cpp_flag(self.compiler))
-			if has_flag(self.compiler, '-fvisibility=hidden'):
-				opts.append('-fvisibility=hidden')
-		elif ct == 'msvc':
-			opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
-		for ext in self.extensions:
-			ext.extra_compile_args = opts
-		build_ext.build_extensions(self)
+	Parameters
+	----------
+	n_samples : integer
+		Number of samples in X0, X1 and Y0
+	
+	Returns
+	-------
+	Y0,X0,X1 : tuple
+		- Y0 reference dataset in calibration period, form in "L"
+		- X0 biased dataset in calibration period, gaussian
+		- X1 biased dataset in projection period, gaussian
+	"""
+	## Construction of X0 (biased period 0), X1 (biased period 1) and Y0 (reference period 0)
+	size0  = int(n_samples/2)
+	size1  = n_samples - int(n_samples/4)
+	
+	## Just a gaussian for X0
+	X0 = np.random.multivariate_normal( mean = [0.,0.] , cov = np.identity(2) , size = n_samples )
+	
+	## A lightly complex gaussian for X1
+	X1 = np.random.multivariate_normal( mean = [1.,2.] , cov = [ [2.,0] , [0,0.5] ] , size = n_samples )
+	
+	## A very complex law for Y0
+	Y0 = np.zeros( (n_samples,2) )
+	Y0[:size0,:]      = np.random.multivariate_normal( mean = [7.,7.]   , cov = [[2,0],[0,0.5]]   , size = size0 )
+	Y0[size0:size1,:] = np.random.multivariate_normal( mean = [5.,9.]   , cov = [[0.5,0],[0,2]]   , size = size1 - size0 )
+	Y0[size1:]        = np.random.multivariate_normal( mean = [5.,12.5] , cov = [[0.2,0],[0,0.2]] , size = n_samples - size1 )
+	meanY0 = np.mean( Y0 , axis = 0 )
+	meanX0 = np.mean( X0 , axis = 0 )
+	Y0 = np.apply_along_axis( lambda x : x - meanY0 + meanX0 , 1 , Y0 )
+	
+	return Y0,X0,X1
 ##}}}
 
+def bimodal_reverse_2d( n_samples ):##{{{
+	"""
+	SBCK.datasets.bimodal_reverse_2d
+	================================
+	
+	Build a test dataset such that:
+	- X0 is a bimodal bivariate normal distribution, with different covariance matrix for each mode. Modes are close
+	- X1 is a bimodal bivariate normal distribution, with different covariance matrix for each mode. Modes are differents
+	- Y0 is a bimodal bivariate normal distribution, two modes are the same, but are orthogonal to X0 and X1
+	
+	Parameters
+	----------
+	n_samples : integer
+		Number of samples in X0, X1 and Y0
+	
+	Returns
+	-------
+	Y0,X0,X1 : tuple
+		- Y0 reference dataset in calibration period
+		- X0 biased dataset in calibration period
+		- X1 biased dataset in projection period
+	"""
+	drawn = int(n_samples/2)
+	drawn = [drawn,n_samples-drawn]
+	lmY0   = [ np.array([5,-3]) , np.array( [-3,3] ) ]
+	lcovY0 = [ 0.9 * np.identity(2) , np.identity(2) ]
+	lmX0   = [ np.zeros(2) , np.array( [2,2] ) ]
+	lcovX0 = [ np.identity(2) , 0.5 * np.identity(2) ]
+	lmX1   = [ np.zeros(2) - 1. , np.array( [5,5] ) ]
+	lcovX1 = [ np.identity(2)  * 2 , 0.1 * np.identity(2) ]
+	Y0     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmY0,lcovY0,drawn) ] )
+	X0     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmX0,lcovX0,drawn) ] )
+	X1     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmX1,lcovX1,drawn) ] )
+	return Y0,X0,X1
+##}}}
 
-##########################
-## Extension to compile ##
-##########################
-
-ext_modules = [
-	Extension(
-		'SBCK.tools.__tools_cpp',
-		['SBCK/tools/src/tools.cpp'],
-		include_dirs=[
-			# Path to pybind11 headers
-			get_eigen_include(eigen_usr_include),
-			get_pybind_include(),
-			get_pybind_include(user=True)
-		],
-		language='c++',
-		depends = [
-			"SBCK/tools/src/SparseHist.hpp"
-			"SBCK/tools/src/NetworkSimplex.hpp"
-			"SBCK/tools/src/NetworkSimplexLemon.hpp"
-			]
-	),
-]
-
-
-#################
-## Compilation ##
-#################
-
-list_packages = [
-	"SBCK",
-	"SBCK.tools",
-	"SBCK.metrics",
-	"SBCK.datasets"
-]
-
-
-setup(
-	name = "SBCK" ,
-	description = "Statistical Bias Correction Kit" ,
-	version = "0.2.2" ,
-	author = "Yoann Robin" ,
-	author_email = "yoann.robin.k@gmail.com" ,
-	license = "CeCILL-C" ,
-	platforms = [ "linux" , "macosx" ] ,
-	requires = [ "numpy" , "scipy" , "matplotlib" ],
-	ext_modules = ext_modules,
-	install_requires = ['pybind11>=2.2'],
-	cmdclass = {'build_ext': BuildExt},
-	zip_safe = False,
-	packages = list_packages,
-	package_dir = { "SBCK" : "SBCK" }
-)
-
+def gaussian_dd( n_samples , n_features = 2 ):##{{{
+	"""
+	SBCK.datasets.gaussian_dd
+	=========================
+	
+	Build a test dataset such that X0, X1 and Y0 are multivariate normal distribution.
+	
+	Parameters
+	----------
+	n_samples : integer
+		Number of samples in X0, X1 and Y0
+	n_features : integer
+		dimension, default is 2
+	
+	Returns
+	-------
+	Y0,X0,X1 : tuple
+		- Y0 reference dataset in calibration period
+		- X0 biased dataset in calibration period
+		- X1 biased dataset in projection period
+	"""
+	X0 = np.random.multivariate_normal( mean = np.zeros(n_features)     , cov = skd.make_spd_matrix(n_features) , size = n_samples )
+	X1 = np.random.multivariate_normal( mean = np.zeros(n_features) + 5 , cov = skd.make_spd_matrix(n_features) , size = n_samples )
+	Y0 = np.random.multivariate_normal( mean = np.zeros(n_features) - 2 , cov = skd.make_spd_matrix(n_features) , size = n_samples )
+	return Y0,X0,X1
+##}}}
 

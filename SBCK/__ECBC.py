@@ -83,175 +83,96 @@
 ##################################################################################
 ##################################################################################
 
-
 ###############
 ## Libraries ##
 ###############
 
-import sys,os
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import setuptools
+import numpy as np
+from .__CDFt          import CDFt
+from .tools.__shuffle import SchaakeShuffle
 
 
-#####################
-## User Eigen path ##
-#####################
+###########
+## Class ##
+###########
 
-eigen_usr_include = ""
-
-i_eigen = -1
-for i,arg in enumerate(sys.argv):
-	if arg[:5] == "eigen":
-		eigen_usr_include = arg[6:]
-		i_eigen = i
-
-if i_eigen > -1:
-	del sys.argv[i_eigen]
-
-
-################################################################
-## Some class and function to compile with Eigen and pybind11 ##
-################################################################
-
-class get_pybind_include(object):##{{{
-	"""Helper class to determine the pybind11 include path
-	The purpose of this class is to postpone importing pybind11
-	until it is actually installed, so that the ``get_include()``
-	method can be invoked. """
-	
-	def __init__(self, user=False):
-		self.user = user
-	
-	def __str__(self):
-		import pybind11
-		return pybind11.get_include(self.user)
-##}}}
-
-def get_eigen_include( propose_path = "" ):##{{{
-	
-	possible_path = [ propose_path , "/usr/include/" , "/usr/local/include/" ]
-	if os.environ.get("HOME") is not None:
-		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
-	
-	for path in possible_path:
-		
-		
-		eigen_include = os.path.join( path , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return path
-		
-		eigen_include = os.path.join( path , "eigen3" , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return os.path.join( path , "eigen3" )
-	
-	return ""
-##}}}
-
-def has_flag(compiler, flagname):##{{{
-	"""Return a boolean indicating whether a flag name is supported on
-	the specified compiler.
+class ECBC(CDFt):
 	"""
-	import tempfile
-	with tempfile.NamedTemporaryFile('w', suffix='.cpp') as f:
-		f.write('int main (int argc, char **argv) { return 0; }')
-		try:
-			compiler.compile([f.name], extra_postargs=[flagname])
-		except setuptools.distutils.errors.CompileError:
-			return False
-	return True
-##}}}
-
-def cpp_flag(compiler):##{{{
-	"""Return the -std=c++[11/14] compiler flag.
-	The c++14 is prefered over c++11 (when it is available).
+	SBCK.ECBC
+	=========
+	
+	Description
+	-----------
+	This class implements the method Empirical Copula Bias Correction discribed in [1].
+	
+	References
+	----------
+	[1] Vrac, M. and P. Friederichs, 2015: Multivariate—Intervariable, Spatial, and Temporal—Bias Correction. J. Climate, 28, 218–237, https://doi.org/10.1175/JCLI-D-14-00059.1
 	"""
-	if has_flag(compiler, '-std=c++14'):
-		return '-std=c++14'
-	elif has_flag(compiler, '-std=c++11'):
-		return '-std=c++11'
-	else:
-		raise RuntimeError( 'Unsupported compiler -- at least C++11 support is needed!' )
-##}}}
-
-class BuildExt(build_ext):##{{{
-	"""A custom build extension for adding compiler-specific options."""
-	c_opts = {
-		'msvc': ['/EHsc'],
-		'unix': [],
-	}
 	
-	if sys.platform == 'darwin':
-		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+	def __init__( self , **kwargs ):##{{{
+		"""
+		Initialisation of ECBC
+		
+		Parameters
+		----------
+		
+		**kwargs: Any named arguments
+			All are passed to SBCK.CDFt
+		
+		Attributes
+		----------
+		"""
+		CDFt.__init__( self , **kwargs )
+		self._ss = SchaakeShuffle()
+	##}}}
 	
-	def build_extensions(self):
-		ct = self.compiler.compiler_type
-		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
-		if ct == 'unix':
-			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
-			opts.append(cpp_flag(self.compiler))
-			if has_flag(self.compiler, '-fvisibility=hidden'):
-				opts.append('-fvisibility=hidden')
-		elif ct == 'msvc':
-			opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
-		for ext in self.extensions:
-			ext.extra_compile_args = opts
-		build_ext.build_extensions(self)
-##}}}
+	def fit( self , Y0 , X0 , X1 = None ):##{{{
+		"""
+		Fit ECBC
+		
+		Parameters
+		----------
+		Y0	: np.array[ shape = (n_samples,n_features) ]
+			Reference dataset during calibration period
+		X0	: np.array[ shape = (n_samples,n_features) ]
+			Biased dataset during calibration period
+		X1	: np.array[ shape = (n_samples,n_features) ] or None
+			Biased dataset during projection period. Can be None to use as a stationary bias correction method
+		"""
+		CDFt.fit( self , Y0 , X0 , X1 )
+		self._ss.fit(Y0)
+	##}}}
+	
+	def predict( self , X1 , X0 = None ):##{{{
+		"""
+		Perform the bias correction
+		
+		Parameters
+		----------
+		X1  : np.array[ shape = (n_samples,n_features) ]
+			Array of value to be corrected in projection period
+		X0  : np.array[ shape = (n_samples,n_features) ] or None
+			Array of value to be corrected in calibration period
+		
+		Returns
+		-------
+		Z1 : np.array[ shape = (n_sample,n_features) ]
+			Return an array of correction in projection period
+		Z0 : np.array[ shape = (n_sample,n_features) ] or None
+			Return an array of correction in calibration period, or None
+		"""
+		
+		Z = CDFt.predict( self , X1 , X0 )
+		if X0 is not None:
+			Z1,Z0 = Z
+			Z1 = self._ss.predict(Z1)
+			Z0 = self._ss.predict(Z0)
+			return Z1,Z0
+		Z1 = Z
+		Z1 = self._ss.predict(Z1)
+		return Z1
+	##}}}
 
-
-##########################
-## Extension to compile ##
-##########################
-
-ext_modules = [
-	Extension(
-		'SBCK.tools.__tools_cpp',
-		['SBCK/tools/src/tools.cpp'],
-		include_dirs=[
-			# Path to pybind11 headers
-			get_eigen_include(eigen_usr_include),
-			get_pybind_include(),
-			get_pybind_include(user=True)
-		],
-		language='c++',
-		depends = [
-			"SBCK/tools/src/SparseHist.hpp"
-			"SBCK/tools/src/NetworkSimplex.hpp"
-			"SBCK/tools/src/NetworkSimplexLemon.hpp"
-			]
-	),
-]
-
-
-#################
-## Compilation ##
-#################
-
-list_packages = [
-	"SBCK",
-	"SBCK.tools",
-	"SBCK.metrics",
-	"SBCK.datasets"
-]
-
-
-setup(
-	name = "SBCK" ,
-	description = "Statistical Bias Correction Kit" ,
-	version = "0.2.2" ,
-	author = "Yoann Robin" ,
-	author_email = "yoann.robin.k@gmail.com" ,
-	license = "CeCILL-C" ,
-	platforms = [ "linux" , "macosx" ] ,
-	requires = [ "numpy" , "scipy" , "matplotlib" ],
-	ext_modules = ext_modules,
-	install_requires = ['pybind11>=2.2'],
-	cmdclass = {'build_ext': BuildExt},
-	zip_safe = False,
-	packages = list_packages,
-	package_dir = { "SBCK" : "SBCK" }
-)
 
 

@@ -83,175 +83,232 @@
 ##################################################################################
 ##################################################################################
 
-
 ###############
 ## Libraries ##
 ###############
 
-import sys,os
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
-import setuptools
+import numpy as np
+import scipy.stats as sc
+import scipy.interpolate as sci
 
 
-#####################
-## User Eigen path ##
-#####################
+#############
+## Classes ##
+#############
 
-eigen_usr_include = ""
-
-i_eigen = -1
-for i,arg in enumerate(sys.argv):
-	if arg[:5] == "eigen":
-		eigen_usr_include = arg[6:]
-		i_eigen = i
-
-if i_eigen > -1:
-	del sys.argv[i_eigen]
-
-
-################################################################
-## Some class and function to compile with Eigen and pybind11 ##
-################################################################
-
-class get_pybind_include(object):##{{{
-	"""Helper class to determine the pybind11 include path
-	The purpose of this class is to postpone importing pybind11
-	until it is actually installed, so that the ``get_include()``
-	method can be invoked. """
+class MonotoneInverse:##{{{
 	
-	def __init__(self, user=False):
-		self.user = user
+	def __init__( self , xminmax , yminmax , transform ):##{{{
+		self.xmin  = xminmax[0]
+		self.xmax  = xminmax[1]
+		self.ymin  = yminmax[0]
+		self.ymax  = yminmax[1]
+		delta = 0.05 * (self.xmax - self.xmin)
+		nstepmin,nstepmax = 0,0
+		while transform(self.xmin) > self.ymin:
+			self.xmin -= delta
+			nstepmin += 1
+		while transform(self.xmax) < self.ymax:
+			self.xmax += delta
+			nstepmax += 1
+		self.nstep = 100 + max(nstepmin,nstepmax)
+		x = np.linspace(self.xmin,self.xmax,self.nstep)
+		y = transform(x)
+		self._inverse = sci.interp1d( y , x )
+	##}}}
 	
-	def __str__(self):
-		import pybind11
-		return pybind11.get_include(self.user)
+	def __call__( self , y ):##{{{
+		return self._inverse(y)
+	##}}}
+
 ##}}}
 
-def get_eigen_include( propose_path = "" ):##{{{
-	
-	possible_path = [ propose_path , "/usr/include/" , "/usr/local/include/" ]
-	if os.environ.get("HOME") is not None:
-		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
-	
-	for path in possible_path:
-		
-		
-		eigen_include = os.path.join( path , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return path
-		
-		eigen_include = os.path.join( path , "eigen3" , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return os.path.join( path , "eigen3" )
-	
-	return ""
-##}}}
-
-def has_flag(compiler, flagname):##{{{
-	"""Return a boolean indicating whether a flag name is supported on
-	the specified compiler.
+class rv_histogram(sc.rv_histogram):##{{{
 	"""
-	import tempfile
-	with tempfile.NamedTemporaryFile('w', suffix='.cpp') as f:
-		f.write('int main (int argc, char **argv) { return 0; }')
-		try:
-			compiler.compile([f.name], extra_postargs=[flagname])
-		except setuptools.distutils.errors.CompileError:
-			return False
-	return True
-##}}}
-
-def cpp_flag(compiler):##{{{
-	"""Return the -std=c++[11/14] compiler flag.
-	The c++14 is prefered over c++11 (when it is available).
+	SBCK.tools.rv_histogram
+	=======================
+	Wrapper on scipy.stats.rv_histogram adding a fit method.
 	"""
-	if has_flag(compiler, '-std=c++14'):
-		return '-std=c++14'
-	elif has_flag(compiler, '-std=c++11'):
-		return '-std=c++11'
-	else:
-		raise RuntimeError( 'Unsupported compiler -- at least C++11 support is needed!' )
+	def __init__( self , *args , **kwargs ):##{{{
+		sc.rv_histogram.__init__( self , *args , **kwargs )
+	##}}}
+	
+	def fit( X , bins = 100 ):##{{{
+		return (np.histogram( X , bins = bins ),)
+	##}}}
+	
 ##}}}
 
-class BuildExt(build_ext):##{{{
-	"""A custom build extension for adding compiler-specific options."""
-	c_opts = {
-		'msvc': ['/EHsc'],
-		'unix': [],
-	}
+class rv_ratio_histogram(sc.rv_histogram):##{{{
+	"""
+	SBCK.tools.rv_ratio_histogram
+	=============================
+	Extension of SBCK.tools.rv_histogram taking into account of a "ratio" part, i.e., instead of fitting:
+	P( X < x )
+	We fit separatly the frequency of 0 and:
+	P( X < x | X > 0 )
+	"""
+	def __init__( self , *args , **kwargs ):##{{{
+		eargs = ()
+		if len(args) > 0:
+			eargs = (args[0],)
+		sc.rv_histogram.__init__( self , *eargs , **kwargs )
+		self.p0 = 0
+		if len(args) > 1:
+			self.p0 = args[1]
+	##}}}
 	
-	if sys.platform == 'darwin':
-		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+	def fit( X , bins = 100 ):##{{{
+		Xp = X[X>0]
+		p0 = np.sum(np.logical_not(X>0)) / X.size
+		return (np.histogram( Xp , bins = bins ),p0)
+	##}}}
 	
-	def build_extensions(self):
-		ct = self.compiler.compiler_type
-		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
-		if ct == 'unix':
-			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
-			opts.append(cpp_flag(self.compiler))
-			if has_flag(self.compiler, '-fvisibility=hidden'):
-				opts.append('-fvisibility=hidden')
-		elif ct == 'msvc':
-			opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
-		for ext in self.extensions:
-			ext.extra_compile_args = opts
-		build_ext.build_extensions(self)
+	def cdf( self , x ):##{{{
+		cdf = np.zeros_like(x)
+		idxp = x > 0
+		idx0 = np.logical_not(x>0)
+		cdf[idxp] = (1-self.p0) * sc.rv_histogram.cdf( self , x[idxp] ) + self.p0
+		cdf[idx0] = self.p0 / 2
+		return cdf
+	##}}}
+	
+	def ppf( self , p ):##{{{
+		idxp = p > self.p0
+		idx0 = np.logical_not(p > self.p0 )
+		ppf = np.zeros_like(p)
+		ppf[idxp] = sc.rv_histogram.ppf( self , (p[idxp] - self.p0) / (1-self.p0) )
+		ppf[idx0] = 0
+		return ppf
+	##}}}
+	
+	def sf( self , x ):##{{{
+		return 1 - self.cdf(x)
+	##}}}
+	
+	def isf( self , p ):##{{{
+		return self.ppf( 1 - p )
+	##}}}
+
 ##}}}
 
+class rv_density:##{{{
+	
+	def __init__( self , *args , **kwargs ):##{{{
+		self._kernel = None
+		if kwargs.get("X") is not None:
+			X = kwargs.get("X")
+			self._kernel = sc.gaussian_kde( X.squeeze() , bw_method = kwargs.get("bw_method") )
+			self._init_icdf( [X.min(),X.max()] )
+		elif len(args) > 0:
+			self._kernel = args[0]
+			self._init_icdf( [args[1],args[2]] )
+	##}}}
+	
+	def rvs( self , size ):##{{{
+		p = np.random.uniform( size = size )
+		return self.icdf(p)
+	##}}}
+	
+	def fit( X , bw_method = None ):##{{{
+		kernel = sc.gaussian_kde( X , bw_method = bw_method )
+		return (kernel,X.min(),X.max())
+	##}}}
+	
+	def pdf( self , x ):##{{{
+		return self._kernel.pdf(x)
+	##}}}
+	
+	def cdf( self , x ):##{{{
+		x = np.array([x]).squeeze().reshape(-1,1)
+		cdf = np.apply_along_axis( lambda z: self._kernel.integrate_box_1d( -np.Inf , z ) , 1 , x )
+		cdf[cdf < 0] = 0
+		cdf[cdf > 1] = 1
+		return cdf.squeeze()
+	##}}}
+	
+	def sf( self , x ):##{{{
+		return 1 - self.cdf(x)
+	##}}}
+	
+	def ppf( self , q ):##{{{
+		return self.icdf(q)
+	##}}}
+	
+	def icdf( self , q ):##{{{
+		return self._icdf_fct(q)
+	##}}}
+	
+	def isf( self , q ):##{{{
+		return self.icdf(1-q)
+	##}}}
+	
+	def _init_icdf( self , xminmax ):##{{{
+		self._icdf_fct = MonotoneInverse( xminmax , [0,1] , self.cdf )
+	##}}}
 
-##########################
-## Extension to compile ##
-##########################
+##}}}
 
-ext_modules = [
-	Extension(
-		'SBCK.tools.__tools_cpp',
-		['SBCK/tools/src/tools.cpp'],
-		include_dirs=[
-			# Path to pybind11 headers
-			get_eigen_include(eigen_usr_include),
-			get_pybind_include(),
-			get_pybind_include(user=True)
-		],
-		language='c++',
-		depends = [
-			"SBCK/tools/src/SparseHist.hpp"
-			"SBCK/tools/src/NetworkSimplex.hpp"
-			"SBCK/tools/src/NetworkSimplexLemon.hpp"
-			]
-	),
-]
-
-
-#################
-## Compilation ##
-#################
-
-list_packages = [
-	"SBCK",
-	"SBCK.tools",
-	"SBCK.metrics",
-	"SBCK.datasets"
-]
-
-
-setup(
-	name = "SBCK" ,
-	description = "Statistical Bias Correction Kit" ,
-	version = "0.2.2" ,
-	author = "Yoann Robin" ,
-	author_email = "yoann.robin.k@gmail.com" ,
-	license = "CeCILL-C" ,
-	platforms = [ "linux" , "macosx" ] ,
-	requires = [ "numpy" , "scipy" , "matplotlib" ],
-	ext_modules = ext_modules,
-	install_requires = ['pybind11>=2.2'],
-	cmdclass = {'build_ext': BuildExt},
-	zip_safe = False,
-	packages = list_packages,
-	package_dir = { "SBCK" : "SBCK" }
-)
+class rv_mixture:##{{{
+	
+	def __init__( self , l_dist , weights = None ):##{{{
+		self._l_dist  = l_dist
+		self._n_dist  = len(l_dist)
+		self._weights = np.array([weights]).squeeze() if weights is not None else np.ones(self._n_dist)
+		self._weights /= self._weights.sum()
+		self._init_icdf()
+	##}}}
+	
+	def rvs( self , size ):##{{{
+		out = np.zeros(size)
+		ib,ie = 0,int(self._weights[0]*size)
+		for i in range(self._n_dist-1):
+			out[ib:ie] = self._l_dist[i].rvs( size = ie - ib )
+			next_size = int(self._weights[i+1]*size)
+			ib,ie = ie,min(ie+next_size,size)
+		out[ib:] = self._l_dist[-1].rvs( size = size - ib )
+		
+		return out[np.random.choice(size,size,replace = False)]
+	##}}}
+	
+	def pdf( self , x ):##{{{
+		x = np.array([x]).reshape(-1,1)
+		dens = np.zeros_like(x)
+		for i in range(self._n_dist):
+			dens += self._l_dist[i].pdf(x) * self._weights[i]
+		return dens
+	##}}}
+	
+	def cdf( self , x ):##{{{
+		x = np.array([x]).reshape(-1,1)
+		cdf = np.zeros_like(x)
+		for i in range(self._n_dist):
+			cdf += self._l_dist[i].cdf(x) * self._weights[i]
+		return cdf.squeeze()
+	##}}}
+	
+	def sf( self , x ):##{{{
+		return 1 - self.cdf(x)
+	##}}}
+	
+	def ppf( self , q ):##{{{
+		return self.icdf(q)
+	##}}}
+	
+	def icdf( self , q ):##{{{
+		q = np.array([q]).reshape(-1,1)
+		return self._icdf_fct(q)
+	##}}}
+	
+	def _init_icdf(self):##{{{
+		rvs = self.rvs(10000)
+		self._icdf_fct = MonotoneInverse( [rvs.min(),rvs.max()] , [0,1] , self.cdf )
+	##}}}
+	
+	def isf( self , q ):##{{{
+		return self.icdf(1-q)
+	##}}}
+	
+##}}}
 
 

@@ -22,7 +22,9 @@ from .__PPPSSR            import PPPSSR
 from .__PPPFunctionLink   import PPPFunctionLink
 from .__PPPFunctionLink   import PPPSquareLink
 from .__PPPFunctionLink   import PPPLogLinLink
+from .__PPPFunctionLink   import PPPArctanLink
 from .__PPPDiffRef        import PPPDiffRef
+from .__PPPDiffRef        import PPPDiffColumns
 from .__PPPNanValues      import PPPRemoveNotFinite
 from .__PPPNanValues      import PPPNotFiniteAnalog
 

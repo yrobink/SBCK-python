@@ -162,3 +162,37 @@ class PPPLogLinLink(PPPFunctionLink):##{{{
 		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
 ##}}}
 
+class PPPArctanLink(PPPFunctionLink):##{{{
+	"""
+	SBCK.ppp.PPPArctanLink
+	======================
+	
+	Arctan link transform, to bound the correction between two values.
+	
+	"""
+	def __init__( self , ymin , ymax , *args , cols = None , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		ymin : [float]
+			Minimum
+		ymax : [float]
+			Maximum
+		cols: [int or array of int]
+			The columns to apply the Link function
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		f = (ymax - ymin) / np.pi
+		y = (np.pi / 2 + np.arctan(x/f) ) * f + ymin
+		transform  = lambda x: (np.pi / 2 + np.arctan(x/f) ) * f + ymin
+		itransform = lambda x: f * np.tan( (x - ymin) / f - np.pi / 2 )
+		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+##}}}
+

@@ -126,3 +126,65 @@ class PPPDiffRef(PrePostProcessing): ##{{{
 	
 ##}}}
 
+class PPPDiffColumns(PrePostProcessing):##{{{
+	"""
+	SBCK.ppp.PPPDiffColumns
+	=======================
+	
+	Similar to SBCK.ppp.PPPDiffRef, but diff columns are replaced by diff column
+	minus ref columns (or reverse if sign = -1)
+	
+	"""
+	
+	def __init__( self , ref , diff , *args , sign = 1 , **kwargs ):##{{{
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		ref: [list]
+			The reference dimension
+		diff: [list]
+			The difference dimension
+		sign: [list]
+			The if upper of lower
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		PrePostProcessing.__init__( self , *args , **kwargs )
+		
+		self.ref  = ref
+		self.diff = diff
+		self.sign = 1 if sign > 0 else -1
+		
+	##}}}
+	
+	def transform( self , X ):##{{{
+		"""
+		Apply the transform
+		"""
+		Xt = X.copy()
+		
+		Xt[:,self.diff] = self.sign * (X[:,self.diff] - X[:,self.ref])
+		
+		return Xt
+	##}}}
+	
+	def itransform( self , Xt ):##{{{
+		"""
+		Apply the inverse transform
+		"""
+		X = Xt.copy()
+		
+		X[:,self.diff] = X[:,self.ref] + self.sign * X[:,self.diff]
+		
+		return X
+	##}}}
+	
+##}}}
+
+

@@ -190,7 +190,6 @@ class PPPArctanLink(PPPFunctionLink):##{{{
 		"""
 		
 		f = (ymax - ymin) / np.pi
-		y = (np.pi / 2 + np.arctan(x/f) ) * f + ymin
 		transform  = lambda x: (np.pi / 2 + np.arctan(x/f) ) * f + ymin
 		itransform = lambda x: f * np.tan( (x - ymin) / f - np.pi / 2 )
 		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )

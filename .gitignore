@@ -1,0 +1,17 @@
+*.so
+*.o
+a.out
+*.exe
+.DS_Store
+*.ipynb_checkpoints
+*.swp
+RcppExports.cpp
+RcppExports.R
+*.Rd
+*.egg-info
+build
+dist
+R/*.tar.gz
+R/*.Rcheck
+R/.Rd2pdf*
+R/*.pdf

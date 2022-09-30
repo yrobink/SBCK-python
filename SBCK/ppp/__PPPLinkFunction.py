@@ -54,7 +54,7 @@ class PPPLinkFunction(PrePostProcessing):##{{{
 	>>> Z = ppp.predict(X1,X0)
 	
 	"""
-	def __init__( self , transform_ , itransform_ , *args , cols = None , **kwargs ):
+	def __init__( self , *args , transform_ = None , itransform_ = None , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========
@@ -76,11 +76,17 @@ class PPPLinkFunction(PrePostProcessing):##{{{
 			All others arguments are passed to SBCK.ppp.PrePostProcessing
 		"""
 		PrePostProcessing.__init__( self , *args , **kwargs )
-		self._transform  = transform_
-		self._itransform = itransform_
+		self._f_transform  = transform_
+		self._f_itransform = itransform_
 		self._cols = cols
 		if cols is not None:
 			self._cols = np.array( [cols] , dtype = int ).squeeze()
+	
+	def _transform( self , X ):
+		return self._f_transform(X)
+	
+	def _itransform( self , Xt ):
+		return self._f_itransform(Xt)
 	
 	def transform( self , X ):
 		"""
@@ -130,7 +136,7 @@ class PPPSquareLink(PPPLinkFunction):##{{{
 		"""
 		transform  = lambda x : x**2
 		itransform = lambda x : np.where( x > 0 , np.sqrt(np.abs(x)) , - np.sqrt(np.abs(x)))
-		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
 ##}}}
 
 class PPPLogLinLink(PPPLinkFunction):##{{{
@@ -159,7 +165,7 @@ class PPPLogLinLink(PPPLinkFunction):##{{{
 		"""
 		transform  = lambda x: np.where( (0 < x) & (x < 1) , np.log( np.where( x > 0 , x , np.nan ) ) , x - 1 )
 		itransform = lambda x: np.where( x < 0 , np.exp(x) , x + 1 )
-		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
 ##}}}
 
 class PPPArctanLink(PPPLinkFunction):##{{{
@@ -192,7 +198,7 @@ class PPPArctanLink(PPPLinkFunction):##{{{
 		f = (ymax - ymin) / np.pi
 		transform  = lambda x: (np.pi / 2 + np.arctan(x/f) ) * f + ymin
 		itransform = lambda x: f * np.tan( (x - ymin) / f - np.pi / 2 )
-		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
 ##}}}
 
 class PPPLogisticLink(PPPLinkFunction):##{{{
@@ -213,7 +219,7 @@ class PPPLogisticLink(PPPLinkFunction):##{{{
 	
 	
 	"""
-	def __init__( self , ymin , ymax , *args , s = 1 , cols = None , **kwargs ):
+	def __init__( self , ymin , ymax , *args , s = 1 , tol = 1e-9 , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========
@@ -234,9 +240,24 @@ class PPPLogisticLink(PPPLinkFunction):##{{{
 			All others arguments are passed to SBCK.ppp.PrePostProcessing
 		"""
 		
-		transform  = lambda x: - np.log( (ymax - ymin) / (x - ymin) - 1 ) / s
-		itransform = lambda y: (ymax - ymin) / ( 1 + np.exp(-s*y) ) + ymin
+		self.ymin = ymin
+		self.ymax = ymax
+		self.s    = s
+		self._tol = tol
 		
-		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , *args , cols = cols , **kwargs )
+	
+	def _transform( self , x ):
+		x = np.where( x < self.ymax , x , self.ymax - self._tol )
+		x = np.where( x > self.ymin , x , self.ymin + self._tol )
+		y = - np.log( (self.ymax - self.ymin) / (x - self.ymin) - 1 ) / self.s
+		return y
+	
+	def _itransform( self , y ):
+		x = (self.ymax - self.ymin) / ( 1 + np.exp(-self.s*y) ) + self.ymin
+		x = np.where( x < self.ymax - self._tol , x , self.ymax )
+		x = np.where( x > self.ymin + self._tol , x , self.ymin )
+		return x
+	
 ##}}}
 

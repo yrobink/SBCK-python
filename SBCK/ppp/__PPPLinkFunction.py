@@ -28,9 +28,9 @@ from .__PrePostProcessing import PrePostProcessing
 ## Class ##
 ###########
 
-class PPPFunctionLink(PrePostProcessing):##{{{
+class PPPLinkFunction(PrePostProcessing):##{{{
 	"""
-	SBCK.ppp.PPPFunctionLink
+	SBCK.ppp.PPPLinkFunction
 	========================
 	
 	This class is used to define pre/post processing class with a link function
@@ -44,7 +44,7 @@ class PPPFunctionLink(PrePostProcessing):##{{{
 	>>> itransform = lamnda x : x**(1/3)
 	>>> 
 	>>> ## And the PPP method
-	>>> ppp = SBCK.ppp.PPPFunctionLink( bc_method = SBCK.CDFt ,
+	>>> ppp = SBCK.ppp.PPPLinkFunction( bc_method = SBCK.CDFt ,
 	>>>                                transform_ = transform ,
 	>>>                               itransform_ = itransform )
 	>>> 
@@ -103,7 +103,7 @@ class PPPFunctionLink(PrePostProcessing):##{{{
 		return Xt
 ##}}}
 
-class PPPSquareLink(PPPFunctionLink):##{{{
+class PPPSquareLink(PPPLinkFunction):##{{{
 	"""
 	SBCK.ppp.PPPSquareLink
 	======================
@@ -130,10 +130,10 @@ class PPPSquareLink(PPPFunctionLink):##{{{
 		"""
 		transform  = lambda x : x**2
 		itransform = lambda x : np.where( x > 0 , np.sqrt(np.abs(x)) , - np.sqrt(np.abs(x)))
-		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
 ##}}}
 
-class PPPLogLinLink(PPPFunctionLink):##{{{
+class PPPLogLinLink(PPPLinkFunction):##{{{
 	"""
 	SBCK.ppp.PPPLogLinLink
 	======================
@@ -159,10 +159,10 @@ class PPPLogLinLink(PPPFunctionLink):##{{{
 		"""
 		transform  = lambda x: np.where( (0 < x) & (x < 1) , np.log( np.where( x > 0 , x , np.nan ) ) , x - 1 )
 		itransform = lambda x: np.where( x < 0 , np.exp(x) , x + 1 )
-		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
 ##}}}
 
-class PPPArctanLink(PPPFunctionLink):##{{{
+class PPPArctanLink(PPPLinkFunction):##{{{
 	"""
 	SBCK.ppp.PPPArctanLink
 	======================
@@ -192,10 +192,10 @@ class PPPArctanLink(PPPFunctionLink):##{{{
 		f = (ymax - ymin) / np.pi
 		transform  = lambda x: (np.pi / 2 + np.arctan(x/f) ) * f + ymin
 		itransform = lambda x: f * np.tan( (x - ymin) / f - np.pi / 2 )
-		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
 ##}}}
 
-class PPPLogisticLink(PPPFunctionLink):##{{{
+class PPPLogisticLink(PPPLinkFunction):##{{{
 	"""
 	SBCK.ppp.PPPLogisticLink
 	========================
@@ -207,7 +207,7 @@ class PPPLogisticLink(PPPFunctionLink):##{{{
 	transform : x |-> - np.log( (ymax - ymin) / (x - ymin) - 1 ) / s
 	
 	and the inverse transform is the logistic function:
-
+	
 	itransform : y |-> (ymax - ymin) / ( 1 + np.exp(-s*y) ) + ymin
 	
 	
@@ -237,6 +237,6 @@ class PPPLogisticLink(PPPFunctionLink):##{{{
 		transform  = lambda x: - np.log( (ymax - ymin) / (x - ymin) - 1 ) / s
 		itransform = lambda y: (ymax - ymin) / ( 1 + np.exp(-s*y) ) + ymin
 		
-		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+		PPPLinkFunction.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
 ##}}}
 

@@ -19,11 +19,11 @@
 
 from .__PrePostProcessing import PrePostProcessing
 from .__PPPSSR            import PPPSSR
-from .__PPPFunctionLink   import PPPFunctionLink
-from .__PPPFunctionLink   import PPPSquareLink
-from .__PPPFunctionLink   import PPPLogLinLink
-from .__PPPFunctionLink   import PPPArctanLink
-from .__PPPFunctionLink   import PPPLogisticLink
+from .__PPPLinkFunction   import PPPLinkFunction
+from .__PPPLinkFunction   import PPPSquareLink
+from .__PPPLinkFunction   import PPPLogLinLink
+from .__PPPLinkFunction   import PPPArctanLink
+from .__PPPLinkFunction   import PPPLogisticLink
 from .__PPPDiffRef        import PPPDiffRef
 from .__PPPDiffRef        import PPPDiffColumns
 from .__PPPNanValues      import PPPRemoveNotFinite

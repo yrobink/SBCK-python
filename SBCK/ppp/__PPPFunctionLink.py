@@ -195,3 +195,48 @@ class PPPArctanLink(PPPFunctionLink):##{{{
 		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
 ##}}}
 
+class PPPLogisticLink(PPPFunctionLink):##{{{
+	"""
+	SBCK.ppp.PPPLogisticLink
+	========================
+	
+	Logistic link transform, to bound the correction between two values.
+	Starting from a dataset bounded between ymin and ymax, the transform maps
+	the interval [ymin,ymax] to R with:
+	
+	transform : x |-> - np.log( (ymax - ymin) / (x - ymin) - 1 ) / s
+	
+	and the inverse transform is the logistic function:
+
+	itransform : y |-> (ymax - ymin) / ( 1 + np.exp(-s*y) ) + ymin
+	
+	
+	
+	"""
+	def __init__( self , ymin , ymax , *args , s = 1 , cols = None , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		ymin : [float]
+			Minimum
+		ymax : [float]
+			Maximum
+		s : [float]
+			The slope around 0 of the transform, default to 1
+		cols: [int or array of int]
+			The columns to apply the Link function
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		transform  = lambda x: - np.log( (ymax - ymin) / (x - ymin) - 1 ) / s
+		itransform = lambda y: (ymax - ymin) / ( 1 + np.exp(-s*y) ) + ymin
+		
+		PPPFunctionLink.__init__( self , transform , itransform , *args , cols = cols , **kwargs )
+##}}}
+

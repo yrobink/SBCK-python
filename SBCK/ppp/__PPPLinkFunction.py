@@ -94,7 +94,7 @@ class PPPLinkFunction(PrePostProcessing):##{{{
 		"""
 		if self._cols is None:
 			return self._transform(X)
-		Xt = X
+		Xt = X.copy()
 		Xt[:,self._cols] = self._transform(X[:,self._cols])
 		return Xt
 	
@@ -104,9 +104,9 @@ class PPPLinkFunction(PrePostProcessing):##{{{
 		"""
 		if self._cols is None:
 			return self._itransform(Xt)
-		X = Xt
+		X = Xt.copy()
 		X[:,self._cols] = self._itransform(Xt[:,self._cols])
-		return Xt
+		return X
 ##}}}
 
 class PPPSquareLink(PPPLinkFunction):##{{{
@@ -248,13 +248,15 @@ class PPPLogisticLink(PPPLinkFunction):##{{{
 		PPPLinkFunction.__init__( self , *args , cols = cols , **kwargs )
 	
 	def _transform( self , x ):
-		x = np.where( x < self.ymax , x , self.ymax - self._tol )
-		x = np.where( x > self.ymin , x , self.ymin + self._tol )
-		y = - np.log( (self.ymax - self.ymin) / (x - self.ymin) - 1 ) / self.s
+		xt = x.copy()
+		xt = np.where( xt < self.ymax , xt , self.ymax - self._tol )
+		xt = np.where( xt > self.ymin , xt , self.ymin + self._tol )
+		y = - np.log( (self.ymax - self.ymin) / (xt - self.ymin) - 1 ) / self.s
 		return y
 	
 	def _itransform( self , y ):
-		x = (self.ymax - self.ymin) / ( 1 + np.exp(-self.s*y) ) + self.ymin
+		x = y.copy()
+		x = (self.ymax - self.ymin) / ( 1 + np.exp(-self.s*x) ) + self.ymin
 		x = np.where( x < self.ymax - self._tol , x , self.ymax )
 		x = np.where( x > self.ymin + self._tol , x , self.ymin )
 		return x

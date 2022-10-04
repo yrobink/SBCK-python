@@ -249,8 +249,8 @@ class PPPLogisticLink(PPPLinkFunction):##{{{
 	
 	def _transform( self , x ):
 		xt = x.copy()
-		xt = np.where( xt < self.ymax , xt , self.ymax - self._tol )
-		xt = np.where( xt > self.ymin , xt , self.ymin + self._tol )
+		xt = np.where( xt < self.ymax - self._tol , xt , self.ymax - self._tol )
+		xt = np.where( xt > self.ymin + self._tol , xt , self.ymin + self._tol )
 		y = - np.log( (self.ymax - self.ymin) / (xt - self.ymin) - 1 ) / self.s
 		return y
 	

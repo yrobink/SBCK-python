@@ -219,7 +219,7 @@ class PPPLogisticLink(PPPLinkFunction):##{{{
 	
 	
 	"""
-	def __init__( self , ymin , ymax , *args , s = 1 , tol = 1e-9 , cols = None , **kwargs ):
+	def __init__( self , ymin , ymax , *args , s = 1 , tol = 1e-4 , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========

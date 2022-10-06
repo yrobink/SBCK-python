@@ -70,9 +70,9 @@ class PrePostProcessing:##{{{
 	PPPSSR.itransform(PPPLogLinLink.itransform(bc_data)). So the formula can read
 	from right to left (as the mathematical composition). Note it is equivalent
 	to define:
-	>>> ppp = SBCK.ppp.PrePostProcessing$new( bc_method = SBCK.CDFt,
-	>>>                          pipe = [SBCK.ppp.PPPLogLinLink,SBCK.ppp.PPPSSR],
-	>>>                          pipe_kwargs = [ {"cols":2} , {"cols":2} ] )
+	>>> ppp = SBCK.ppp.PrePostProcessing( bc_method = SBCK.CDFt,
+	>>>                     pipe = [SBCK.ppp.PPPLogLinLink,SBCK.ppp.PPPSSR],
+	>>>                     pipe_kwargs = [ {"cols":2} , {"cols":2} ] )
 	
 	"""
 	

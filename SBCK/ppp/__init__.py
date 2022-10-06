@@ -28,3 +28,6 @@ from .__PPPDiffRef        import PPPDiffRef
 from .__PPPDiffRef        import PPPDiffColumns
 from .__PPPNanValues      import PPPRemoveNotFinite
 from .__PPPNanValues      import PPPNotFiniteAnalog
+
+from .__BCISkipNotValid import BCISkipNotValid
+

@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2022 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -17,24 +16,34 @@
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
-from .__release import version
-__version__ = version
+###############
+## Libraries ##
+###############
 
-from .__RBC    import RBC
-from .__IdBC   import IdBC
-from .__QM     import QM
-from .__CDFt   import CDFt
-from .__OTC    import OTC
-from .__dOTC   import dOTC
-from .__ECBC   import ECBC
-from .__QMrs   import QMrs
-from .__R2D2   import R2D2
-from .__QDM    import QDM
-from .__MBCn   import MBCn
-from .__MRec   import MRec
-from .__TSMBC  import TSMBC
-from .__dTSMBC import dTSMBC
-from .__AR2D2  import AR2D2
+from .ppp.__PrePostProcessing import PrePostProcessing
 
-from .__XClimPPP import XClimPPP
+
+###########
+## Class ##
+###########
+
+class XClimPPP(PrePostProcessing):
+	"""
+	SBCK.XClimPPP
+	=============
+	
+	Experimental: just a class based on SBCK.ppp.PrePostProcessing for xclim
+	
+	
+	"""
+	def __init__( self , **kwargs ):
+		"""
+		Initialisation of XClimPPP.
+		
+		kwargs are directly given to SBCK.ppp.PrePostProcessing, only keywords
+		arguments are available.
+		
+		"""
+		PrePostProcessing.__init__( self , **kwargs )
+
 

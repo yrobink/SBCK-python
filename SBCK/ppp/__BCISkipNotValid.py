@@ -62,7 +62,7 @@ class BCISkipNotValid:
 		self._isgood = True
 	##}}}
 	
-	def fit( self , Y0 , X0 , X1  ):##{{{
+	def fit( self , Y0 , X0 , X1 = None ):##{{{
 		"""
 		Fit of CDFt model
 		
@@ -76,10 +76,15 @@ class BCISkipNotValid:
 			Biased dataset during projection period
 		"""
 		
-		self._isgood = np.all(np.isfinite(Y0)) and np.all(np.isfinite(X0)) and np.all(np.isfinite(X1))
+		self._isgood = np.all(np.isfinite(Y0)) and np.all(np.isfinite(X0))
+		if X1 is not None:
+			self._isgood = self._isgood and np.all(np.isfinite(X1))
 		
 		if self._isgood:
-			self._bc_method.fit( Y0 , X0 , X1 )
+			if X1 is not None:
+				self._bc_method.fit( Y0 , X0 , X1 )
+			else:
+				self._bc_method.fit( Y0 , X0 )
 	##}}}
 	
 	def predict( self , X1 , X0 = None ):##{{{
@@ -103,7 +108,10 @@ class BCISkipNotValid:
 		"""
 		
 		if self._isgood:
-			Z = self._bc_method.predict( X1 , X0 )
+			if X0 is not None:
+				Z = self._bc_method.predict( X1 , X0 )
+			else:
+				Z = self._bc_method.predict( X1 )
 		else:
 			Z1 = np.zeros_like(X1) + np.nan
 			if X0 is not None:

@@ -36,5 +36,6 @@ from .__TSMBC  import TSMBC
 from .__dTSMBC import dTSMBC
 from .__AR2D2  import AR2D2
 
-from .__XClimPPP import XClimPPP
+from .__XClimPPP import XClimNPPP
+from .__XClimPPP import XClimSPPP
 

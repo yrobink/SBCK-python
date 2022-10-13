@@ -27,23 +27,55 @@ from .ppp.__PrePostProcessing import PrePostProcessing
 ## Class ##
 ###########
 
-class XClimPPP(PrePostProcessing):
+class XClimSPPP(PrePostProcessing):
 	"""
-	SBCK.XClimPPP
-	=============
+	SBCK.XClimSPPP
+	==============
 	
-	Experimental: just a class based on SBCK.ppp.PrePostProcessing for xclim
+	Experimental: just a class based on SBCK.ppp.PrePostProcessing for xclim,
+	stationary case
 	
 	
 	"""
 	def __init__( self , **kwargs ):
 		"""
-		Initialisation of XClimPPP.
+		Initialisation of XClimSPPP.
 		
 		kwargs are directly given to SBCK.ppp.PrePostProcessing, only keywords
 		arguments are available.
 		
 		"""
 		PrePostProcessing.__init__( self , **kwargs )
+	
+	def fit( self , Y0 , X0 , X1 ):
+		PrePostProcessing.fit( self , Y0 = Y0 , X0 = X0 )
+	
+	def predict( self , X1 , X0 = None ):
+		return PrePostProcessing.predict( self , X1 )
 
 
+class XClimNPPP(PrePostProcessing):
+	"""
+	SBCK.XClimNPPP
+	==============
+	
+	Experimental: just a class based on SBCK.ppp.PrePostProcessing for xclim,
+	non-stationary case
+	
+	
+	"""
+	def __init__( self , **kwargs ):
+		"""
+		Initialisation of XClimNPPP.
+		
+		kwargs are directly given to SBCK.ppp.PrePostProcessing, only keywords
+		arguments are available.
+		
+		"""
+		PrePostProcessing.__init__( self , **kwargs )
+	
+	def fit( self , Y0 , X0 , X1 ):
+		PrePostProcessing.fit( self , Y0 = Y0 , X0 = X0 , X1 = X1 )
+	
+	def predict( self , X1 , X0 = None ):
+		return PrePostProcessing.predict( self , X1 = X1 , X0 = X0 )

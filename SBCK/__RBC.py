@@ -41,7 +41,7 @@ class RBC:
 	
 	"""
 	
-	def __init__( self ):##{{{
+	def __init__( self , **kwargs ):##{{{
 		"""
 		Initialisation of RBC
 		

@@ -39,7 +39,7 @@ class IdBC:
 	
 	"""
 	
-	def __init__( self ):##{{{
+	def __init__( self , **kwargs ):##{{{
 		"""
 		Initialisation of IdBC
 		

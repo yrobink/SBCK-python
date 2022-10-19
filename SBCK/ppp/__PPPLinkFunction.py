@@ -176,7 +176,7 @@ class PPPArctanLink(PPPLinkFunction):##{{{
 	Arctan link transform, to bound the correction between two values.
 	
 	"""
-	def __init__( self , ymin , ymax , *args , cols = None , **kwargs ):
+	def __init__( self , ymin : float , ymax : float , *args , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========
@@ -219,7 +219,7 @@ class PPPLogisticLink(PPPLinkFunction):##{{{
 	
 	
 	"""
-	def __init__( self , ymin , ymax , *args , s = 1 , tol = 1e-4 , cols = None , **kwargs ):
+	def __init__( self , ymin : float , ymax : float , *args , s : float = 1 , tol : float = 1e-4 , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========

@@ -113,7 +113,7 @@ class PPPNotFiniteAnalog(PrePostProcessing):##{{{
 	
 	"""
 	
-	def __init__( self , analog_var , *args , threshold = 0.05 , **kwargs ):##{{{
+	def __init__( self , analog_var , *args , threshold: float = 0.05 , **kwargs ):##{{{
 		"""
 		Constructor
 		===========
@@ -148,7 +148,8 @@ class PPPNotFiniteAnalog(PrePostProcessing):##{{{
 		pnan_var = [i for i in range(X.shape[1]) if i not in self.analog_var]
 		
 		## Check validity of analog variables
-		if not np.isfinite(X[:,self.analog_var]).all():
+		Xf = np.isfinite(X[:,self.analog_var])
+		if not Xf.all():
 			raise ValueError("All values of analogs variables must be finite!")
 		
 		## Read valid

@@ -17,6 +17,8 @@
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
 
+from .__checkf import skipNotValid
+
 from .__PrePostProcessing import PrePostProcessing
 from .__PPPSSR            import PPPSSR
 from .__PPPLinkFunction   import PPPLinkFunction
@@ -28,6 +30,4 @@ from .__PPPDiffRef        import PPPDiffRef
 from .__PPPDiffRef        import PPPDiffColumns
 from .__PPPNanValues      import PPPRemoveNotFinite
 from .__PPPNanValues      import PPPNotFiniteAnalog
-
-from .__BCISkipNotValid import BCISkipNotValid
 

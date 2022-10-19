@@ -20,6 +20,8 @@
 ## Libraries ##
 ###############
 
+from .__checkf import skipNotValid
+
 ###########
 ## Class ##
 ###########
@@ -77,7 +79,7 @@ class PrePostProcessing:##{{{
 	"""
 	
 	
-	def __init__( self , bc_method = None , bc_method_kwargs = {} , pipe = [] , pipe_kwargs = [] ):##{{{
+	def __init__( self , bc_method = None , bc_method_kwargs = {} , pipe = [] , pipe_kwargs = [] , checkf = skipNotValid ):##{{{
 		"""
 		Constructor
 		===========
@@ -93,7 +95,11 @@ class PrePostProcessing:##{{{
 			correction.
 		pipe_kwargs: [list of dict]
 			List of keyword arguments to pass to each PreProcessing class
-		
+		checkf: [function]
+			Boolean function controlling if the fit can occurs. Intercept
+			'bc_method' and 'pipe' before their applications. If check return
+			False on the dataset fitted, the fit doesn't occurs, and the predict
+			return the input.
 		"""
 		if not type(pipe) == list:
 			pipe = [pipe]
@@ -104,7 +110,9 @@ class PrePostProcessing:##{{{
 		if bc_method is not None:
 			self._bc_method  = bc_method( **bc_method_kwargs )
 		
-		self._kind = None
+		self._kind   = None
+		self._checkf = lambda x : True if x is None else checkf(x)
+		self._check  = None
 		
 		##}}}
 	
@@ -156,10 +164,18 @@ class PrePostProcessing:##{{{
 		Fit the bias correction method after the pre-processing.
 		"""
 		
+		## The check
+		self._check = all([self._checkf(K) for K in [Y0,X0,X1]])
+		
+		if not self._check:
+			return
+		
+		## The transform
 		Y0t = self._pipe_transform( Y0 , "Y0" )
 		X0t = self._pipe_transform( X0 , "X0" )
 		X1t = self._pipe_transform( X1 , "X1" )
 		
+		## The fit
 		if X1 is None:
 			self._bc_method.fit( Y0t , X0t )
 		else:
@@ -171,6 +187,13 @@ class PrePostProcessing:##{{{
 		Predict the bias correction method after the pre-processing, then apply
 		the post-processing operation.
 		"""
+		
+		if not self._check:
+			if X0 is None:
+				return X1
+			elif X1 is None:
+				return X0
+			return X1,X0
 		
 		X0t = self._pipe_transform( X0 , "X0" )
 		X1t = self._pipe_transform( X1 , "X1" )

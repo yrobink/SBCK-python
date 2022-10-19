@@ -76,7 +76,7 @@ class PPPDiffRef(PrePostProcessing): ##{{{
 		"""
 		PrePostProcessing.__init__( self , *args , **kwargs )
 		
-		self.ref   = ref
+		self.ref   = int(np.array([ref]).ravel()[0])
 		self.lower = lower
 		self.upper = upper
 		
@@ -101,6 +101,7 @@ class PPPDiffRef(PrePostProcessing): ##{{{
 		if self.upper is not None:
 			for i in self.upper:
 				Xt[:,i] = X[:,i] - X[:,self.ref]
+		
 		
 		return Xt
 	##}}}

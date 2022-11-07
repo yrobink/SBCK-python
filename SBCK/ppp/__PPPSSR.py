@@ -89,7 +89,7 @@ class PPPSSR(PrePostProcessing): ##{{{
 		self._icurrent += 1
 		
 		if self._cols is None:
-			self._cols = [i for i in range(X.shape[1])]
+			self._cols = np.array( [i for i in range(X.shape[1])] , dtype = int ).squeeze()
 		cols = self._cols
 		
 		Xn = np.array( [np.nanmin( np.where( X[:,cols] > 0 , X[:,cols] , np.nan ) , axis = 0 )] )

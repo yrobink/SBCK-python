@@ -128,6 +128,8 @@ class CDFt:
 		self._normalize_cdf    = kwargs.get("normalize_cdf")
 		if ~(type(self._normalize_cdf) in [bool,list]):
 			self._normalize_cdf = True
+		self._p_left  = 0
+		self._p_right = 1
 	##}}}
 	
 	def fit( self , Y0 , X0 , X1 ):##{{{
@@ -233,7 +235,20 @@ class CDFt:
 		return Z1
 	##}}}
 	
-	def _infer_Y1( self , Y0 , X0 , X1 , idist ):##{{{
+	def _infer_Y1( self , Y0_ , X0_ , X1_ , idist ):##{{{
+		
+		Y0 = Y0_
+		X0 = X0_
+		X1 = X1_
+#		Y0 = np.sort(Y0_.squeeze())[5:-5]
+#		X0 = np.sort(X0_.squeeze())[5:-5]
+#		X1 = np.sort(X1_.squeeze())[5:-5]
+#		qY0 = np.quantile( Y0_ , [0.05,0.95] ).squeeze()
+#		qX0 = np.quantile( X0_ , [0.05,0.95] ).squeeze()
+#		qX1 = np.quantile( X1_ , [0.05,0.95] ).squeeze()
+#		Y0 = Y0_[ (Y0_ > qY0[0]) & (Y0_ < qY0[1]) ]
+#		X0 = X0_[ (X0_ > qX0[0]) & (X0_ < qX0[1]) ]
+#		X1 = X1_[ (X1_ > qX1[0]) & (X1_ < qX1[1]) ]
 		
 		dsupp = self._dsupp
 		
@@ -351,16 +366,16 @@ class CDFt:
 		icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
 		
 		## Now find cut
-		lsuppl_Y0  = np.median(Y0) - np.min(Y0)
-		lsuppl_X0  = np.median(X0) - np.min(X0)
-		lsuppl_X1  = np.median(X1) - np.min(X1)
+		lsuppl_Y0  = np.median(Y0) - np.quantile(Y0,self._p_left)
+		lsuppl_X0  = np.median(X0) - np.quantile(X0,self._p_left)
+		lsuppl_X1  = np.median(X1) - np.quantile(X1,self._p_left)
 		lsuppl_Y1  = lsuppl_Y0 * lsuppl_X1 / lsuppl_X0
-		lsuppl_pY1 = icdfY1(0.5) - icdfY1(0)
-		lsuppr_Y0  = np.max(Y0) - np.median(Y0)
-		lsuppr_X0  = np.max(X0) - np.median(X0)
-		lsuppr_X1  = np.max(X1) - np.median(X1)
+		lsuppl_pY1 = icdfY1(0.5) - icdfY1(self._p_left)
+		lsuppr_Y0  = np.quantile(Y0,self._p_right) - np.median(Y0)
+		lsuppr_X0  = np.quantile(X0,self._p_right) - np.median(X0)
+		lsuppr_X1  = np.quantile(X1,self._p_right) - np.median(X1)
 		lsuppr_Y1  = lsuppr_Y0 * lsuppr_X1 / lsuppr_X0
-		lsuppr_pY1 = icdfY1(1) - icdfY1(0.5)
+		lsuppr_pY1 = icdfY1(self._p_right) - icdfY1(0.5)
 		
 		if lsuppl_pY1 > lsuppl_Y1 or lsuppr_pY1 > lsuppr_Y1:
 			
@@ -405,6 +420,7 @@ class CDFt:
 #		hY1 = icdfY1( np.random.uniform( size = self._samples_Y1 , low = p_min , high = p_max ) )
 		rvX1 = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1.squeeze()) , **self._distX1.kwargs )
 		hY1  = icdfY1( rvX1.cdf(X1) )
+#		hY1  = icdfY1( rvX1.cdf(X1_) )
 		
 		return hY1
 	##}}}

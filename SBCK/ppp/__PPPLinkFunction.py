@@ -109,6 +109,66 @@ class PPPLinkFunction(PrePostProcessing):##{{{
 		return X
 ##}}}
 
+class PPPAddLink(PPPLinkFunction):##{{{
+	"""
+	SBCK.ppp.PPPAddLink
+	===================
+	
+	Addition link transform.
+	
+	"""
+	def __init__( self , m : float , *args , cols = None , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		m : [float]
+			The value to add
+		cols: [int or array of int]
+			The columns to apply the Link function
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		transform  = lambda x: x + m
+		itransform = lambda x: x - m
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+##}}}
+
+class PPPMultLink(PPPLinkFunction):##{{{
+	"""
+	SBCK.ppp.PPPMultLink
+	====================
+	
+	Multiplication link transform.
+	
+	"""
+	def __init__( self , s : float , *args , cols = None , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		 : [float]
+			The value used to multiply
+		cols: [int or array of int]
+			The columns to apply the Link function
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		transform  = lambda x: x * s
+		itransform = lambda x: x / s
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+##}}}
+
 class PPPSquareLink(PPPLinkFunction):##{{{
 	"""
 	SBCK.ppp.PPPSquareLink

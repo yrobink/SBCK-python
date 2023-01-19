@@ -22,6 +22,8 @@ from .__checkf import skipNotValid
 from .__PrePostProcessing import PrePostProcessing
 from .__PPPSSR            import PPPSSR
 from .__PPPLinkFunction   import PPPLinkFunction
+from .__PPPLinkFunction   import PPPAddLink
+from .__PPPLinkFunction   import PPPMultLink
 from .__PPPLinkFunction   import PPPSquareLink
 from .__PPPLinkFunction   import PPPLogLinLink
 from .__PPPLinkFunction   import PPPArctanLink

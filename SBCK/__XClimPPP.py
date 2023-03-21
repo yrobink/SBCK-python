@@ -47,7 +47,7 @@ class XClimSPPP(PrePostProcessing):
 		"""
 		PrePostProcessing.__init__( self , **kwargs )
 	
-	def fit( self , Y0 , X0 , X1 ):
+	def fit( self , Y0 , X0 , X1 = None ):
 		PrePostProcessing.fit( self , Y0 = Y0 , X0 = X0 )
 	
 	def predict( self , X1 , X0 = None ):

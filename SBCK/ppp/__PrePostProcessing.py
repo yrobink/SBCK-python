@@ -21,6 +21,7 @@
 ###############
 
 from .__checkf import skipNotValid
+from ..__IdBC import IdBC
 
 ###########
 ## Class ##
@@ -109,6 +110,8 @@ class PrePostProcessing:##{{{
 		self._pipe = [ p(**kwargs) for p,kwargs in zip(pipe,pipe_kwargs) ]
 		if bc_method is not None:
 			self._bc_method  = bc_method( **bc_method_kwargs )
+		else:
+			self._bc_method = IdBC()
 		
 		self._kind   = None
 		self._checkf = lambda x : True if x is None else checkf(x)

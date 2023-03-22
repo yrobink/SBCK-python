@@ -202,7 +202,7 @@ for line in lines:
 	if "description" in line:
 		description = line.replace("\n","").split("\"")[1]
 	if "license" in line:
-		license = line.replace("\n","").replace(" ","").replace("\"","").split("=")[-1]
+		license = line.replace("\n","").replace("\"","").split("=")[-1].strip()
 	if "author" in line and "author_email" not in line:
 		author = line.replace("\n","").split("\"")[1]
 	if "author_email" in line:

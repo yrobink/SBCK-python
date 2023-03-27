@@ -202,7 +202,7 @@ for line in lines:
 	if "description" in line:
 		description = line.replace("\n","").split("\"")[1]
 	if "license" in line:
-		license = line.replace("\n","").replace(" ","").replace("\"","").split("=")[-1]
+		license = line.replace("\n","").replace("\"","").split("=")[-1].strip()
 	if "author" in line and "author_email" not in line:
 		author = line.replace("\n","").split("\"")[1]
 	if "author_email" in line:
@@ -221,10 +221,18 @@ setup(
 	author       = author,
 	author_email = author_email,
 	license      = license,
-	platforms        = [ "linux" , "macosx" ] ,
-	requires         = [ "numpy" , "scipy" , "matplotlib" ],
+	platforms        = [ "linux" , "macosx" ],
+	classifiers      = [
+		"Development Status :: 5 - Production/Stable",
+		"License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+		"Natural Language :: English",
+		"Operating System :: MacOS :: MacOS X",
+		"Operating System :: POSIX :: Linux",
+		"Programming Language :: Python :: 3",
+		"Topic :: Scientific/Engineering :: Mathematics"
+	],
 	ext_modules      = ext_modules,
-	install_requires = ['pybind11>=2.2'],
+	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" ],
 	cmdclass         = {'build_ext': BuildExt},
 	zip_safe         = False,
 	packages         = list_packages,

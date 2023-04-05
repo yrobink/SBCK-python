@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 Yoann Robin
+## Copyright(c) 2022, 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -205,11 +205,11 @@ class PPPLogLinLink(PPPLinkFunction):##{{{
 	======================
 	
 	Log linear link transform, i.e.:
-	- transform is given by log(x) if 0 < x < 1, else x - 1
-	- inverse transform is given by exp(x) if x < 0, else x + 1
+	- transform is given by s*log(x+s) + s if 0 < x < s, else x
+	- inverse transform is given by s*exp( (x-s) / s ) if x < s, else x
 	
 	"""
-	def __init__( self , *args , cols = None , **kwargs ):
+	def __init__( self , *args , s = 1e-5 , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========
@@ -223,9 +223,13 @@ class PPPLogLinLink(PPPLinkFunction):##{{{
 		*kwargs:
 			All others arguments are passed to SBCK.ppp.PrePostProcessing
 		"""
-		transform  = lambda x: np.where( (0 < x) & (x < 1) , np.log( np.where( x > 0 , x , np.nan ) ) , x - 1 )
-		itransform = lambda x: np.where( x < 0 , np.exp(x) , x + 1 )
+		if not s > 0:
+			raise Exception( f"Parameter s = {s} must be non negative!" )
+		self.s = s
+		transform  = lambda x: np.where( (0 < x) & (x < s) , s * np.log( np.where( x > 0 , x , np.nan ) / s ) + s , x )
+		itransform = lambda x: np.where( x < s , s * np.exp( (x-s) / s ) , x )
 		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+	
 ##}}}
 
 class PPPArctanLink(PPPLinkFunction):##{{{

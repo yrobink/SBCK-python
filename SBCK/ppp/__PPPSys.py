@@ -50,5 +50,5 @@ class PPPIgnoreWarnings(PrePostProcessing):
 			All others arguments are passed to SBCK.ppp.PrePostProcessing
 		"""
 		warnings.simplefilter("ignore")
-		bcp.PrePostProcessing.__init__( self , *args , **kwargs )
+		PrePostProcessing.__init__( self , *args , **kwargs )
 

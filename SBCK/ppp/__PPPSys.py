@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 Yoann Robin
+## Copyright(c) 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -16,21 +16,39 @@
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
+###############
+## Libraries ##
+###############
 
-from .__checkf import skipNotValid
-
+import warnings
 from .__PrePostProcessing import PrePostProcessing
-from .__PPPSys            import PPPIgnoreWarnings
-from .__PPPSSR            import PPPSSR
-from .__PPPLinkFunction   import PPPLinkFunction
-from .__PPPLinkFunction   import PPPAddLink
-from .__PPPLinkFunction   import PPPMultLink
-from .__PPPLinkFunction   import PPPSquareLink
-from .__PPPLinkFunction   import PPPLogLinLink
-from .__PPPLinkFunction   import PPPArctanLink
-from .__PPPLinkFunction   import PPPLogisticLink
-from .__PPPDiffRef        import PPPDiffRef
-from .__PPPDiffRef        import PPPDiffColumns
-from .__PPPNanValues      import PPPRemoveNotFinite
-from .__PPPNanValues      import PPPNotFiniteAnalog
+
+#############
+## Classes ##
+#############
+
+
+class PPPIgnoreWarnings(PrePostProcessing):
+	"""
+	SBCK.ppp.PPPIgnoreWarnings
+	==========================
+	
+	This PPP method is used to supress all warnings raised by python during
+	the execution
+	"""
+	
+	def __init__( self , *args , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		warnings.simplefilter("ignore")
+		bcp.PrePostProcessing.__init__( self , *args , **kwargs )
 

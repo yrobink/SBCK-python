@@ -28,6 +28,47 @@ from .__PrePostProcessing import PrePostProcessing
 ## Class ##
 ###########
 
+class PPPPreserveOrder(PrePostProcessing):##{{{
+	"""
+	SBCK.ppp.PPPPreserveOrder
+	=========================
+	
+	The inverse transform of this PPP sort the data of the column 'cols' along
+	rows. It is useful for example when tas, tasmin and tasmax are correted to
+	ensure their order.
+	
+	"""
+
+	def __init__( self , *args , cols = None , **kwargs ):##{{{
+		PrePostProcessing.__init__( self , *args , **kwargs )
+		
+		self._cols = cols
+		if cols is not None:
+			self._cols = np.array( [cols] , dtype = int ).squeeze()
+	##}}}
+	
+	def transform( self , X ):##{{{
+		"""
+    	Apply the PerserveOrder transform, in fact just identity
+		"""
+		return X
+	##}}}
+	
+	def itransform( self , Xt ):##{{{
+		"""
+    	Apply the inverse PerserveOrder transform, i.e. sort along cols
+		"""
+		
+		if self._cols is None:
+			return Xt
+		
+		X = Xt.copy()
+		X[:,self._cols] = np.sort( X[:,self._cols] , axis = 1 )
+		
+		return X
+	##}}}
+##}}}
+
 class PPPDiffRef(PrePostProcessing): ##{{{
 	"""
 	SBCK.ppp.PPPDiffRef

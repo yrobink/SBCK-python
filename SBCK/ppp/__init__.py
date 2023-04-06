@@ -31,6 +31,7 @@ from .__PPPLinkFunction   import PPPArctanLink
 from .__PPPLinkFunction   import PPPLogisticLink
 from .__PPPDiffRef        import PPPDiffRef
 from .__PPPDiffRef        import PPPDiffColumns
+from .__PPPDiffRef        import PPPPreserveOrder
 from .__PPPNanValues      import PPPRemoveNotFinite
 from .__PPPNanValues      import PPPNotFiniteAnalog
 

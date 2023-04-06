@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -181,33 +181,9 @@ list_packages = [
 ## Infos from release ##
 ########################
 
-with open( os.path.join(here, "SBCK/__release.py"), "r" ) as f:
+with open( os.path.join( here , "SBCK" , "__release.py" ) , "r" ) as f:
 	lines = f.readlines()
-
-version_major = None
-version_minor = None
-version_patch = None
-version_extra = None
-for line in lines:
-	if "name" in line:
-		name = line.replace("\n","").replace(" ","").replace("\"","").split("=")[-1]
-	if "version_major" in line and version_major is None:
-		version_major = line.replace("\n","").replace(" ","").split("=")[-1]
-	if "version_minor" in line and version_minor is None:
-		version_minor = line.replace("\n","").replace(" ","").split("=")[-1]
-	if "version_patch" in line and version_patch is None:
-		version_patch = line.replace("\n","").replace(" ","").split("=")[-1]
-	if "version_extra" in line and version_extra is None:
-		version_extra = line.replace("\n","").replace(" ","").replace("\"","").split("=")[-1]
-	if "description" in line:
-		description = line.replace("\n","").split("\"")[1]
-	if "license" in line:
-		license = line.replace("\n","").replace("\"","").split("=")[-1].strip()
-	if "author" in line and "author_email" not in line:
-		author = line.replace("\n","").split("\"")[1]
-	if "author_email" in line:
-		author_email = line.replace("\n","").split("\"")[1]
-version = f"{version_major}.{version_minor}.{version_patch}{version_extra}"
+exec("".join(lines))
 
 
 #######################

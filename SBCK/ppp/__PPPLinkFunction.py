@@ -169,6 +169,66 @@ class PPPMultLink(PPPLinkFunction):##{{{
 		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
 ##}}}
 
+class PPPMaxLink(PPPLinkFunction):##{{{
+	"""
+	SBCK.ppp.PPPMaxLink
+	===================
+	
+	Max link.
+	
+	"""
+	def __init__( self , M : float , *args , cols = None , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		M : [float]
+			The max
+		cols: [int or array of int]
+			The columns to apply the Link function
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		transform  = lambda x: np.where( (x < M) | ~np.isfinite(x) , x , M )
+		itransform = lambda x: np.where( (x < M) | ~np.isfinite(x) , x , M )
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+##}}}
+
+class PPPMinLink(PPPLinkFunction):##{{{
+	"""
+	SBCK.ppp.PPPMinLink
+	===================
+	
+	Min link.
+	
+	"""
+	def __init__( self , M : float , *args , cols = None , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		M : [float]
+			The min
+		cols: [int or array of int]
+			The columns to apply the Link function
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		
+		transform  = lambda x: np.where( (x > M) | ~np.isfinite(x) , x , M )
+		itransform = lambda x: np.where( (x > M) | ~np.isfinite(x) , x , M )
+		PPPLinkFunction.__init__( self , *args , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+##}}}
+
 class PPPSquareLink(PPPLinkFunction):##{{{
 	"""
 	SBCK.ppp.PPPSquareLink

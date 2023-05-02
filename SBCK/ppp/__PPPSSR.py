@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 Yoann Robin
+## Copyright(c) 2022, 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -51,7 +51,7 @@ class PPPSSR(PrePostProcessing): ##{{{
 	>>> Z1,Z0 = ppp.predict(X1,X0)
 	"""
 	
-	def __init__( self , *args , cols = None , isaved = "Y0" , **kwargs ): ##{{{
+	def __init__( self , *args , cols = None , threshold = None , **kwargs ): ##{{{
 		"""
 		Constructor
 		===========
@@ -60,25 +60,22 @@ class PPPSSR(PrePostProcessing): ##{{{
 		---------
 		cols: [int or array of int]
 			The columns to apply the SSR
-		isaved: str
-			Choose the threshold used for inverse transform. Can be "Y0", "X0"
 			or "X1"
+		threshold: None or float
+			If a float, this is the threshold used instead of a threshold
+			infered from data
 		*args:
 			All others arguments are passed to SBCK.ppp.PrePostProcessing
 		*kwargs:
 			All others arguments are passed to SBCK.ppp.PrePostProcessing
 		"""
 		PrePostProcessing.__init__( self , *args , **kwargs )
-		self.Xn        = None
-		self._cols     = cols
-		self._isaved   = isaved
-		self._icurrent = -1
+		self._Xn   = threshold
+		self.Xn    = None
+		self._cols = cols
 		
 		if cols is not None:
 			self._cols = np.array( [cols] , dtype = int ).squeeze()
-		
-		if isaved not in ["Y0","X0","X1"]:
-			raise ValueError(f"isaved (={isaved}) parameter must be in ['Y0','X0','X1']")
 		
 	##}}}
 	
@@ -86,7 +83,6 @@ class PPPSSR(PrePostProcessing): ##{{{
 		"""
     	Apply the SSR transform.
 		"""
-		self._icurrent += 1
 		
 		if self._cols is None:
 			self._cols = np.array( [i for i in range(X.shape[1])] , dtype = int ).squeeze()
@@ -97,22 +93,15 @@ class PPPSSR(PrePostProcessing): ##{{{
 		if np.any(np.isnan(Xn)):
 			Xn[np.isnan(Xn)] = 1
 		
+		if self._Xn is not None:
+			Xn[:] = self._Xn
+		
+		if self.Xn is not None:
+			Xn = self.Xn
+		
 		ncols = cols.size
 		Xt = X.copy()
 		Xt[:,cols] = np.where( (X[:,cols] > Xn).reshape(-1,ncols) , X[:,cols].reshape(-1,ncols) , np.random.uniform( low = Xn / 100 , high = Xn , size = (X.shape[0],ncols) ) ).squeeze()
-#		nvalid = np.isnan(Xn)
-#		valid  = ~np.isnan(Xn)
-#		
-#		Xt = X.copy()
-#		
-#		if valid.sum() > 0:
-#			ncols = valid.sum()
-#			c = cols[valid]
-#			Xt[:,c] = np.where( (X[:,c] > Xn[c]).reshape(-1,ncols) , X[:,c].reshape(-1,ncols) , np.random.uniform( low = Xn[c] / 100 , high = Xn[c] , size = (X.shape[0],ncols) ) ).squeeze()
-#		else:
-#			ncols = nvalid.sum()
-#			c = cols[nvalid]
-#			Xt[:,c] = np.random.uniform( low = 0.001 , high = 1 , size = (X.shape[0],ncols) )
 		
 		if self._kind == "Y0":
 			self.Xn = Xn

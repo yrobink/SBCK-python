@@ -265,7 +265,7 @@ class PPPLogLinLink(PPPLinkFunction):##{{{
 	======================
 	
 	Log linear link transform, i.e.:
-	- transform is given by s*log(x+s) + s if 0 < x < s, else x
+	- transform is given by s*log(x/s) + s if 0 < x < s, else x
 	- inverse transform is given by s*exp( (x-s) / s ) if x < s, else x
 	
 	"""

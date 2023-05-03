@@ -186,6 +186,13 @@ with open( os.path.join( here , "SBCK" , "__release.py" ) , "r" ) as f:
 exec("".join(lines))
 
 
+#################
+## Description ##
+#################
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README-pypi.md").read_text()
+
 #######################
 ## And now the setup ##
 #######################
@@ -193,6 +200,8 @@ exec("".join(lines))
 setup(
 	name         = name,
 	description  = description,
+	long_description = long_description,
+	long_description_content_type = 'text/markdown',
 	version      = version,
 	author       = author,
 	author_email = author_email,

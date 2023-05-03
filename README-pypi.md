@@ -19,17 +19,17 @@
 This summary of ability of each method to perform a bias correction is proposed by François, (2020). Please refer to
 this article for further interpretation.
 
-| Characteristics                             | CDF-t              | R2D2               | dOTC               | MBCn               | MRec               |
-|---------------------------------------------| :----------------: | :----------------: | :----------------: | :----------------: | :----------------: |
-| Correction of univariate dist. prop.        | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| Modification of correlations of the model   | :x:                | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| Capacity to correct inter-var. prop.        | :x:                | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| Capacity to correct spatial prop.           | :x:                | :heavy_check_mark: | :heavy_check_mark: | :warning:          | :warning:          |
-| Capacity to correct temporal prop.          | :x:                | :x:                | :x:                | :x:                | :x:                |
-| Preserve the rank structure of the model    | :heavy_check_mark: | :warning:          | :warning:          | :warning:          | :warning:          |
-| Capacity to correct small geographical area | n.a.               | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| Capacity to correct large geographical area | n.a.               | :warning:          | :warning:          | :warning:          | :x:                |
-| Allow for change of the multi-dim. prop.    | :heavy_check_mark: | :x:                | :heavy_check_mark: | :warning:          | :heavy_check_mark: |
+| Characteristics                             | CDF-t   | R2D2   | dOTC   | MBCn   | MRec   |
+|---------------------------------------------| :-----: | :----: | :----: | :----: | :----: |
+| Correction of univariate dist. prop.        | Yes     | Yes    | Yes    | Yes    | Yes    |
+| Modification of correlations of the model   | No      | Yes    | Yes    | Yes    | Yes    |
+| Capacity to correct inter-var. prop.        | No      | Yes    | Yes    | Yes    | Yes    |
+| Capacity to correct spatial prop.           | No      | Yes    | Yes    | ~      | ~      |
+| Capacity to correct temporal prop.          | No      | No     | No     | No     | No     |
+| Preserve the rank structure of the model    | Yes     | ~      | ~      | ~      | ~      |
+| Capacity to correct small geographical area | n.a.    | Yes    | Yes    | Yes    | Yes    |
+| Capacity to correct large geographical area | n.a.    | ~      | ~      | ~      | No     |
+| Allow for change of the multi-dim. prop.    | Yes     | No     | Yes    | ~      | Yes    |
 
 
 ## Python instruction

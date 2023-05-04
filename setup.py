@@ -214,6 +214,10 @@ setup(
 		"Operating System :: MacOS :: MacOS X",
 		"Operating System :: POSIX :: Linux",
 		"Programming Language :: Python :: 3",
+		"Programming Language :: Python :: 3.7",
+		"Programming Language :: Python :: 3.8",
+		"Programming Language :: Python :: 3.9",
+		"Programming Language :: Python :: 3.10",
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
 	ext_modules      = ext_modules,
@@ -221,7 +225,7 @@ setup(
 	cmdclass         = {'build_ext': BuildExt},
 	zip_safe         = False,
 	packages         = list_packages,
-	package_dir      = { "SBCK" : os.path.join(here, "SBCK") }
+	package_dir      = { "SBCK" : "./SBCK" }
 )
 
 

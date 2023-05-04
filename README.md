@@ -41,8 +41,15 @@ Requires:
 - scipy
 - pybind11
 
-For python, just use the command:
+You can install from pypi:
 ```
+pip3 install SBCK
+```
+
+Or from sources:
+```
+git clone https://github.com/yrobink/SBCK-python.git
+cd SBCK
 pip3 install .
 ```
 
@@ -50,6 +57,11 @@ If the Eigen library is not found, use:
 ```
 pip3 install . eigen="path-to-eigen"
 ```
+
+## Acknowledgements
+
+Thanks to [[Trevor James Smith]](https://github.com/Zeitsperre) for his help with the publication on pypi.
+
 
 ## License
 

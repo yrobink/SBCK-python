@@ -28,6 +28,7 @@ import sysconfig
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import setuptools
+from pathlib import Path
 
 
 #####################
@@ -49,7 +50,8 @@ if i_eigen > -1:
 ## Python path resolution ##
 ############################
 
-here = os.path.abspath( os.path.dirname(__file__) )
+cpath = Path(__file__).parent
+
 
 ################################################################
 ## Some class and function to compile with Eigen and pybind11 ##
@@ -148,7 +150,7 @@ class BuildExt(build_ext):##{{{
 ext_modules = [
 	Extension(
 		"SBCK.tools.__tools_cpp",
-		[ os.path.join(here, 'SBCK/tools/src/tools.cpp') ],
+		[ str(cpath / 'SBCK/tools/src/tools.cpp') ],
 		include_dirs=[
 			# Path to pybind11 headers
 			get_eigen_include(eigen_usr_include),
@@ -181,17 +183,17 @@ list_packages = [
 ## Infos from release ##
 ########################
 
-with open( os.path.join( here , "SBCK" , "__release.py" ) , "r" ) as f:
-	lines = f.readlines()
-exec("".join(lines))
+exec( (cpath / "SBCK" / "__release.py").read_text() )
 
 
 #################
 ## Description ##
 #################
-from pathlib import Path
-this_directory = Path(__file__).parent
-long_description = (this_directory / "README-pypi.md").read_text()
+long_description = (cpath / "README.md").read_text()
+long_description = long_description.replace(":heavy_check_mark:"," Yes              ")
+long_description = long_description.replace(":x: "," No ")
+long_description = long_description.replace(":warning:"," ~       ")
+
 
 #######################
 ## And now the setup ##

@@ -385,7 +385,7 @@ class CDFt:
 				pl  = np.linspace( 0 , 0.5 , 10000 )
 				ql  = icdfY1(pl)
 				ql  = ql[-1] - ql
-				idxl = np.argmin( np.abs( ql - lsuppr_Y1 ) )
+				idxl = np.argmin( np.abs( ql - lsuppl_Y1 ) )
 				p_min = pl[idxl]
 			
 			## Find p_max

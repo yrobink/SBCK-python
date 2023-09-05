@@ -327,13 +327,13 @@ class CDFt:
 				if idx == dsupp -1:
 					extend_support = True
 				else:
+					supp_r_Y0  = rvY0.ppf(p_max)  - rvY0.ppf(cdfY1[-1])
 					if self._scale_right_tail is None:
 						supp_r_X0s = rvX0s.ppf(p_max) - rvX0s.ppf(cdfY1[-1]) 
 						supp_r_X1s = rvX1s.ppf(p_max) - rvX1s.ppf(cdfY1[-1]) 
-						supp_r_Y0  = rvY0.ppf(p_max)  - rvY0.ppf(cdfY1[-1])
 						scale_right_tail = supp_r_X1s / supp_r_X0s
 					else:
-						scale_right_rail = self._scale_right_tail
+						scale_right_tail = self._scale_right_tail
 					supp_r_Y1  = supp_r_Y0 * scale_right_tail
 					if x[idx] + supp_r_Y1 > x[-1]:
 						extend_support = True

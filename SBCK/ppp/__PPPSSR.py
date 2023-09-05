@@ -84,6 +84,9 @@ class PPPSSR(PrePostProcessing): ##{{{
     	Apply the SSR transform.
 		"""
 		
+		if X.ndim == 1:
+			X = X.reshape(-1,1)
+		
 		if self._cols is None:
 			self._cols = np.array( [i for i in range(X.shape[1])] , dtype = int ).squeeze()
 		cols = self._cols
@@ -115,6 +118,8 @@ class PPPSSR(PrePostProcessing): ##{{{
 		"""
 		
 		X = Xt.copy()
+		if X.ndim == 1:
+			X = X.reshape(-1,1)
 		cols = self._cols
 		X[:,cols] = np.where( Xt[:,cols] > self.Xn , Xt[:,cols] , 0 )
 		

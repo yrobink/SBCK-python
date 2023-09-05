@@ -21,6 +21,7 @@ from .__checkf import skipNotValid
 
 from .__PrePostProcessing import PrePostProcessing
 from .__PPPSys            import PPPIgnoreWarnings
+from .__PPPSys            import PPPXarray
 from .__PPPSSR            import PPPSSR
 from .__PPPLinkFunction   import PPPLinkFunction
 from .__PPPLinkFunction   import PPPAddLink

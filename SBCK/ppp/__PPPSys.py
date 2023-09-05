@@ -23,12 +23,14 @@
 import warnings
 from .__PrePostProcessing import PrePostProcessing
 
+import numpy as np
+
+
 #############
 ## Classes ##
 #############
 
-
-class PPPIgnoreWarnings(PrePostProcessing):
+class PPPIgnoreWarnings(PrePostProcessing):##{{{
 	"""
 	SBCK.ppp.PPPIgnoreWarnings
 	==========================
@@ -51,4 +53,54 @@ class PPPIgnoreWarnings(PrePostProcessing):
 		"""
 		warnings.simplefilter("ignore")
 		PrePostProcessing.__init__( self , *args , **kwargs )
+##}}}
+
+class PPPXarray(PrePostProcessing):###{{{
+	"""
+	SBCK.ppp.PPPXarray
+	==========================
+	
+	This PPP method is used to deal with xarray. The xarray interface is removed
+	before the fit, and applied to output of predict method.
+	"""
+	
+	def __init__( self , *args , **kwargs ):
+		"""
+		Constructor
+		===========
+		
+		Arguments
+		---------
+		*args:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		*kwargs:
+			All others arguments are passed to SBCK.ppp.PrePostProcessing
+		"""
+		PrePostProcessing.__init__( self , *args , **kwargs )
+	
+	def transform( self , X ):
+		
+		if self._kind == 'X0':
+			self._x0 = X.copy() + np.nan
+		if self._kind == 'X1':
+			self._x1 = X.copy() + np.nan
+		
+		Xt = X.values
+		if Xt.ndim == 1:
+			Xt = Xt.reshape(-1,1)
+		return Xt
+	
+	def itransform( self , Xt ):
+		
+		if self._kind == "X0":
+			X = self._x0.copy()
+			X[:] = Xt.reshape(X.shape)
+		elif self._kind == "X1":
+			X = self._x1.copy()
+			X[:] = Xt.reshape(X.shape)
+		else:
+			X = Xt
+		
+		return X
+##}}}
 

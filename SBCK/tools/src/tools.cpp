@@ -1,5 +1,5 @@
 
-// Copyright(c) 2021 Yoann Robin
+// Copyright(c) 2021 / 2023 Yoann Robin
 // 
 // This file is part of SBCK.
 // 
@@ -25,7 +25,6 @@
 #include <pybind11/eigen.h>
 
 #include "SparseHist.hpp"
-#include "NetworkSimplex.hpp"
 
 //============//
 // namespaces //
@@ -43,8 +42,6 @@ PYBIND11_MODULE( __tools_cpp , m )
 	//===========//
 	// Functions //
 	//===========//
-	
-	m.def( "network_simplex" , &network_simplex ) ;
 	
 	//=======//
 	// Class //

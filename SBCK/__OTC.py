@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -25,8 +25,9 @@ import numpy       as np
 import scipy.stats as sc
 from .tools.__tools_cpp           import SparseHist
 from .tools.__bin_width_estimator import bin_width_estimator
-from .tools.__OT                  import OTNetworkSimplex
-from .tools.__OT                  import OTSinkhornLogDual
+from .tools.__OT                  import POTemd
+#from .tools.__OT                  import OTNetworkSimplex
+#from .tools.__OT                  import OTSinkhornLogDual
 
 
 ###########
@@ -47,7 +48,7 @@ class OTC:
 	[1] Robin, Y., Vrac, M., Naveau, P., Yiou, P.: Multivariate stochastic bias corrections with optimal transport, Hydrol. Earth Syst. Sci., 23, 773–786, 2019, https://doi.org/10.5194/hess-23-773-2019
 	"""
 	
-	def __init__( self , bin_width = None , bin_origin = None , ot = OTNetworkSimplex() ):##{{{
+	def __init__( self , bin_width = None , bin_origin = None , ot = POTemd() ):##{{{
 		"""
 		Initialisation of Optimal Transport bias Corrector.
 		
@@ -58,7 +59,7 @@ class OTC:
 		bin_origin : np.array( [shape = (n_features) ] )
 			Corner of one bin, see SBCK.SparseHist. If is None, np.repeat(0,n_features) is used
 		ot         : OT*Solver*
-			A solver for Optimal transport, default is OTSinkhornLogDual()
+			A solver for Optimal transport, default is POTemd()
 		
 		Attributes
 		----------
@@ -101,10 +102,6 @@ class OTC:
 		
 		## Optimal Transport
 		self._ot.fit( self.muX , self.muY )
-		if not self._ot.state:
-			print( "Warning: Error in network simplex, try SinkhornLogDual" )
-			self._ot = OTSinkhornLogDual()
-			self._ot.fit( self.muX , self.muY )
 		
 		## 
 		self._plan = np.copy( self._ot.plan() )

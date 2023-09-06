@@ -160,8 +160,6 @@ ext_modules = [
 		language='c++',
 		depends = [
 			"SBCK/tools/src/SparseHist.hpp"
-			"SBCK/tools/src/NetworkSimplex.hpp"
-			"SBCK/tools/src/NetworkSimplexLemon.hpp"
 			]
 	),
 ]
@@ -223,7 +221,7 @@ setup(
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
 	ext_modules      = ext_modules,
-	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" ],
+	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
 	cmdclass         = {'build_ext': BuildExt},
 	zip_safe         = False,
 	packages         = list_packages,

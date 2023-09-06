@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,7 +20,7 @@
 
 from .__tools_cpp             import SparseHist
 from .__bin_width_estimator   import bin_width_estimator
-from .__OT                    import OTNetworkSimplex
+from .__OT                    import POTemd
 from .__OT                    import OTSinkhorn
 from .__OT                    import OTSinkhornLogDual
 from .__shuffle               import schaake_shuffle

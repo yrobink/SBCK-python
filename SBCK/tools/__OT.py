@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -23,8 +23,8 @@
 
 import numpy as np
 import scipy.spatial.distance as ssd
-from .__tools_cpp import network_simplex
-
+#from .__tools_cpp import network_simplex
+import ot
 
 #############
 ## Classes ##
@@ -36,19 +36,17 @@ class OTHist:##{{{
 		self.c = c
 ##}}}
 
-class OTNetworkSimplex:##{{{
+class POTemd:##{{{
 	"""
-	SBCK.tools.NetworkSimplex
-	=========================
+	SBCK.tools.POTemd
+	=================
 	
-	Network simplex method to solve optimal transport problem
+	Earth Mover Distance (emd) solver from the POT package.
+	see https://pythonot.github.io
 	
-	References
-	==========
-	Bazaraa, M. S., Jarvis, J. J., and Sherali, H. D.: Linear Programming and Network Flows, 4th edn., John Wiley & Sons, 2009.
 	"""
 	
-	def __init__( self , power = 2 ):##{{{
+	def __init__( self , power = 2 , numItermax = 100_000_000):##{{{
 		"""
 		Initialisation of solver
 		
@@ -60,6 +58,9 @@ class OTNetworkSimplex:##{{{
 		self.C = None
 		self.P = None
 		self.power = power
+		self.state = True
+		self.numItermax = numItermax
+		
 	##}}}
 	
 	def fit( self , mu0 , mu1 , C = None ):##{{{
@@ -73,10 +74,18 @@ class OTNetworkSimplex:##{{{
 		mu1 : (SBCK.SparseHist)
 			Target histogram
 		"""
-		self.C = ssd.cdist( mu0.c , mu1.c )**self.power if C is None else C
+		self.C = C
+		if C is None:
+			self.C = ssd.cdist( mu0.c , mu1.c )
+		self.C = self.C**self.power
 		
-		self.P,self.state = network_simplex( mu0.p , mu1.p , self.C )
-		
+		try:
+			_,out = ot.emd2( mu0.p , mu1.p , self.C , return_matrix = True , numItermax = self.numItermax )
+			self.P = out['G']
+			self.state = True
+		except Exception as e:
+			print(e)
+			self.state = False
 	##}}}
 	
 	def plan(self):##{{{
@@ -90,7 +99,9 @@ class OTNetworkSimplex:##{{{
 		"""
 		return self.P
 	##}}}
+	
 ##}}}
+
 
 class OTSinkhorn:##{{{
 	"""

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -26,7 +26,7 @@ import scipy.stats as sc
 
 from .tools.__tools_cpp           import SparseHist
 from .tools.__bin_width_estimator import bin_width_estimator
-from .tools.__OT                  import OTNetworkSimplex
+from .tools.__OT                  import POTemd
 from .__OTC                       import OTC
 
 
@@ -72,7 +72,7 @@ class dOTC:
 		return MC
 	#}}}
 	
-	def __init__( self , bin_width = None , bin_origin = None , cov_factor = "std" , ot = OTNetworkSimplex() ):##{{{
+	def __init__( self , bin_width = None , bin_origin = None , cov_factor = "std" , ot = POTemd() ):##{{{
 		"""
 		Initialisation of dynamical Optimal Transport bias Corrector.
 		

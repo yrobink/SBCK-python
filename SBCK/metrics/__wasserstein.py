@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2023 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -22,7 +22,7 @@
 ###############
 
 import numpy as np
-from SBCK.tools.__OT import OTNetworkSimplex
+from SBCK.tools.__OT import POTemd
 from .__decorators import _to_SparseHist
 
 
@@ -31,7 +31,7 @@ from .__decorators import _to_SparseHist
 ##############
 
 @_to_SparseHist
-def wasserstein( muX , muY , p = 2. , ot = OTNetworkSimplex() , metric = "euclidean" ):
+def wasserstein( muX , muY , p = 2. , ot = POTemd() , metric = "euclidean" ):
 	"""
 	Description
 	===========
@@ -63,7 +63,7 @@ def wasserstein( muX , muY , p = 2. , ot = OTNetworkSimplex() , metric = "euclid
 	
 	ot.power = p 
 	ot.fit( muX , muY )
-	if type(ot) == OTNetworkSimplex:
+	if type(ot) == POTemd:
 		w = cost(ot)
 		if not ot.state:
 			w = np.nan

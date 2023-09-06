@@ -37,6 +37,6 @@ from .__PPPDiffRef        import PPPDiffColumns
 from .__PPPDiffRef        import PPPPreserveOrder
 from .__PPPNanValues      import PPPRemoveNotFinite
 from .__PPPNanValues      import PPPNotFiniteAnalog
-
-from .__PPPExtremes      import PPPLimitTailsRatio
+from .__PPPExtremes       import PPPLimitTailsRatio
+from .__PPPOTCNoise       import PPPOTCNoise
 

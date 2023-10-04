@@ -397,9 +397,9 @@ class CDFt:
 				idxr = np.argmin( np.abs( qr - lsuppr_Y1 ) )
 				p_max = pr[idxr]
 			
-			## Final: Replace by 0 / 1 bellow / behind p_min / 1-p_min
+			## Final: Replace by 0 / 1 bellow / behind p_min / p_max
 			cdfY1[cdfY1 < p_min] = 0
-			cdfY1[cdfY1 > 1 - p_min] = 1
+			cdfY1[cdfY1 > p_max] = 1
 			
 			## Cut values and new icdf
 			try:
@@ -416,11 +416,13 @@ class CDFt:
 				pass
 			icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
 		
+		
 		## Draw hY1
+		hY1 = icdfY1( np.random.uniform( size = self._samples_Y1 , low = 0 , high = 1 ) )
 #		hY1 = icdfY1( np.random.uniform( size = self._samples_Y1 , low = p_min , high = p_max ) )
-		rvX1 = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1.squeeze()) , **self._distX1.kwargs )
-		hY1  = icdfY1( rvX1.cdf(X1) )
-#		hY1  = icdfY1( rvX1.cdf(X1_) )
+#		rvX1 = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1.squeeze()) , **self._distX1.kwargs )
+#		hY1  = icdfY1( rvX1.cdf(X1) )
+		
 		
 		return hY1
 	##}}}

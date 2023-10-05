@@ -365,57 +365,58 @@ class CDFt:
 		## Inverse of the CDF
 		icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
 		
-		## Now find cut
-		lsuppl_Y0  = np.median(Y0) - np.quantile(Y0,self._p_left)
-		lsuppl_X0  = np.median(X0) - np.quantile(X0,self._p_left)
-		lsuppl_X1  = np.median(X1) - np.quantile(X1,self._p_left)
-		lsuppl_Y1  = lsuppl_Y0 * lsuppl_X1 / lsuppl_X0
-		lsuppl_pY1 = icdfY1(0.5) - icdfY1(self._p_left)
-		lsuppr_Y0  = np.quantile(Y0,self._p_right) - np.median(Y0)
-		lsuppr_X0  = np.quantile(X0,self._p_right) - np.median(X0)
-		lsuppr_X1  = np.quantile(X1,self._p_right) - np.median(X1)
-		lsuppr_Y1  = lsuppr_Y0 * lsuppr_X1 / lsuppr_X0
-		lsuppr_pY1 = icdfY1(self._p_right) - icdfY1(0.5)
-		
-		if lsuppl_pY1 > lsuppl_Y1 or lsuppr_pY1 > lsuppr_Y1:
-			
-			## Find p_min
-			p_min = 0
-			if lsuppl_pY1 > lsuppl_Y1:
-				pl  = np.linspace( 0 , 0.5 , 10000 )
-				ql  = icdfY1(pl)
-				ql  = ql[-1] - ql
-				idxl = np.argmin( np.abs( ql - lsuppl_Y1 ) )
-				p_min = pl[idxl]
-			
-			## Find p_max
-			p_max = 1
-			if lsuppr_pY1 > lsuppr_Y1:
-				pr  = np.linspace( 0.5 , 1 , 10000 )
-				qr  = icdfY1(pr)
-				qr  = qr - qr[0]
-				idxr = np.argmin( np.abs( qr - lsuppr_Y1 ) )
-				p_max = pr[idxr]
-			
-			## Final: Replace by 0 / 1 bellow / behind p_min / p_max
-			cdfY1[cdfY1 < p_min] = 0
-			cdfY1[cdfY1 > p_max] = 1
-			
-			## Cut values and new icdf
-			try:
-				idxl  = np.max(np.argwhere(cdfY1 < p_min))
-				x     = x[idxl:]
-				cdfY1 = cdfY1[idxl:]
-			except:
-				pass
-			try:
-				idxr  = np.min(np.argwhere(cdfY1 > p_max)) + 1
-				x     = x[:idxr]
-				cdfY1 = cdfY1[:idxr]
-			except:
-				pass
-			icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
-		
+#		## Now find cut
+#		lsuppl_Y0  = np.median(Y0) - np.quantile(Y0,self._p_left)
+#		lsuppl_X0  = np.median(X0) - np.quantile(X0,self._p_left)
+#		lsuppl_X1  = np.median(X1) - np.quantile(X1,self._p_left)
+#		lsuppl_Y1  = lsuppl_Y0 * lsuppl_X1 / lsuppl_X0
+#		lsuppl_pY1 = icdfY1(0.5) - icdfY1(self._p_left)
+#		lsuppr_Y0  = np.quantile(Y0,self._p_right) - np.median(Y0)
+#		lsuppr_X0  = np.quantile(X0,self._p_right) - np.median(X0)
+#		lsuppr_X1  = np.quantile(X1,self._p_right) - np.median(X1)
+#		lsuppr_Y1  = lsuppr_Y0 * lsuppr_X1 / lsuppr_X0
+#		lsuppr_pY1 = icdfY1(self._p_right) - icdfY1(0.5)
+#		
+#		if lsuppl_pY1 > lsuppl_Y1 or lsuppr_pY1 > lsuppr_Y1:
+#			
+#			## Find p_min
+#			p_min = 0
+#			if lsuppl_pY1 > lsuppl_Y1:
+#				pl  = np.linspace( 0 , 0.5 , 10000 )
+#				ql  = icdfY1(pl)
+#				ql  = ql[-1] - ql
+#				idxl = np.argmin( np.abs( ql - lsuppl_Y1 ) )
+#				p_min = pl[idxl]
+#			
+#			## Find p_max
+#			p_max = 1
+#			if lsuppr_pY1 > lsuppr_Y1:
+#				pr  = np.linspace( 0.5 , 1 , 10000 )
+#				qr  = icdfY1(pr)
+#				qr  = qr - qr[0]
+#				idxr = np.argmin( np.abs( qr - lsuppr_Y1 ) )
+#				p_max = pr[idxr]
+#			
+#			## Final: Replace by 0 / 1 bellow / behind p_min / p_max
+#			cdfY1[cdfY1 < p_min] = 0
+#			cdfY1[cdfY1 > p_max] = 1
+#			
+#			## Cut values and new icdf
+#			try:
+#				idxl  = np.max(np.argwhere(cdfY1 < p_min))
+#				x     = x[idxl:]
+#				cdfY1 = cdfY1[idxl:]
+#			except:
+#				pass
+#			try:
+#				idxr  = np.min(np.argwhere(cdfY1 > p_max)) + 1
+#				x     = x[:idxr]
+#				cdfY1 = cdfY1[:idxr]
+#			except:
+#				pass
+#			icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
+#		print(cdfY1[0])
+#		print(cdfY1[-1])
 		
 		## Draw hY1
 		hY1 = icdfY1( np.random.uniform( size = self._samples_Y1 , low = 0 , high = 1 ) )

@@ -18,8 +18,8 @@
 
 
 version_major = 1
-version_minor = 3
-version_patch = 2
+version_minor = 4
+version_patch = 0
 version_extra = ""
 version       = "{}.{}.{}{}".format(version_major,version_minor,version_patch,version_extra)
 

@@ -22,7 +22,7 @@
 ###############
 
 import numpy as np
-from SBCK.tools.__OT import POTemd
+from sbck.tools.__OT import POTemd
 from .__decorators import _to_SparseHist
 
 

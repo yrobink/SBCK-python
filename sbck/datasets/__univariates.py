@@ -23,7 +23,7 @@
 
 import numpy       as np
 import scipy.stats as sc
-from SBCK.tools.__rv_extend import rv_mixture
+from sbck.tools.__rv_extend import rv_mixture
 
 
 ###############

@@ -1,4 +1,0 @@
-include COPYING
-include README.md
-
-recursive-include SBCK *.py *.hpp *.cpp

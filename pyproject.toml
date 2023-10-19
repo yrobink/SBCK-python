@@ -18,6 +18,14 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
+include = [  # package build for .whl
+    { path = "**/*.dll", format = "wheel" },
+    { path = "**/*.pyd", format = "wheel" },
+    { path = "**/*.exp", format = "wheel" },
+    { path = "**/*.lib", format = "wheel" },
+    { path = "**/*.obj", format = "wheel" },
+    { path = "**/*.so", format = "wheel" }
+]
 
 [eigen]
 auto_install = true

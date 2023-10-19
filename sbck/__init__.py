@@ -16,10 +16,6 @@
 ## 
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
-
-from .__release import version
-__version__ = version
-
 from .__RBC    import RBC
 from .__IdBC   import IdBC
 from .__QM     import QM

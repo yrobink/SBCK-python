@@ -28,6 +28,8 @@ def install_eigen_locally():
     download_dir = "./downloads"
     extraction_dir = "./extraction"
     destination_dir = os.path.join(site.getsitepackages()[0], "include")
+    if os.path.isdir(destination_dir):
+        return
     os.makedirs(download_dir, exist_ok=True)
     os.makedirs(extraction_dir, exist_ok=True)
     zip_file_path = os.path.join(download_dir, "eigen-3.4.0.zip")
@@ -137,11 +139,11 @@ for i, f in [(":heavy_check_mark:", " Yes              "), (":x: ", " No "), (":
 
 # update generated setup.py args
 def build(setup_args: dict):
-    setup_args.update(dict(
+    setup_args |= dict(
         ext_modules=ext_modules,
         cmdclass={'build_ext': BuildExt},
         zip_safe=False,
-        package_dir={"SBCK": "./SBCK"},
+        package_dir={"sbck": "./sbck"},
         long_description_content_type='text/markdown',
         long_description=long_description,
-    ))
+    )

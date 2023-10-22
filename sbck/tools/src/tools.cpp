@@ -71,6 +71,6 @@ PYBIND11_MODULE( __tools_cpp , m )
 	//============//
 	
 //	m.doc() = "pybind11 example plugin" ; // optional module docstring
-	m.attr("__name__") = "SBCK.tools.__tools_cpp";
+	m.attr("__name__") = "sbck.tools.__tools_cpp";
 //	m.attr("the_answer") = 42;
 }

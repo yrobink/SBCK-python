@@ -14,10 +14,13 @@ from setuptools import Extension
 from setuptools.command.build_ext import build_ext
 
 cpath = Path(__file__).parent
-
 # Load custom Eigen settings
-with open("pyproject.toml", "rb") as f:
-    toml = tomllib.load(f)
+try:
+    with open("pyproject.toml", "rb") as f:
+        toml = tomllib.load(f)
+except FileNotFoundError:
+    with open("pyproject.tmp", "rb") as f:
+        toml = tomllib.load(f)
 toml_eigen = toml["eigen"]
 eigen_usr_include, eigen_auto_install = toml_eigen.get("usr_include", ""), toml_eigen.get("auto_install", False)
 
@@ -27,7 +30,10 @@ def install_eigen_locally():
     url = "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip"
     download_dir = "./downloads"
     extraction_dir = "./extraction"
-    destination_dir = os.path.join(site.getsitepackages()[0], "include")
+    if sys.platform.startswith("win"):
+        destination_dir = os.path.join(site.getsitepackages()[0], "include")
+    else:
+        destination_dir = str(Path(site.getsitepackages()[0]).parent.parent.parent / "include")
     if os.path.isdir(destination_dir):
         return
     os.makedirs(download_dir, exist_ok=True)
@@ -119,15 +125,15 @@ class BuildExt(build_ext):
 # Extension to compile
 ext_modules = [
     Extension(
-        "SBCK.tools.__tools_cpp",
-        [str(cpath / 'SBCK/tools/src/tools.cpp')],
+        "sbck.tools.__tools_cpp",
+        [str(cpath / 'sbck/tools/src/tools.cpp')],
         include_dirs=[  # Path to pybind11 headers
             get_eigen_include(eigen_usr_include),
             pybind11.get_include(),
             pybind11.get_include(user=True),
         ],
         language='c++',
-        depends=["SBCK/tools/src/SparseHist.hpp"]
+        depends=["sbck/tools/src/SparseHist.hpp"]
     ),
 ]
 

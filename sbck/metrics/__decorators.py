@@ -22,8 +22,8 @@
 ###############
 
 import numpy as np
-from SBCK.tools.__bin_width_estimator import bin_width_estimator
-from SBCK.tools.__tools_cpp import SparseHist
+from sbck.tools.__bin_width_estimator import bin_width_estimator
+from sbck.tools.__tools_cpp import SparseHist
 
 
 

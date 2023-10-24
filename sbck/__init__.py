@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2023 Yoann Robin
+## Copyright(c) 2021 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -15,16 +16,22 @@
 ## 
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
+from .__RBC    import RBC
+from .__IdBC   import IdBC
+from .__QM     import QM
+from .__CDFt   import CDFt
+from .__OTC    import OTC
+from .__dOTC   import dOTC
+from .__ECBC   import ECBC
+from .__QMrs   import QMrs
+from .__R2D2   import R2D2
+from .__QDM    import QDM
+from .__MBCn   import MBCn
+from .__MRec   import MRec
+from .__TSMBC  import TSMBC
+from .__dTSMBC import dTSMBC
+from .__AR2D2  import AR2D2
 
+from .__XClimPPP import XClimNPPP
+from .__XClimPPP import XClimSPPP
 
-version_major = 1
-version_minor = 4
-version_patch = 0
-version_extra = ""
-version       = "{}.{}.{}{}".format(version_major,version_minor,version_patch,version_extra)
-
-name = "SBCK"
-description = "Statistical Bias Correction Kit"
-author = "Yoann Robin"
-author_email = "yoann.robin.k@gmail.com"
-license = "GNU General Public License v3"

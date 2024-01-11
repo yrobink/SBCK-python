@@ -8,6 +8,7 @@ on:
 jobs:
   run:
     runs-on: ${{ matrix.os }}
+    environment: boa
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +39,6 @@ jobs:
       - name: Publish
         shell: bash -l {0}
         run: |
-          anaconda upload --user $USER ./build/*/*.tar.bz2
+          anaconda upload --user ${{ vars.ANACONDA_USER }} ./build/*/*.tar.bz2
         env:
-          USER: ${{ vars.ANACONDA_CHANNEL }}
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}

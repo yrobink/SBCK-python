@@ -5,10 +5,6 @@ on:
     types:
       - published
 
-env:
-  # ANACONDA_CHANNEL: svenrodriguez
-  ANACONDA_CHANNEL: ipsl
-
 jobs:
   run:
     runs-on: ${{ matrix.os }}
@@ -42,6 +38,7 @@ jobs:
       - name: Publish
         shell: bash -l {0}
         run: |
-          anaconda upload --user $ANACONDA_CHANNEL ./build/*/*.tar.bz2
+          anaconda upload --user $USER ./build/*/*.tar.bz2
         env:
+          USER: ${{ vars.ANACONDA_CHANNEL }}
           ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}

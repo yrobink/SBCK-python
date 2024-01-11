@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  release:
+    types:
+      - published
+
+env:
+  # ANACONDA_CHANNEL: svenrodriguez
+  ANACONDA_CHANNEL: ipsl
+
+jobs:
+  run:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: # use quotes to avoid float casting (3.10 => 3.1)
+          - "3.8"
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+        os:
+          - ubuntu-latest
+          - macos-latest
+          # - windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: install mamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: recipe/env.yml
+      - name: Build
+        shell: bash -l {0}
+        run: |
+          mkdir build
+          boa build recipe \
+            --output-folder ./build \
+            --variant-config-files recipe/variants.yaml \
+            --python ${{ matrix.python }}
+      - name: Publish
+        shell: bash -l {0}
+        run: |
+          anaconda upload --user $ANACONDA_CHANNEL ./build/*/*.tar.bz2
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}

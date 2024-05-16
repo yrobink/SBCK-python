@@ -59,7 +59,7 @@ def wasserstein( muX , muY , p = 2. , ot = POTemd() , metric = "euclidean" ):
 	
 	"""
 	
-	cost = lambda OT : np.sqrt(np.sum(OT.P * OT.C))
+	cost = lambda OT : np.power( np.sum(OT.P * OT.C) , 1. / p )
 	
 	ot.power = p 
 	ot.fit( muX , muY )

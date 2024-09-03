@@ -35,7 +35,7 @@ from pathlib import Path
 ## User Eigen path ##
 #####################
 
-eigen_usr_include = ""
+eigen_usr_include = os.environ.get('EIGEN_PATH', '')
 
 i_eigen = -1
 for i,arg in enumerate(sys.argv):

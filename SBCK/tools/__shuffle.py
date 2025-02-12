@@ -42,7 +42,8 @@ import numpy        as np
 import scipy.stats  as sc
 import scipy.linalg as scl
 import scipy.spatial.distance as ssd
-from .__rv_extend import mrv_histogram
+from .__rv_extend import mrv_base
+
 
 #############
 ## Classes ##
@@ -266,7 +267,7 @@ class MVQuantilesShuffle: ##{{{
 		self.col_ucond  = [ i for i in range(self.n_features) if i not in self.col_cond ]
 		
 		## Build non-parametric marginal distribution of Y
-		rvY = mrv_histogram().fit(Y)
+		rvY = mrv_base().fit(Y)
 		
 		## Index to build block search matrix
 		tiY = (n_samplesY - 1 - scl.toeplitz(range(n_samplesY)))[::-1,:][:self.lag_search,:(n_samplesY-self.lag_search+1)]
@@ -299,7 +300,7 @@ class MVQuantilesShuffle: ##{{{
 		n_samplesX = X.shape[0]
 		
 		## Build non-parametric marginal distribution of X
-		rvX  = mrv_histogram().fit(X)
+		rvX  = mrv_base().fit(X)
 		
 		## Index to build block search matrix
 		tiX  = (n_samplesX - 1 - scl.toeplitz(range(n_samplesX)))[::-1,:][:self.lag_search,:(n_samplesX-self.lag_search+1)]

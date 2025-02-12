@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -17,119 +17,219 @@
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
-##################################################################################
-##################################################################################
-##                                                                              ##
-## Original authors : Mathieu Vrac and Soulivanh Thao                           ##
-## Contact          : mathieu.vrac@lsce.ipsl.fr                                 ##
-## Contact          : soulivanh.thao@lsce.ipsl.fr                               ##
-##                                                                              ##
-## Notes   : R2D2 is the re-implementation of the function R2D2 of R package    ##
-##           "R2D2" developped by Mathieu Vrac and Soulivanh Thao, available at ##
-##                                                                              ##
-##           This code is governed by the GNU-GPL3 license with the             ##
-##           authorization of Mathieu Vrac                                      ##
-##                                                                              ##
-##################################################################################
-##################################################################################
-
 ###############
 ## Libraries ##
 ###############
 
 import numpy as np
-from .__CDFt          import CDFt
-from .tools.__shuffle import SchaakeShuffleRef
+import deprecated
+
+from .__AbstractBC import AbstractBC
+from .__decorators import io_fit
+from .__decorators import io_predict
+from .__CDFt import CDFt
+from .tools.__shuffle import MVQuantilesShuffle
+from .tools.__shuffle import MVRanksShuffle
 
 
 ###########
 ## Class ##
 ###########
 
-class R2D2(CDFt):
+class R2D2(AbstractBC):##{{{
 	"""
 	SBCK.R2D2
 	=========
 	
 	Description
 	-----------
-	Non stationnary Quantile Mapping bias corrector with multivariate rankshuffle, as described in [1]
+	Multivariate bias correction with quantiles shuffle, see [1].
 	
 	References
 	----------
-	[1] Vrac, M.: Multivariate bias adjustment of high-dimensional climate simulations: the Rank Resampling for Distributions and Dependences (R2 D2 ) bias correction, Hydrol. Earth Syst. Sci., 22, 3175–3196, https://doi.org/10.5194/hess-22-3175-2018, 2018.
+	[1] Vrac, M.: Multivariate bias adjustment of high-dimensional climate
+	simulations: the Rank Resampling for Distributions and Dependences (R2 D2 )
+	bias correction, Hydrol. Earth Syst. Sci., 22, 3175–3196,
+	https://doi.org/10.5194/hess-22-3175-2018, 2018.
+	[2] Vrac, M. et S. Thao (2020). “R2 D2 v2.0 : accounting for temporal
+		dependences in multivariate bias correction via analogue rank
+		resampling”. In : Geosci. Model Dev. 13.11, p. 5367-5387.
+		doi :10.5194/gmd-13-5367-2020.
+	
 	"""
 	
-	
-	def __init__( self , refs = [0] , **kwargs ):##{{{
+	def __init__( self , col_cond = [0] , lag_search = 1 , lag_keep = 1 , bc_method = CDFt , shuffle = "quantile" , reverse = False , **bckwargs ):##{{{
 		"""
-		Initialisation of R2D2.
+		Initialisation of AR2D2.
 		
 		Parameters
 		----------
-		refs     : list
-			Index of reference for SchaakeShuffleRef, see SBCK.tools.SchaakeShuffleRef
-		**kwargs : see SBCK.CDFt
-			All others arguments are passed to SBCK.CDFt class.
+		col_cond : list[int]
+			Conditioning columns
+		lag_search: int
+			Number of lags to transform the dependence structure
+		lag_keep: int
+			Number of lags to keep
+		bc_method: SBCK.<bc_method>
+			Bias correction method
+		shuffle: str
+			Shuffle method used, can be "quantile" or "rank".
+		reverse: bool
+			If False, first apply bc_method, and after the shuffle. If True, 
+			reverse this operation.
+		**bckwargs: ...
+			all others named arguments are passed to bc_method
 		"""
-		CDFt.__init__( self , **kwargs )
-		self._refs = refs
-		self._ssr  = SchaakeShuffleRef( refs[0] )
+		super().__init__("R2D2")
+		if shuffle == "quantile":
+			self.mvq = MVQuantilesShuffle( col_cond , lag_search , lag_keep )
+		else:
+			self.mvq = MVRanksShuffle( col_cond , lag_search , lag_keep )
+		self.bc_method = bc_method
+		self.bckwargs  = bckwargs
+		self._bcm      = None
+		self._reverse  = reverse
 	##}}}
 	
-	def fit( self , Y0 , X0 , X1 ):##{{{
+	def _fit( self , Y0 , X0 , X1 ):##{{{
+		self.mvq.fit(Y0)
+		self._bcm = self.bc_method(**self.bckwargs)
+		if X1 is None:
+			if self._reverse:
+				Z0 = self.mvq.transform(X0)
+				self._bcm.fit( Y0 , Z0 )
+			else:
+				self._bcm.fit( Y0 , X0 )
+		else:
+			if self._reverse:
+				Z0 = self.mvq.transform(X0)
+				Z1 = self.mvq.transform(X1)
+				self._bcm.fit( Y0 , Z0 , Z1 )
+			else:
+				self._bcm.fit( Y0 , X0 , X1 )
+		return self
+	##}}}
+	
+	@io_fit
+	def fit( self , Y0 , X0 , X1 = None ):##{{{
 		"""
-		Fit of the R2D2 model
+		Fit the AR2D2 model
 		
 		Parameters
 		----------
-		Y0	: np.array[ shape = (n_samples,n_features) ]
-			Reference dataset during calibration period
-		X0	: np.array[ shape = (n_samples,n_features) ]
-			Biased dataset during calibration period
-		X1	: np.array[ shape = (n_samples,n_features) ]
-			Biased dataset during projection period
+		Y0 : np.ndarray
+			Reference dataset during period 0
+		X0 : np.ndarray
+			Biased dataset during period 0
+		X1	: np.ndarray or None
+			Biased dataset during period 1. If None, the method is considered as
+			stationary
 		"""
-		CDFt.fit( self , Y0 , X0 , X1 )
-		self._ssr.fit(Y0)
+		
+		return self._fit( Y0 , X0 , X1 )
 	##}}}
 	
-	def predict( self , X1 , X0 = None ):##{{{
+	def _predict( self , X1 , X0 ):##{{{
+		if X0 is None and X1 is None:
+			return
+		if X0 is None:
+			if self._reverse:
+				Z1 = self.mvq.transform(X1)
+				return self._bcm.predict(Z1)
+			else:
+				Z1b = self._bcm.predict(X1)
+				return self.mvq.transform(Z1b)
+		if X1 is None:
+			if self._reverse:
+				Z0 = self.mvq.transform(X0)
+				return self._bcm.predict(Z0)
+			else:
+				Z0b = self._bcm.predict(X0)
+				return self.mvq.transform(Z0b)
+		
+		if self._reverse:
+			Z0 = self.mvq.transform(X0)
+			Z1 = self.mvq.transform(X1)
+			return self._bcm.predict(Z1,Z0)
+		else:
+			Z1b,Z0b = self._bcm.predict(X1,X0)
+			return self.mvq.transform(Z1b),self.mvq.transform(Z0b)
+	##}}}
+	
+	@io_predict
+	def predict( self , X1 = None , X0 = None ):##{{{
 		"""
 		Perform the bias correction
-		Return Z1 if X0 is None, else return a tuple Z1,Z0
+		Return Z1 if X0 is None (and vice-versa), else return a tuple Z1,Z0
 		
 		Parameters
 		----------
-		X1  : np.array[ shape = (n_samples,n_features) ]
+		X1  : np.ndarray
 			Array of value to be corrected in projection period
-		X0  : np.array[ shape = (n_samples,n_features) ] or None
+		X0  : np.ndarray or None
 			Array of value to be corrected in calibration period
 		
 		Returns
 		-------
-		Z1 : np.array[ shape = (n_sample,n_features) ]
+		Z1 : np.ndarray
 			Return an array of correction in projection period
-		Z0 : np.array[ shape = (n_sample,n_features) ] or None
+		Z0 : np.ndarray or None
 			Return an array of correction in calibration period
 		"""
-		Zu = CDFt.predict( self , X1 , X0 )
-		
-		if X0 is not None:
-			Z1u,Z0u = Zu
-			Z1 = np.zeros( Z1u.shape + (len(self._refs),) )
-			Z0 = np.zeros( Z0u.shape + (len(self._refs),) )
-			for i,r in enumerate(self._refs):
-				self._ssr._ref = r
-				Z1[:,:,i] = self._ssr.predict(Z1u)
-				Z0[:,:,i] = self._ssr.predict(Z0u)
-			return Z1.squeeze(),Z0.squeeze()
-		
-		Z1u = Zu
-		Z1  = np.zeros( Z1u.shape + (len(self._refs),) )
-		for i,r in enumerate(self._refs):
-			self._ssr._ref = r
-			Z1[:,:,i] = self._ssr.predict(Z1u)
-		return Z1.squeeze()
+		return self._predict( X1 , X0 )
 	##}}}
+	
+##}}}
+
+@deprecated.deprecated( reason = "AR2D2 code is transfered to R2R2" , version = "2.0.0" )
+class AR2D2(R2D2):##{{{
+	"""
+	SBCK.AR2D2
+	==========
+	
+	Deprecated, use R2D2.
+	
+	"""
+	
+	def __init__( self , *args , **kwargs ):
+		super().__init__( *args , **kwargs )
+		self._name = "AR2D2"
+	
+	@io_fit
+	def fit( self , Y0 , X0 , X1 = None ):
+		super()._fit( Y0 = Y0 , X0 = X0 , X1 = X1 )
+		
+		return self
+	
+	@io_predict
+	def predict( self , X1 = None , X0 = None ):
+		return super()._predict( X1 = X1 , X0 = X0 )
+	
+##}}}
+
+@deprecated.deprecated( reason = "Redundant with R2R2" , version = "2.0.0" )
+class QMrs(R2D2):##{{{
+	"""
+	SBCK.QMrs
+	=========
+	
+	Deprecated, use R2D2.
+	
+	"""
+	
+	def __init__( self , *args , **kwargs ):
+		super().__init__( *args , **kwargs )
+		self._name = "QMrs"
+	
+	@io_fit
+	def fit( self , Y0 , X0 ):
+		super()._fit( Y0 = Y0 , X0 = X0 )
+		
+		return self
+	
+	@io_predict
+	def predict( self , X0 ):
+		return super()._predict( X0 = X0 )
+	
+##}}}
 

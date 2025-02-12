@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,136 +21,136 @@
 ## Libraries ##
 ###############
 
-import numpy       as np
-import scipy.stats as sc
+import numpy as np
 
-from .tools.__Dist import _Dist
+from .__AbstractBC import AbstractBC
+from .__AbstractBC import MultiUBC
+from .tools.__rv_extend import WrapperStatisticalDistribution
+from .tools.__rv_extend import rv_empirical
+
 
 ###########
 ## Class ##
 ###########
 
-class QM:
+class Univariate_QM(AbstractBC):##{{{
+	
+	def __init__( self , rvY = rv_empirical , rvX = rv_empirical ):
+		super().__init__( "Univariate_QM" )
+		self._rvY = rvY
+		self._rvX = rvX
+		self.rvY0 = WrapperStatisticalDistribution(self._rvY)
+		self.rvX0 = WrapperStatisticalDistribution(self._rvX)
+	
+	def fit( self , Y0 , X0 ):
+		self.rvX0.fit(X0)
+		self.rvY0.fit(Y0)
+		
+		return self
+	
+	def predict( self , X0 ):
+		eps  = np.sqrt(np.finfo(X0.dtype).resolution)
+		cdf  = self.rvX0.cdf(X0)
+		cdfx = max( 1 - ( 1 - cdf[cdf < 1].max() / 10 ) , 1 - eps )
+		cdfn = min(           cdf[cdf > 0].min() / 10   ,     eps )
+		cdf = np.where( cdf < 1 , cdf , cdfx )
+		cdf = np.where( cdf > 0 , cdf , cdfn )
+		return self.rvY0.icdf(cdf)
+##}}}
+
+class QM(MultiUBC):##{{{
+	
 	"""
 	SBCK.QM
 	=======
-	
-	Description
-	-----------
-	Quantile Mapping bias corrector, see e.g. [1,2,3]. The implementation proposed here is generic, and can use
-	scipy.stats to fit a parametric distribution, or can use a frozen distribution.
+	Quantile Mapping bias corrector, see e.g. [1,2,3]. The implementation
+	proposed here is generic, and can use scipy.stats to fit a parametric
+	distribution, or can use a frozen distribution.
 	
 	Example
 	-------
 	```
-	## Start with a reference / biased dataset, noted Y,X, from normal distribution:
-	X = np.random.normal( loc = 0 , scale = 2   , size = 1000 )
-	Y = np.random.normal( loc = 5 , scale = 0.5 , size = 1000 )
+	## Start with imports
+	from SBCK import QM
+	from SBCK.tools import rv_empirical
 	
-	## Generally, we do not know the distribution of X and Y, and we use the empirical quantile mapping:
-	qm_empiric = QM( distY0 = SBCK.tools.rv_histogram , distX0 = SBCK.tools.rv_histogram ) ## = QM(), default
-	qm_empiric.fit(Y,X)
-	Z_empiric = qm_empiric.predict(X) ## Z is the correction in a non parametric way
+	## Start by define two kinds of laws from scipy.stats, the Normal and Exponential distribution
+	norm  = sc.norm
+	expon = sc.expon
 	
-	## But we can know that X and Y follow a Normal distribution, without knowing the parameters:
-	qm_normal = QM( distY0 = scipy.stats.norm , distX0 = scipy.stats.norm )
-	qm_normal.fit(Y,X)
-	Z_normal = qm_normal.predict(X)
+	## And define calibration and projection dataset such that the law of each columns are reversed
+	size = 10000
+	Y0   = np.stack( [expon.rvs( scale = 2 , size = size ),norm.rvs( loc = 0 , scale = 1 , size = size )] ).T
+	X0   = np.stack( [norm.rvs( loc = 0 , scale = 1 , size = size ),expon.rvs( scale = 1 , size = size )] ).T
 	
-	## And finally, we can know the law of Y, and it is usefull to freeze the distribution:
-	qm_freeze = QM( distY0 = scipy.stats.norm( loc = 5 , scale = 0.5 ) , distX0 = scipy.stats.norm )
-	qm_freeze.fit(Y,X) ## = qm_freeze.fit(None,X) because Y is not used
-	Z_freeze = qm_freeze.predict(X)
+	## Generally, the law of Y0 and X0 is unknow, so we use the empirical histogram distribution
+	qm   = bc.QM( rvY = [bct.rv_empirical,bct.rv_empirical] , rvX = [bct.rv_empirical,bct.rv_empirical] ).fit( Y0 , X0 )
+	Z0_h = qm.predict(X0)
+	
+	## Actually, this is the default behavior
+	qm = bc.QM().fit( Y0 , X0 )
+	assert np.abs(Z0_h - qm.predict(X0)).max() < 1e-12
+	
+	## In some case we know the kind of law of Y0 (or X0)
+	qm    = bc.QM( rvY = [expon,norm] ).fit( Y0 , X0 )
+	Z0_Y0 = qm.predict(X0)
+	
+	## Or, even better, we know the law of the 2nd component of Y0 (or X0)
+	qm    = bc.QM( rvY = [expon,norm(loc=0,scale=1)] ).fit( Y0 , X0 )
+	Z0_Y2 = qm.predict(X0)
+	
+	## Obviously, we can mix all this strategy to build a custom Quantile Mapping
+	qm    = bc.QM( rvY = [bct.rv_empirical,norm(loc=0,scale=1)] , rvX = [norm,bct.rv_empirical] ).fit( Y0 , X0 )
+	Z0_Yh = qm.predict(X0)
 	```
 	
 	References
 	----------
-	[1] Panofsky, H. A. and Brier, G. W.: Some applications of statistics to meteorology, Mineral Industries Extension Services, College of Mineral Industries, Pennsylvania State University, 103 pp., 1958.
-	[2] Wood, A. W., Leung, L. R., Sridhar, V., and Lettenmaier, D. P.: Hydrologic Implications of Dynamical and Statistical Approaches to Downscaling Climate Model Outputs, Clim. Change, 62, 189–216, https://doi.org/10.1023/B:CLIM.0000013685.99609.9e, 2004.
-	[3] Déqué, M.: Frequency of precipitation and temperature extremes over France in an anthropogenic scenario: Model results and statistical correction according to observed values, Global Planet. Change, 57, 16–26, https://doi.org/10.1016/j.gloplacha.2006.11.030, 2007.
+	[1] Panofsky, H. A. and Brier, G. W.: Some applications of statistics to
+	meteorology, Mineral Industries Extension Services, College of Mineral
+	Industries, Pennsylvania State University, 103 pp., 1958.
+	[2] Wood, A. W., Leung, L. R., Sridhar, V., and Lettenmaier, D. P.:
+	Hydrologic Implications of Dynamical and Statistical Approaches to
+	Downscaling Climate Model Outputs, Clim. Change, 62, 189–216,
+	https://doi.org/10.1023/B:CLIM.0000013685.99609.9e, 2004.
+	[3] Déqué, M.: Frequency of precipitation and temperature extremes over
+	France in an anthropogenic scenario: Model results and statistical
+	correction according to observed values, Global Planet. Change, 57, 16–26,
+	https://doi.org/10.1016/j.gloplacha.2006.11.030, 2007.
 	"""
 	
-	def __init__( self , **kwargs ):##{{{
+	def __init__( self , rvY = rv_empirical , rvX = rv_empirical ):##{{{
 		"""
-		Initialisation of Quantile Mapping bias corrector. All arguments must be named.
+		SBCK.QM.__init__
+		================
 		
-		Parameters
-		----------
-		distY0 : A statistical distribution from scipy.stats or SBCK.tools.rv_*
-			The distribution of references.
-		distX0 : A statistical distribution from scipy.stats or SBCK.tools.rv_*
-			The distribution of biased dataset.
-		kwargsY0 : dict
-			Arguments passed to distY0
-		kwargsX0 : dict
-			Arguments passed to distX0
-		n_features: None or integer
-			Numbers of features, optional because it is determined during fit if X0 and Y0 are not None.
-		tol : float
-			Numerical tolerance, default 1e-3
+		Arguments
+		---------
+		rvY: SBCK.tools.<law> | scipy.stats.<law>
+			Law of references
+		rvX: SBCK.tools.<law> | scipy.stats.<law>
+			Law of models
 		"""
-		self.n_features = kwargs.get("n_features")
-		self._tol = kwargs.get("tol") if kwargs.get("tol") is not None else 1e-3
 		
-		self._distY0 = _Dist( dist = kwargs.get("distY0") , kwargs = kwargs.get("kwargsY0") )
-		self._distX0 = _Dist( dist = kwargs.get("distX0") , kwargs = kwargs.get("kwargsX0") )
+		## Build args for MultiUBC
+		if not isinstance( rvY , (list,tuple) ):
+			if isinstance( rvX , (list,tuple) ):
+				rvY = [rvY for _ in range(len(rvX))]
+			else:
+				rvY = [rvY]
+		if not isinstance( rvX , (list,tuple) ):
+			if isinstance( rvY , (list,tuple) ):
+				rvX = [rvX for _ in range(len(rvY))]
+			else:
+				rvX = [rvX]
+		if not len(rvX) == len(rvY):
+			raise ValueError( f"Incoherent arguments between rvY and rvX" )
+		args = [ (rvy,rvx) for rvy,rvx in zip(rvY,rvX) ]
+		
+		## And init upper class
+		super().__init__( "QM" , Univariate_QM , args = args )
 	##}}}
 	
-	def fit( self , Y0 , X0 ):##{{{
-		"""
-		Fit the QM model
-		
-		Parameters
-		----------
-		Y0	: np.array[ shape = (n_samples,n_features) ]
-			Reference dataset
-		X0	: np.array[ shape = (n_samples,n_features) ]
-			Biased dataset
-		"""
-		## Reshape data in form [n_samples,n_features]
-		if Y0 is not None and Y0.ndim == 1 : Y0 = Y0.reshape(-1,1)
-		if X0 is not None and X0.ndim == 1 : X0 = X0.reshape(-1,1)
-		if self.n_features is None:
-			if Y0 is None and X0 is None:
-				print( "n_features must be set during initialization if Y0 = X0 = None" )
-			elif Y0 is not None: self.n_features = Y0.shape[1]
-			else: self.n_features = X0.shape[1]
-		
-		## 
-		self._distY0.set_features(self.n_features)
-		self._distX0.set_features(self.n_features)
-		
-		## Fit
-		for i in range(self.n_features):
-			if Y0 is not None: self._distY0.fit( Y0[:,i] , i )
-			else : self._distY0.fit( None , i )
-			if X0 is not None: self._distX0.fit( X0[:,i] , i )
-			else : self._distX0.fit( None , i )
-	##}}}
-	
-	def predict( self , X0 ):##{{{
-		"""
-		Perform the bias correction
-		
-		Parameters
-		----------
-		X0  : np.array[ shape = (n_samples,n_features) ]
-			Array of values to be corrected
-		
-		Returns
-		-------
-		Z0 : np.array[ shape = (n_samples,n_features) ]
-			Return an array of correction
-		"""
-		if X0.ndim == 1 : X0 = X0.reshape(-1,1)
-		Z0 = np.zeros_like(X0)
-		for i in range(self.n_features):
-			cdf = self._distX0.law[i].cdf(X0[:,i])
-			cdf[np.logical_not(cdf < 1)] = 1 - self._tol
-			cdf[np.logical_not(cdf > 0)] = self._tol
-			Z0[:,i] = self._distY0.law[i].ppf( cdf )
-		
-		return Z0
-	##}}}
+##}}}
 
 

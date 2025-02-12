@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,454 +21,93 @@
 ## Libraries ##
 ###############
 
+import deprecated
+
 import numpy as np
 import scipy.stats as sc
 import scipy.interpolate as sci
+import scipy.optimize as sco
+
+from .__stats import gpdfit
 
 
-#############
-## Classes ##
-#############
+##############
+## rv_class ##
+##############
 
-class MonotoneInverse:##{{{
+def io_type(func):##{{{
+	"""
+	SBCK.tools.io_type
+	==================
 	
-	def __init__( self , xminmax , yminmax , transform ):##{{{
-		self.xmin  = xminmax[0]
-		self.xmax  = xminmax[1]
-		self.ymin  = yminmax[0]
-		self.ymax  = yminmax[1]
-		delta = 0.05 * (self.xmax - self.xmin)
-		nstepmin,nstepmax = 0,0
-		while transform(self.xmin) > self.ymin:
-			self.xmin -= delta
-			nstepmin += 1
-		while transform(self.xmax) < self.ymax:
-			self.xmax += delta
-			nstepmax += 1
-		self.nstep = 100 + max(nstepmin,nstepmax)
-		x = np.linspace(self.xmin,self.xmax,self.nstep)
-		y = transform(x)
-		self._inverse = sci.interp1d( y , x )
-	##}}}
+	Decorator of the cdf, icdf and pdf method of rv_base used to cast input
+	data in numpy.ndarray, and re-cast to original type in output.
 	
-	def __call__( self , y ):##{{{
-		return self._inverse(y)
-	##}}}
-
+	"""
+	def wrapper( self , x ):
+		
+		## Transform to 1d array
+		xt = np.atleast_1d( np.asarray(x) ).ravel()
+		
+		## Apply function
+		yt = func( self , xt )
+		
+		## And go back to x
+		if np.isscalar(x):
+			try:
+				y = type(x)(yt[0])
+			except:
+				y = float(yt[0])
+			return y
+		
+		y = x.copy() + np.nan
+		y[:] = yt.reshape(y.shape)
+		
+		return y
+	
+	return wrapper
 ##}}}
 
-#class rv_histogram(sc.rv_histogram):##{{{
-#	"""
-#	SBCK.tools.rv_histogram
-#	=======================
-#	Wrapper on scipy.stats.rv_histogram adding a fit method.
-#	"""
-#	def __init__( self , *args , **kwargs ):##{{{
-#		sc.rv_histogram.__init__( self , *args , **kwargs )
-#	##}}}
-#	
-#	def fit( X , bins = 100 ):##{{{
-#		return (np.histogram( X , bins = bins ),)
-#	##}}}
-#	
-###}}}
-
-class rv_histogram:##{{{
+class rv_base:##{{{
 	"""
-	SBCK.tools.rv_histogram
-	=======================
-	Empirical histogram class. The difference with scipy.stats.rv_histogram
-	is the way to infer the cdf and the icdf. Here:
-	
-	>>> X ## Input
-	>>> Xs = np.sort(X)
-	>>> Xr = sc.rankdata(Xs,method="max")
-	>>> p  = np.unique(Xr) / X.size
-	>>> q  = Xs[np.unique(Xr)-1]
-	>>> p[0] = 0
-	>>>
-	>>> icdf = scipy.interpolate.interp1d( p , q )
-	>>> cdf  = scipy.interpolate.interp1d( q , p )
+	SBCK.tools.rv_base
+	==================
+	Base class of random variable, used to be derived.
 	"""
 	
-	def __init__( self , cdf = None , icdf = None , pdf = None , *args , X = None , **kwargs ):
-		self._cdf  = None
-		self._icdf = None
-		self._pdf  = None
-		if cdf is not None and icdf is not None and pdf is not None:
-			self._cdf  = cdf
-			self._icdf = icdf
-			self._pdf  = pdf
-		elif X is not None:
-			cdf,icdf,pdf = rv_histogram.fit(X)
-			self._cdf  = cdf
-			self._icdf = icdf
-			self._pdf  = pdf
-	
-	def fit( X , *args , **kwargs ):
-		
-		Xs = np.sort(X.squeeze())
-		Xr = sc.rankdata(Xs,method="max")
-		p  = np.unique(Xr) / X.size
-		q  = Xs[np.unique(Xr)-1]
-		
-		p[0] = 0
-#		p  = np.hstack( (0,p) )
-#		q  = np.hstack( (X.min(),q) )
-#		if q[0] == q[1]:
-#			eps  = np.sqrt(np.finfo(float).resolution)
-#			q[1] = (1-eps) * q[0] + eps * q[2]
-		
-		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
-		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (0,1) )
-		
-		h,c = np.histogram( X , int(0.1*X.size) , density = True )
-		c = (c[1:] + c[:-1]) / 2
-		pdf = sci.interp1d( c , h , bounds_error = False , fill_value = (0,0) ) 
-		
-		return (cdf,icdf,pdf)
-	
-	def rvs( self , size ):
-		return self._icdf( np.random.uniform( size = size ) )
-	
-	def cdf( self , q ):
-		return self._cdf(q)
-	
-	def icdf( self , p ):
-		return self._icdf(p)
-	
-	def sf( self , q ):
-		return 1 - self._cdf(q)
-	
-	def isf( self , p ):
-		return self._icdf(1-p)
-	
-	def ppf( self , p ):
-		return self.icdf(p)
-	
-	def pdf( self , x ):
-		return self._pdf(x)
-##}}}
-
-class rv_ratio_histogram(sc.rv_histogram):##{{{
-	"""
-	SBCK.tools.rv_ratio_histogram
-	=============================
-	Extension of SBCK.tools.rv_histogram taking into account of a "ratio" part, i.e., instead of fitting:
-	P( X < x )
-	We fit separatly the frequency of 0 and:
-	P( X < x | X > 0 )
-	"""
-	def __init__( self , *args , **kwargs ):##{{{
-		eargs = ()
-		if len(args) > 0:
-			eargs = (args[0],)
-		sc.rv_histogram.__init__( self , *eargs , **kwargs )
-		self.p0 = 0
-		if len(args) > 1:
-			self.p0 = args[1]
-	##}}}
-	
-	def fit( X , bins = 100 ):##{{{
-		Xp = X[X>0]
-		p0 = np.sum(np.logical_not(X>0)) / X.size
-		return (np.histogram( Xp , bins = bins ),p0)
-	##}}}
-	
-	def cdf( self , x ):##{{{
-		cdf = np.zeros_like(x)
-		idxp = x > 0
-		idx0 = np.logical_not(x>0)
-		cdf[idxp] = (1-self.p0) * sc.rv_histogram.cdf( self , x[idxp] ) + self.p0
-		cdf[idx0] = self.p0 / 2
-		return cdf
-	##}}}
-	
-	def ppf( self , p ):##{{{
-		idxp = p > self.p0
-		idx0 = np.logical_not(p > self.p0 )
-		ppf = np.zeros_like(p)
-		ppf[idxp] = sc.rv_histogram.ppf( self , (p[idxp] - self.p0) / (1-self.p0) )
-		ppf[idx0] = 0
-		return ppf
-	##}}}
-	
-	def sf( self , x ):##{{{
-		return 1 - self.cdf(x)
-	##}}}
-	
-	def isf( self , p ):##{{{
-		return self.ppf( 1 - p )
-	##}}}
-
-##}}}
-
-class rv_density:##{{{
-	
-	def __init__( self , *args , **kwargs ):##{{{
-		self._kernel = None
-		if kwargs.get("X") is not None:
-			X = kwargs.get("X")
-			self._kernel = sc.gaussian_kde( X.squeeze() , bw_method = kwargs.get("bw_method") )
-			self._init_icdf( [X.min(),X.max()] )
-		elif len(args) > 0:
-			self._kernel = args[0]
-			self._init_icdf( [args[1],args[2]] )
+	def __init__(self):##{{{
+		pass
 	##}}}
 	
 	def rvs( self , size ):##{{{
-		p = np.random.uniform( size = size )
-		return self.icdf(p)
-	##}}}
-	
-	def fit( X , bw_method = None ):##{{{
-		kernel = sc.gaussian_kde( X , bw_method = bw_method )
-		return (kernel,X.min(),X.max())
-	##}}}
-	
-	def pdf( self , x ):##{{{
-		return self._kernel.pdf(x)
-	##}}}
-	
-	def cdf( self , x ):##{{{
-		x = np.array([x]).squeeze().reshape(-1,1)
-		cdf = np.apply_along_axis( lambda z: self._kernel.integrate_box_1d( -np.Inf , z ) , 1 , x )
-		cdf[cdf < 0] = 0
-		cdf[cdf > 1] = 1
-		return cdf.squeeze()
-	##}}}
-	
-	def sf( self , x ):##{{{
-		return 1 - self.cdf(x)
-	##}}}
-	
-	def ppf( self , q ):##{{{
-		return self.icdf(q)
-	##}}}
-	
-	def icdf( self , q ):##{{{
-		return self._icdf_fct(q)
-	##}}}
-	
-	def isf( self , q ):##{{{
-		return self.icdf(1-q)
-	##}}}
-	
-	def _init_icdf( self , xminmax ):##{{{
-		self._icdf_fct = MonotoneInverse( xminmax , [0,1] , self.cdf )
-	##}}}
-
-##}}}
-
-class rv_mixture:##{{{
-	
-	def __init__( self , l_dist , weights = None ):##{{{
-		self._l_dist  = l_dist
-		self._n_dist  = len(l_dist)
-		self._weights = np.array([weights]).squeeze() if weights is not None else np.ones(self._n_dist)
-		self._weights /= self._weights.sum()
-		self._init_icdf()
-	##}}}
-	
-	def rvs( self , size ):##{{{
-		out = np.zeros(size)
-		ib,ie = 0,int(self._weights[0]*size)
-		for i in range(self._n_dist-1):
-			out[ib:ie] = self._l_dist[i].rvs( size = ie - ib )
-			next_size = int(self._weights[i+1]*size)
-			ib,ie = ie,min(ie+next_size,size)
-		out[ib:] = self._l_dist[-1].rvs( size = size - ib )
-		
-		return out[np.random.choice(size,size,replace = False)]
-	##}}}
-	
-	def pdf( self , x ):##{{{
-		x = np.array([x]).reshape(-1,1)
-		dens = np.zeros_like(x)
-		for i in range(self._n_dist):
-			dens += self._l_dist[i].pdf(x) * self._weights[i]
-		return dens
-	##}}}
-	
-	def cdf( self , x ):##{{{
-		x = np.array([x]).reshape(-1,1)
-		cdf = np.zeros_like(x)
-		for i in range(self._n_dist):
-			cdf += self._l_dist[i].cdf(x) * self._weights[i]
-		return cdf.squeeze()
-	##}}}
-	
-	def sf( self , x ):##{{{
-		return 1 - self.cdf(x)
-	##}}}
-	
-	def ppf( self , q ):##{{{
-		return self.icdf(q)
-	##}}}
-	
-	def icdf( self , q ):##{{{
-		q = np.array([q]).reshape(-1,1)
-		return self._icdf_fct(q)
-	##}}}
-	
-	def _init_icdf(self):##{{{
-		rvs = self.rvs(10000)
-		self._icdf_fct = MonotoneInverse( [rvs.min(),rvs.max()] , [0,1] , self.cdf )
-	##}}}
-	
-	def isf( self , q ):##{{{
-		return self.icdf(1-q)
-	##}}}
-	
-##}}}
-
-class mrv_histogram:##{{{
-	"""
-	SBCK.tools.mrv_histogram
-	========================
-	Multidimensional rv_histogram. Each margins is fitted separately.
-	"""
-	
-	def __init__( self ):
-		self.n_features = 0
-		self._law = []
-	
-	def fit( self , X ):
-		if X.ndim == 1:
-			X = X.reshape(-1,1)
-		self.n_features = X.shape[1]
-		for i in range(self.n_features):
-			self._law.append( rv_histogram( *rv_histogram.fit( X[:,i] ) ) )
-		
-		return self
-	
-	def rvs( self , size = 1 ):
-		return np.array( [ self._law[i].rvs(size=size) for i in range(self.n_features) ] ).T.copy()
-	
-	def cdf( self , q ):
-		q = q.reshape(-1,self.n_features)
-		return np.array( [ self._law[i].cdf(q[:,i]) for i in range(self.n_features) ] ).T.copy()
-	
-	def sf( self , q ):
-		q = q.reshape(-1,self.n_features)
-		return np.array( [ self._law[i].sf(q[:,i]) for i in range(self.n_features) ] ).T.copy()
-	
-	def ppf( self , p ):
-		p = p.reshape(-1,self.n_features)
-		return np.array( [ self._law[i].ppf(p[:,i]) for i in range(self.n_features) ] ).T.copy()
-	
-	def icdf( self , p ):
-		return self.ppf(p)
-	
-	def isf( self , p ):
-		p = p.reshape(-1,self.n_features)
-		return np.array( [ self._law[i].isf(p[:,i]) for i in range(self.n_features) ] ).T.copy()
-	
-##}}}
-
-class rv_empirical_gpd(rv_histogram):##{{{
-	"""
-	SBCK.tools.rv_empirical_gpd
-	===========================
-	Empirical histogram class where tails are given by the fit of Generalized
-	Pareto Distribution. In dev., so use with caution.
-	
-	"""
-	
-	def __init__( self , *args , X = None , p = 0.9 , **kwargs ):##{{{
-		
-		if len(args) in [5,6]:
-			super().__init__( *args )
-			self._gpd_l   = args[3]
-			self._gpd_r   = args[4]
-			if len(args) == 5:
-				self._p = p
-			else:
-				self._p = args[5]
-		elif X is not None:
-			cdf,icdf,pdf,gpd_l,gpd_r,p = rv_empirical_gpd.fit( X , p = p )
-			super().__init__( cdf , icdf , pdf )
-			self._gpd_l   = gpd_l
-			self._gpd_r   = gpd_r
-			self._p       = p
-	##}}}
-	
-	def _gpd(X):##{{{
-		m     = np.mean(X)
-		s     = np.std(X)
-		scale = m * ( m**2 / s**2 + 1 ) / 2
-		shape = 1 - scale / m
-		return scale,shape
-	##}}}
-	
-	def fit( X , *args , p = 0.9 , **kwargs ):##{{{
-		
-		## Empirical part
-		cdf,icdf,pdf = rv_histogram.fit(X)
-		
-		## Location parameter
-		loc_l = icdf(1-p)
-		loc_r = icdf(p)
-		
-		## GPD left fit
-		Xl = -(X[X<loc_l] - loc_l)
-		sc_l,sh_l = rv_empirical_gpd._gpd(Xl)
-		gpd_l = sc.genpareto( loc = - loc_l , scale = sc_l , c = sh_l )
-		
-		## GPD right fit
-		Xr = X[X>loc_r] - loc_r
-		sc_r,sh_r = rv_empirical_gpd._gpd(Xr)
-		gpd_r = sc.genpareto( loc = loc_r , scale = sc_r , c = sh_r )
-		
-		return cdf,icdf,pdf,gpd_l,gpd_r,p
-	##}}}
-	
-	def rvs( self , size = 1 ):##{{{
 		return self.icdf( np.random.uniform( size = size ) )
 	##}}}
 	
-	def cdf( self , q ):##{{{
-		q = np.array([q]).reshape(-1)
-		p = np.zeros_like(q) + np.nan
-		
-		## Empirical
-		idx = (q > self.loc_l) & (q < self.loc_r)
-		p[idx] = self._cdf(q[idx])
-		
-		## Left part
-		idx = q < self.loc_l
-		ql  = -(q[idx] - self.loc_l) - self.loc_l
-		p[idx] = (1-self._p) * self._gpd_l.sf(ql)
-		
-		## Right part
-		idx = q > self.loc_r
-		p[idx] = self._p + (1-self._p) * self._gpd_r.cdf(q[idx])
-		
-		return p
+	## _cdf, _icdf and _pdf ##{{{
+	
+	def _cdf( self , x ):
+		raise NotImplementedError
+	
+	def _icdf( self , p ):
+		raise NotImplementedError
+	
+	def _pdf( self , x ):
+		raise NotImplementedError
+	
 	##}}}
 	
+	@io_type
+	def cdf( self , x ):##{{{
+		return self._cdf(x)
+	##}}}
+	
+	@io_type
 	def icdf( self , p ):##{{{
-		p = np.array([p]).reshape(-1)
-		
-		q = np.zeros_like(p) + np.nan
-		
-		## Empirical part
-		idx = ( p > (1-self._p) ) & (p < self._p)
-		q[idx] = self._icdf(p[idx])
-		
-		## Left part
-		idx = p < 1 - self._p
-		q[idx] = - self._gpd_l.isf( p[idx] / (1-self._p) )
-		
-		## Right part
-		idx = p > self._p
-		q[idx] = self._gpd_r.isf( ( 1 - p[idx] ) / (1-self._p) )
-		
-		return q
+		return self._icdf(p)
 	##}}}
 	
-	def sf( self , q ):##{{{
-		return 1 - self.cdf(q)
+	def sf( self , x ):##{{{
+		return 1 - self.cdf(x)
 	##}}}
 	
 	def isf( self , p ):##{{{
@@ -479,37 +118,816 @@ class rv_empirical_gpd(rv_histogram):##{{{
 		return self.icdf(p)
 	##}}}
 	
+	@io_type
+	def pdf( self , x ):##{{{
+		return self._pdf(x)
+	##}}}
+	
+	def _init_icdf_from_cdf( self , xmin , xmax ):##{{{
+		
+		x    = np.linspace( xmin , xmax , 1000 )
+		p    = self._cdf(x)
+		icdf = sci.interp1d( p , x , bounds_error = False , fill_value = (xmin,xmax) )
+		
+		return icdf
+	##}}}
+	
+	## Properties ##{{{
+	
+	@property
+	def a(self):
+		return self._icdf(0)
+	
+	@property
+	def b(self):
+		return self._icdf(1)
+	##}}}
+	
+##}}}
+
+class rv_empirical(rv_base):##{{{
+	"""
+	SBCK.tools.rv_empirical
+	=======================
+	Empirical histogram class. The differences with scipy.stats.rv_histogram
+	are 1. the fit method and 2. the way to infer the cdf and the icdf. Here:
+	
+	>>> X ## Input
+	>>> rvX = rv_empirical( *rv_empirical.fit(X) )
+	"""
+	
+	def __init__( self , cdf = None , icdf = None , pdf = None , *args , X = None , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_empirical.__init__
+		================================
+		
+		Arguments
+		---------
+		cdf: callable | None
+			The cumulative density function (cdf), infered if X is given
+		icdf: callable | None
+			The inverse of the cdf, infered if X is given
+		pdf: callable | None
+			The probability density function, infered if X is given
+		X: np.ndarray | None
+			Init the rv_empirical with X
+		"""
+		super().__init__()
+		self._fcdf  = None
+		self._ficdf = None
+		self._fpdf  = None
+		if cdf is not None and icdf is not None and pdf is not None:
+			self._fcdf  = cdf
+			self._ficdf = icdf
+			self._fpdf  = pdf
+		elif cdf is not None and icdf is not None and kwargs.get( "no_pdf" , False ):
+			self._fcdf  = cdf
+			self._ficdf = icdf
+		elif X is not None:
+			cdf,icdf,pdf = type(self).fit(X)
+			self._fcdf  = cdf
+			self._ficdf = icdf
+			self._fpdf  = pdf
+		else:
+			raise ValueError( "Bad input arguments" )
+	##}}}
+	
+	@staticmethod
+	def fit( X , *args , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_empirical.fit
+		===========================
+		
+		Fit method
+		
+		Arguments
+		---------
+		X: np.ndarray | None
+			Init the rv_empirical with X
+		kwargs:
+			bin_number: int = int(0.1*X.size)
+				Numbers of bin used to infer the pdf, must be between bin_min
+				and bin_max
+			bin_min: int = 21
+				Minimal numbers of bin used to infer the pdf
+			bin_max: int = 101
+				Maximal numbers of bin used to infer the pdf
+		
+		
+		Returns
+		-------
+		cdf: callable
+			The cumulative density function (cdf), infered if X is given
+		icdf: callable
+			The inverse of the cdf, infered if X is given
+		pdf: callable
+			The probability density function, infered if X is given
+		"""
+		
+		Xs = np.sort(X.squeeze())
+		Xr = sc.rankdata(Xs,method="max")
+		p  = np.unique(Xr) / X.size
+		q  = Xs[np.unique(Xr)-1]
+		
+		if p[0] > 0:
+			q  = np.hstack( (q[0] - np.sqrt(np.finfo(float).resolution),q) )
+			p  = np.hstack( (0,p) )
+		
+		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
+		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (0,1) )
+		
+		dq   = 0.05 * (q.max() - q.min())
+		bins = np.linspace( q.min() - dq , q.max() + dq , min( max( kwargs.get("bin_number",int(0.1*X.size)) , kwargs.get("bin_min",21) ) , kwargs.get("bin_max",101) ) )
+		h,c  = np.histogram( X , bins , density = True )
+		c    = (c[1:] + c[:-1]) / 2
+		pdf  = sci.interp1d( c , h , bounds_error = False , fill_value = (0,0) ) 
+		
+		return (cdf,icdf,pdf)
+	##}}}
+	
+	## _cdf, _icdf and _pdf ##{{{
+	
+	def _cdf( self , x ):
+		return self._fcdf(x)
+	
+	def _icdf( self , p ):
+		return self._ficdf(p)
+	
+	def _pdf( self , x ):
+		return self._fpdf(x)
+	
+	##}}}
+	
+	
+##}}}
+
+class rv_empirical_ratio(rv_empirical):##{{{
+	"""
+	SBCK.tools.rv_empirical_ratio
+	=============================
+	Extension of SBCK.tools.rv_empirical taking into account of a "ratio" part,
+	i.e., instead of fitting:
+	P( X < x )
+	We fit separatly the frequency of 0 and:
+	P( X < x | X > 0 )
+	"""
+	
+	def __init__( self , cdf = None , icdf = None , pdf = None , p0 = None , *args , X = None , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_empirical.__init__
+		================================
+		
+		Arguments
+		---------
+		cdf: callable | None
+			The cumulative density function (cdf), infered if X is given
+		icdf: callable | None
+			The inverse of the cdf, infered if X is given
+		pdf: callable | None
+			The probability density function, infered if X is given
+		p0: float | None
+			The probability at 0
+		X: np.ndarray | None
+			Init the rv_empirical_ratio with X
+		"""
+		
+		self._p0  = p0
+		if cdf is not None and icdf is not None and pdf is not None and p0 is not None:
+			super().__init__( cdf , icdf , pdf )
+		elif cdf is not None and icdf is not None and p0 is not None and kwargs.get( "no_pdf" , False ):
+			super().__init__( cdf , icdf , pdf , no_pdf = True )
+		elif X is not None:
+			cdf,icdf,pdf,p0 = type(self).fit(X)
+			super().__init__( cdf , icdf , pdf )
+			self._p0   = p0
+		else:
+			raise ValueError( "Bad input arguments" )
+	##}}}
+	
+	## Properties ##{{{
+	
+	@property
+	def p0(self):
+		return self._p0
+	
+	##}}}
+	
+	@staticmethod
+	def fit( X , *args , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_empirical_ratio.fit
+		=================================
+		
+		Fit method
+		
+		Arguments
+		---------
+		X: np.ndarray | None
+			Init the rv_empirical_ratio with X
+		
+		Returns
+		-------
+		cdf: callable
+			The cumulative density function (cdf), infered if X is given
+		icdf: callable
+			The inverse of the cdf, infered if X is given
+		pdf: callable
+			The probability density function, infered if X is given
+		p0: float
+			The probability at 0
+		"""
+		Xp = X[X>0]
+		p0 = 1 - np.sum( X>0 ) / X.size
+		return rv_empirical.fit( Xp , *args , **kwargs) + (p0,)
+	##}}}
+	
+	def _cdf( self , x ):##{{{
+		p = np.zeros_like(x) + np.nan
+		idxp = x > 0
+		idxn = x < 0
+		idx0 = ~idxp & ~idxn
+		p[idxp] = (1-self.p0) * super()._cdf( x[idxp] ) + self.p0
+		p[idx0] = self.p0
+		p[idxn] = 0
+		return p
+	##}}}
+	
+	def _icdf( self , p ):##{{{
+		
+		x    = np.zeros_like(p) + np.nan
+		idxp = p > self.p0
+		idx0 = ~idxp
+		x[idxp] = super()._icdf( (p[idxp] - self.p0) / (1-self.p0) )
+		x[idx0] = 0
+		return x
+	##}}}
+	
+	def _pdf( self , x ):##{{{
+		
+		pdf = np.zeros_like(x) + np.nan
+		xp  = x[x>0].min() / 2
+		xn  = x[x<0].max() / 2
+		
+		idxp = x > xp
+		idxn = x < xn
+		idx0 = ~idxp & ~idxn
+		
+		pdf[idxn] = 0
+		pdf[idxp] = super()._pdf(x[idxp]) * (1 - self.p0)
+		pdf[idx0] = sc.uniform.pdf( x[idx0] , loc = xp , scale = xn ) * self.p0
+		return pdf
+	##}}}
+	
+##}}}
+
+class rv_empirical_gpd(rv_empirical):##{{{
+	"""
+	SBCK.tools.rv_empirical_gpd
+	===========================
+	Empirical histogram class where tails are given by the fit of Generalized
+	Pareto Distribution.
+	
+	"""
+	
+	def __init__( self , *args , X = None , p = 0.1 , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_empirical_gpd.__init__
+		====================================
+		
+		Arguments
+		---------
+		args (if given):
+			cdf: callable
+				The cumulative density function (cdf), infered if X is given
+			icdf: callable
+				The inverse of the cdf, infered if X is given
+			pdf: callable
+				The probability density function, infered if X is given
+			locl: float
+				Location parameter of the left GPD
+			locr: float
+				Location parameter of the right GPD
+			gpdl: scipy.stats.genpareto
+				Law of the left tail
+			gpdr: scipy.stats.genpareto
+				Law of the right tail
+			pl: float
+				Probability of the left tail
+			pr: float
+				Probability of the right tail
+		X: np.ndarray | None
+			Init the rv_empirical_gpd with X
+		p: float | tuple | list
+			Probability of the tailS, i.e.
+			 - if p is a float, left and right tails have a weight of p/2.
+			 - if p is a tuple | list, then pl,pr = p
+			Not used if pl + pr = p are given in args.
+		"""
+		
+		if X is not None:
+			cdf,icdf,pdf,locl,locr,gpdl,gpdr,pl,pr = rv_empirical_gpd.fit( X , p )
+		else:
+			if len(args) == 7: ## p is not given
+				cdf,icdf,pdf,locl,locr,gpdl,gpdr = args
+				if isinstance(p,float):
+					pl = p / 2
+					pr = 1 - p / 2
+				else:
+					pl,pr = p
+			elif len(args) == 8: ## p given as a single value
+				cdf,icdf,pdf,locl,locr,gpdl,gpdr,p = args
+				pl = p / 2
+				pr = 1 - p / 2
+			elif len(args) == 9: ## pl and pr are given
+				cdf,icdf,pdf,locl,locr,gpdl,gpdr,pl,pr = args
+			else:
+				raise ValueError("Incoherent arguments")
+		
+		super().__init__( cdf , icdf , pdf )
+		self._locl = locl
+		self._locr = locr
+		self._gpdl = gpdl
+		self._gpdr = gpdr
+		self._pl   = pl
+		self._pr   = pr
+	##}}}
+	
+	@staticmethod
+	def fit( X , p = 0.1 ):##{{{
+		"""
+		SBCK.tools.rv_empirical_gpd.fit
+		===============================
+		
+		Arguments
+		---------
+		X: np.ndarray | None
+			Init the rv_empirical_gpd with X
+		p: float | tuple | list
+			Probability of the tailS, i.e.
+			 - if p is a float, left and right tails have a weight of p/2.
+			 - if p is a tuple | list, then pl,pr = p
+			Not used if pl + pr = p are given in args.
+		"""
+		
+		## Find pl and pr
+		if isinstance( p , float ):
+			pl = p / 2
+			pr = 1 - p / 2
+		else:
+			pl,pr = p
+		
+		## Location parameter
+		locl = np.quantile( X , pl )
+		locr = np.quantile( X , pr )
+		
+		## Cut X in the three part
+		idxl = X < locl
+		idxr = X > locr
+		idxm = ~idxl & ~idxr
+		Xl   = X[idxl] - locl
+		Xr   = X[idxr] - locr
+		Xm   = X[idxm]
+		
+		## Empirical part
+		cdf,icdf,pdf = rv_empirical.fit(Xm)
+		
+		## GPD left fit
+		scl,shl = gpdfit(-Xl)
+		gpdl    = sc.genpareto( loc = 0 , scale = scl , c = shl )
+		
+		## GPD right fit
+		scr,shr = gpdfit(Xr)
+		gpdr    = sc.genpareto( loc = 0 , scale = scr , c = shr )
+		
+		return cdf,icdf,pdf,locl,locr,gpdl,gpdr,pl,pr
+	##}}}
+	
+	def _pdf( self , x ):##{{{
+		
+		pdf = np.zeros_like(x)
+		
+		## Split index into left, middle and right part
+		idxl = x < self.locl
+		idxr = x > self.locr
+		idxm = ~idxl & ~idxr
+		
+		## Empirical
+		pdf[idxm] = rv_empirical._pdf( self , x[idxm] ) * (self.pr - self.pl)
+		
+		## Left part
+		pdf[idxl] = self.pl * self._gpdl.pdf( -(x[idxl] - self.locl) )
+		
+		## Right part
+		pdf[idxr] = self._gpdr.pdf(x[idxr] - self.locr) * (1-self.pr)
+		
+		return pdf
+	##}}}
+	
+	def _cdf( self , x ):##{{{
+		
+		p = np.zeros_like(x) + np.nan
+		
+		## Split index into left, middle and right part
+		idxl = x < self.locl
+		idxr = x > self.locr
+		idxm = ~idxl & ~idxr
+		
+		## Empirical
+		p[idxm] = rv_empirical._cdf( self , x[idxm] ) * (self.pr - self.pl) + self.pl
+		
+		## Left part
+		p[idxl] = self.pl * self._gpdl.sf( -(x[idxl] - self.locl) )
+		
+		## Right part
+		p[idxr] = self.pr + (1-self.pr) * self._gpdr.cdf(x[idxr] - self.locr)
+		
+		return p
+	##}}}
+	
+	def _icdf( self , p ):##{{{
+		
+		x = np.zeros_like(p) + np.nan
+		
+		## Split index into left, middle and right part
+		idxl = p < self.pl
+		idxr = p > self.pr
+		idxm = ~idxl & ~idxr
+		
+		## Empirical part
+		x[idxm] = rv_empirical._icdf( self , ( p[idxm] - self.pl ) / (self.pr - self.pl) )
+		
+		## Left part
+		x[idxl] = self.locl - self._gpdl.isf( p[idxl] / self.pl )
+		
+		## Right part
+		x[idxr] = self.locr + self._gpdr.ppf( (p[idxr] - self.pr) / (1-self.pr ))
+		
+		return x
+	##}}}
+	
 	## Attributes ##{{{
 	
 	@property
-	def p(self):
-		return self._p
+	def pl(self):
+		return self._pl
 	
 	@property
-	def loc_l(self):
-		return -float(self._gpd_l.kwds["loc"])
+	def pr(self):
+		return self._pr
 	
 	@property
-	def loc_r(self):
-		return float(self._gpd_r.kwds["loc"])
+	def locl(self):
+		return self._locl
 	
 	@property
-	def scale_l(self):
-		return float(self._gpd_l.kwds["scale"])
+	def locr(self):
+		return self._locr
 	
 	@property
-	def scale_r(self):
-		return float(self._gpd_r.kwds["scale"])
+	def scalel(self):
+		return float(self._gpdl.kwds["scale"])
 	
 	@property
-	def shape_l(self):
-		return float(self._gpd_l.kwds["c"])
+	def scaler(self):
+		return float(self._gpdr.kwds["scale"])
 	
 	@property
-	def shape_r(self):
-		return float(self._gpd_r.kwds["c"])
+	def shapel(self):
+		return float(self._gpdl.kwds["c"])
+	
+	@property
+	def shaper(self):
+		return float(self._gpdr.kwds["c"])
 	
 	##}}}
 	
 ##}}}
+
+class rv_density(rv_base):##{{{
+	"""
+	SBCK.tools.rv_density
+	=====================
+	Empirical density class. Use a gaussian kernel. 'bw_method' argument
+	can be given as kwargs to scipy.stats.gaussian_kde
+	
+	"""
+	
+	def __init__( self , *args , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_density.__init__
+		==============================
+		
+		Arguments
+		---------
+		args (if given):
+			kernel: scipy.stats.gaussian_kde
+				Kernel of X
+			xmin: float
+				left bound of the support
+			xmax: float
+				right bound of the support
+		kwargs (if given):
+			X: np.ndarray
+				Init the rv_density with X
+			bw_method:
+				bandwidth method, see scipy.stats.gaussian_kde
+		"""
+		super().__init__()
+		self._kernel = None
+		if kwargs.get("X") is not None:
+			X = kwargs.get("X")
+			self._kernel = sc.gaussian_kde( X.squeeze() , bw_method = kwargs.get("bw_method") )
+			self._icdf = self._init_icdf_from_cdf( X.min() , X.max() )
+		elif len(args) > 0:
+			self._kernel = args[0]
+			self._icdf = self._init_icdf_from_cdf( args[1] , args[2] )
+		
+	##}}}
+	
+	def fit( X , bw_method = None ):##{{{
+		"""
+		SBCK.tools.rv_density.fit
+		=========================
+		
+		Arguments
+		---------
+		X: np.ndarray
+			Init the rv_density with X
+		bw_method:
+			bandwidth method, see scipy.stats.gaussian_kde
+		
+		Returns
+		-------
+		kernel: scipy.stats.gaussian_kde
+			Kernel of X
+		xmin: float
+			left bound of the support
+		xmax: float
+			right bound of the support
+		"""
+		kernel = sc.gaussian_kde( X , bw_method = bw_method )
+		return (kernel,X.min(),X.max())
+	##}}}
+	
+	def _cdf( self , x ):##{{{
+		cdf = np.apply_along_axis( lambda z: self._kernel.integrate_box_1d( -np.Inf , z ) , 1 , x.reshape(-1,1) )
+		cdf[cdf < 0] = 0
+		cdf[cdf > 1] = 1
+		return cdf.squeeze()
+	##}}}
+	
+	def _pdf( self , x ):##{{{
+		return self._kernel.pdf(x)
+	##}}}
+	
+##}}}
+
+class rv_mixture(rv_base):##{{{
+	"""
+	SBCK.tools.rv_mixture
+	=====================
+	Mixture of distributions. A fit method is implemented, but not really work.
+	
+	"""
+	
+	def __init__( self , *args , **kwargs ):##{{{
+		"""
+		SBCK.tools.rv_mixture.__init__
+		==============================
+		
+		Arguments
+		---------
+		args:
+			A list of scipy.stats.* distribution (initialized), and a vector of
+			weights.
+		"""
+		super().__init__()
+		
+		self._dist    = []
+		self._weights = None
+		for d in args:
+			if isinstance( d , (list,tuple,np.ndarray) ):
+				self._weights = np.array(d).ravel()
+			else:
+				self._dist.append(d)
+		
+		if self._weights is None:
+			if "weights" in kwargs:
+				self._weights = kwargs["weights"]
+			else:
+				self._weights = np.ones(len(self._dist))
+		self._weights  = np.array([self._weights]).ravel()
+		self._weights /= self._weights.sum()
+		
+		## Build the icdf
+		xmin =  np.inf
+		xmax = -np.inf
+		for dist in self._dist:
+			xmin = min( xmin , dist.ppf(  1e-3) )
+			xmax = max( xmax , dist.ppf(1-1e-3) )
+		self._icdf = self._init_icdf_from_cdf(xmin,xmax)
+	##}}}
+	
+	def _pdf( self , x ):##{{{
+		pdf = np.zeros_like(x)
+		for i in range(len(self._dist)):
+			pdf += self._dist[i].pdf(x) * self._weights[i]
+		return pdf
+	##}}}
+	
+	def _cdf( self , x ):##{{{
+		cdf = np.zeros_like(x)
+		for i in range(len(self._dist)):
+			cdf += self._dist[i].cdf(x) * self._weights[i]
+		return cdf
+	##}}}
+	
+	@staticmethod
+	def fit( X , *args ):##{{{
+		"""
+		SBCK.tools.rv_mixture.fit
+		=========================
+		
+		Use a MLE method, but not really work
+		
+		Arguments
+		---------
+		X: np.ndarray
+			Init the rv_density with X
+		args:
+			A list of scipy.stats.* distribution, not initialized
+		
+		Returns
+		-------
+		- A list of scipy.stats.* distribution, initialized
+		- A vector of weights
+		"""
+		
+		## Step 1, find the numbers of parameters
+		nhpars = []
+		x0     = []
+		for law in args:
+			ehpar = list(law.fit(X))
+			x0 = x0 + ehpar
+			nhpars.append( len(ehpar) )
+		thpar = sum(nhpars)
+		
+		## Define the likelihood
+		def mle( x , X , nhpars , *args ):
+			
+			## Extract hyper-parameters and weights
+			thpar = sum(nhpars)
+			hpars = x[:thpar]
+			ws    = np.exp(x[thpar:])
+			ws    = ws / ws.sum()
+			
+			## Split hpar in hpar for each law
+			i0,i1  = 0,0
+			lhpars = []
+			for n in nhpars:
+				i1 = i0 + n
+				lhpars.append(hpars[i0:i1])
+				i0 = i1
+			
+			## And compute likelihood
+			ll = 0
+			for law,hpar,w in zip(args,lhpars,ws):
+				ll += w * law.logpdf( X , *hpar.tolist() ).sum()
+			
+			return -ll
+		
+		## Define the init point
+		x0 = np.array( [x0 + np.zeros(len(args)).tolist()] ).ravel()
+		
+		## Optimization
+		res = sco.minimize( mle , x0 , args = (X,nhpars) + args , method = "Nelder-Mead" )
+		x   = res.x
+		
+		## Split output parameters
+		hpars = x[:thpar]
+		ws    = np.exp(x[thpar:])
+		ws    = ws / ws.sum()
+		i0,i1  = 0,0
+		lhpars = []
+		for n in nhpars:
+			i1 = i0 + n
+			lhpars.append(hpars[i0:i1])
+			i0 = i1
+		
+		##
+		oargs = []
+		for law,hpar in zip(args,lhpars):
+			oargs.append( law( *hpar.tolist() ) )
+		oargs.append(ws)
+		
+		return tuple(oargs)
+	##}}}
+	
+##}}}
+
+
+###########################
+## Multivariate rv_class ##
+###########################
+
+class mrv_base:##{{{
+	"""
+	SBCK.tools.mrv_base
+	==================
+	Class used to transform univariate rv in multivariate rv. Each margins is
+	fitted separately.
+	"""
+	
+	def __init__( self , *args ):
+		self.ndim  = len(args)
+		self._claw = args
+		self._law  = []
+	
+	def fit( self , X ):
+		if X.ndim == 1:
+			X = X.reshape(-1,1)
+		if self.ndim == 0:
+			self.ndim  = X.shape[1]
+			self._claw = [rv_empirical for _ in range(self.ndim)]
+		elif not self.ndim == X.shape[1]:
+			raise ValueError( "Dimensions of X not compatible with arguments" )
+		for i in range(self.ndim):
+			claw = self._claw[i]
+			self._law.append( claw( *claw.fit( X[:,i] ) ) )
+		
+		return self
+	
+	def rvs( self , size = 1 ):
+		return np.array( [ self._law[i].rvs(size=size) for i in range(self.ndim) ] ).T.copy()
+	
+	def cdf( self , x ):
+		x = x.reshape(-1,self.ndim)
+		return np.array( [ self._law[i].cdf(x[:,i]) for i in range(self.ndim) ] ).T.copy()
+	
+	def sf( self , x ):
+		return 1 - self.cdf(x)
+	
+	def icdf( self , p ):
+		p = p.reshape(-1,self.ndim)
+		return np.array( [ self._law[i].ppf(p[:,i]) for i in range(self.ndim) ] ).T.copy()
+	
+	def isf( self , p ):
+		return self.icdf(1-p)
+	
+	def ppf( self , p ):
+		return self.icdf(p)
+	
+##}}}
+
+
+############################
+## Wrapper of QM and CDFt ##
+############################
+
+class WrapperStatisticalDistribution:##{{{
+	
+	def __init__( self , law = rv_empirical ):
+		self.law = law
+	
+	def is_frozen( self ):
+		return isinstance(self.law,sc._distn_infrastructure.rv_frozen)
+	
+	def is_parametric( self ):
+		raise NotImplementedError
+	
+	def cdf( self , x ):
+		return self.law.cdf(x)
+	
+	def icdf( self , p ):
+		return self.law.ppf(p)
+	
+	def fit( self , X ):
+		if not self.is_frozen():
+			self.law = self.law( *self.law.fit( X.squeeze() ) )
+		return self
+##}}}
+
+
+################
+## Deprecated ##
+################
+
+@deprecated.deprecated( reason = "rv_histogram is renamed rv_empirical" , version = "2.0.0" )
+class rv_histogram(rv_empirical):##{{{
+	def __init__( self , *args , **kwargs ):
+		super().__init__(*args,**kwargs)
+##}}}
+
+@deprecated.deprecated( reason = "rv_ratio_histogram is renamed rv_empirical_ratio" , version = "2.0.0" )
+class rv_ratio_histogram(rv_empirical_ratio):##{{{
+	def __init__( self , *args , **kwargs ):
+		super().__init__(*args,**kwargs)
+##}}}
+
+@deprecated.deprecated( reason = "mrv_histogram is renamed mrv_base" , version = "2.0.0" )
+class mrv_histogram(mrv_base):##{{{
+	def __init__( self , *args , **kwargs ):
+		super().__init__(*args,**kwargs)
+##}}}
+
 

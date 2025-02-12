@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -22,15 +22,120 @@
 ###############
 
 import numpy as np
+from .__AbstractBC import AbstractBC
+from .__dOTC import OTC
 from .__dOTC import dOTC
-from .tools.__Shift import Shift
+from .tools.__misc import Shift
 
 
 ###########
 ## Class ##
 ###########
 
-class dTSMBC:
+class TSMBC(AbstractBC):##{{{
+	"""
+	SBCK.TSMBC
+	==========
+	
+	Description
+	-----------
+	Time Shifted Multivariate Bias Correction.
+	
+	References
+	----------
+	[1] Robin, Y. and Vrac, M.: Is time a variable like the others in
+	multivariate statistical downscaling and bias correction?, Earth Syst.
+	Dynam. Discuss. [preprint], https://doi.org/10.5194/esd-2021-12, in review,
+	2021.
+	"""
+	
+	def __init__( self , lag , bc_method = OTC , method = "row" , ref = "middle" , **kwargs ):##{{{
+		"""
+		Initialisation of TSMBC.
+		
+		Parameters
+		----------
+		lag       : integer
+			Time lag of the shift
+		bc_method : An class of SBCK
+			bias correction method used, default is SBCK.OTC
+		method    : string
+			inverse method for shift, see SBCK.tools.Shift
+		ref       : integer
+			Reference columns/rows for inverse, see SBCK.tools.Shift, default is 0.5 * (lag+1)
+		**kwargs  : arguments of bc_method
+		
+		Attributes
+		----------
+		bc_method : An element of SBCK
+			Bias correction method
+		shift     : Shift class
+			class used to shift and un-shift data
+		"""
+		super().__init__("TSMBC")
+		self.bc_method = bc_method(**kwargs)
+		if ref == "middle": ref = int(0.5*(lag+1))
+		self.shift     = Shift( lag , method , ref )
+	##}}}
+	
+	## Properties {{{
+	
+	@property
+	def ref(self):
+		return self.shift.ref
+	
+	@ref.setter
+	def ref( self , _ref ):
+		self.shift.ref = _ref
+	
+	@property
+	def method(self):
+		return self.shift.method
+	
+	@method.setter
+	def method( self , _method ):
+		self.shift.method = _method
+	##}}}
+	
+	def fit( self , Y0 , X0 ):##{{{
+		"""
+		Fit of the bc_method model on shifted X0 and Y0
+		
+		Parameters
+		----------
+		Y0	: np.ndarray
+			Reference dataset
+		X0	: np.ndarray
+			Biased dataset
+		"""
+		Xs = self.shift.transform(X0)
+		Ys = self.shift.transform(Y0)
+		self.bc_method.fit( Ys , Xs )
+		
+		return self
+	##}}}
+	
+	def predict( self , X0 ):##{{{
+		"""
+		Perform the bias correction
+		
+		Parameters
+		----------
+		X0  : np.ndarray
+			Array of values to be corrected
+		
+		Returns
+		-------
+		Z0 : np.ndarray
+			Return an array of correction
+		"""
+		Xs = self.shift.transform(X0)
+		return self.shift.inverse( self.bc_method.predict(Xs) )
+	##}}}
+	
+##}}}
+
+class dTSMBC(AbstractBC):##{{{
 	"""
 	SBCK.dTSMBC
 	===========
@@ -41,7 +146,10 @@ class dTSMBC:
 	
 	References
 	----------
-	[1] Robin, Y. and Vrac, M.: Is time a variable like the others in multivariate statistical downscaling and bias correction?, Earth Syst. Dynam. Discuss. [preprint], https://doi.org/10.5194/esd-2021-12, in review, 2021.
+	[1] Robin, Y. and Vrac, M.: Is time a variable like the others in
+	multivariate statistical downscaling and bias correction?, Earth Syst.
+	Dynam. Discuss. [preprint], https://doi.org/10.5194/esd-2021-12, in review,
+	2021.
 	"""
 	
 	def __init__( self , lag , bc_method = dOTC , method = "row" , ref = "middle" , **kwargs ):##{{{
@@ -67,6 +175,7 @@ class dTSMBC:
 		shift     : Shift class
 			class used to shift and un-shift data
 		"""
+		super().__init__("dTSMBC")
 		self.bc_method = bc_method(**kwargs)
 		if ref == "middle": ref = int(0.5*(lag+1))
 		self.shift     = Shift( lag , method , ref )
@@ -97,17 +206,19 @@ class dTSMBC:
 		
 		Parameters
 		----------
-		Y0	: np.array[ shape = (n_samples,n_features) ]
+		Y0	: np.ndarray
 			Reference dataset on learning part
-		X0	: np.array[ shape = (n_samples,n_features) ]
+		X0	: np.ndarray
 			Biased dataset on learning part
-		X1	: np.array[ shape = (n_samples,n_features) ]
+		X1	: np.ndarray
 			Biased dataset on projection part
 		"""
 		Y0s = self.shift.transform(Y0)
 		X0s = self.shift.transform(X0)
 		X1s = self.shift.transform(X1)
 		self.bc_method.fit( Y0s , X0s , X1s )
+		
+		return self
 	##}}}
 	
 	def predict( self , X1 , X0 = None ):##{{{
@@ -117,16 +228,16 @@ class dTSMBC:
 		
 		Parameters
 		----------
-		X1  : np.array[ shape = (n_samples,n_features) ]
+		X1  : np.ndarray
 			Array of values to be corrected in projection period
-		X0  : np.array[ shape = (n_samples,n_features) ] or None
+		X0  : np.ndarray or None
 			Array of values to be corrected in calibration period
 		
 		Returns
 		-------
-		Z1 : np.array[ shape = (n_sample,n_features) ]
+		Z1 : np.ndarray
 			Return an array of correction in projection period
-		Z0 : np.array[ shape = (n_sample,n_features) ] or None
+		Z0 : np.ndarray or None
 			Return an array of correction in calibration period, or None
 		"""
 		X1s = self.shift.transform(X1)
@@ -141,4 +252,8 @@ class dTSMBC:
 		Z1 = self.shift.inverse(Z1s)
 		return Z1
 	##}}}
+	
+##}}}
+
+
 

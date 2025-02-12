@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -23,9 +23,9 @@
 
 import numpy as np
 import scipy.stats as sc
-import sklearn.datasets as skd
 
 from ..__QM import QM
+from ..tools.__stats import rvs_spd_matrix
 
 
 ###############
@@ -156,9 +156,10 @@ def gaussian_dd( n_samples , n_features = 2 ):##{{{
 		- X0 biased dataset in calibration period
 		- X1 biased dataset in projection period
 	"""
-	X0 = np.random.multivariate_normal( mean = np.zeros(n_features)     , cov = skd.make_spd_matrix(n_features) , size = n_samples )
-	X1 = np.random.multivariate_normal( mean = np.zeros(n_features) + 5 , cov = skd.make_spd_matrix(n_features) , size = n_samples )
-	Y0 = np.random.multivariate_normal( mean = np.zeros(n_features) - 2 , cov = skd.make_spd_matrix(n_features) , size = n_samples )
+
+	X0 = np.random.multivariate_normal( mean = np.zeros(n_features)     , cov = rvs_spd_matrix(n_features) , size = n_samples )
+	X1 = np.random.multivariate_normal( mean = np.zeros(n_features) + 5 , cov = rvs_spd_matrix(n_features) , size = n_samples )
+	Y0 = np.random.multivariate_normal( mean = np.zeros(n_features) - 2 , cov = rvs_spd_matrix(n_features) , size = n_samples )
 	return Y0,X0,X1
 ##}}}
 
@@ -192,25 +193,22 @@ def like_tas_pr( n_samples ):##{{{
 	mX0   = np.array([5 for _ in range(n_dim-1)] + [0])
 	mX1   = np.array([8 for _ in range(n_dim-1)] + [0])
 	mY0   = np.zeros(n_dim)
-	covX0 = skd.make_spd_matrix(n_dim)
-	covX1 = skd.make_spd_matrix(n_dim)
-	covY0 = skd.make_spd_matrix(n_dim)
+	covX0 = rvs_spd_matrix(n_dim)
+	covX1 = rvs_spd_matrix(n_dim)
+	covY0 = rvs_spd_matrix(n_dim)
 	
 	X0 = np.random.multivariate_normal( mean = mX0 , cov = covX0 , size = n_samples )
 	X1 = np.random.multivariate_normal( mean = mX1 , cov = covX1 , size = n_samples )
 	Y0 = np.random.multivariate_normal( mean = mY0 , cov = covY0 , size = n_samples )
 	
-	qm = QM( distY0 = sc.expon( scale = 1 ) )
-	qm.fit(None,Y0[:,-1])
-	Y0[:,-1] = qm.predict(Y0[:,-1]).squeeze()
+	qm = QM( rvY = sc.expon( scale = 1 ) ).fit(None,Y0[:,-1])
+	Y0[:,-1] = qm.predict(Y0[:,-1])
 	
-	qm = QM( distY0 = sc.expon( scale = 0.5 ) )
-	qm.fit(None,X0[:,-1])
-	X0[:,-1] = qm.predict(X0[:,-1]).squeeze()
+	qm = QM( rvY = sc.expon( scale = 0.5 ) ).fit(None,X0[:,-1])
+	X0[:,-1] = qm.predict(X0[:,-1])
 	
-	qm = QM( distY0 = sc.expon( scale = 1 ) )
-	qm.fit(None,X1[:,-1])
-	X1[:,-1] = qm.predict(X1[:,-1]).squeeze()
+	qm = QM( rvY = sc.expon( scale = 1 ) ).fit(None,X1[:,-1])
+	X1[:,-1] = qm.predict(X1[:,-1])
 	
 	X0[X0[:,-1] < np.quantile(X0[:,-1],0.05),-1] = 0
 	X1[X0[:,-1] < np.quantile(X1[:,-1],0.10),-1] = 0
@@ -218,4 +216,88 @@ def like_tas_pr( n_samples ):##{{{
 	
 	return Y0,X0,X1
 ##}}}
+
+def gaussian_scale_problem( n_samples ):##{{{
+	"""
+	SBCK.datasets.gaussian_scale_problem
+	====================================
+	
+	Build a test dataset where the change in the evolution of the scale is hard
+	to correct.
+	
+	Parameters
+	----------
+	n_samples : integer
+		Number of samples in X0, X1 and Y0
+	
+	Returns
+	-------
+	Y0,X0,X1 : tuple
+		- Y0 reference dataset in calibration period
+		- X0 biased dataset in calibration period
+		- X1 biased dataset in projection period
+	"""
+	Y0 = np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) )
+	X0 = np.random.normal( loc = 0 , scale = 1.  , size = (n_samples,2) ) + np.array([0,5])
+	X1 = np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) ) + np.array([5,5])
+	
+	return Y0,X0,X1
+##}}}
+
+def weird_dep_structure( n_samples ):##{{{
+	"""
+	SBCK.datasets.weird_dep_structure
+	=================================
+	
+	Build a test dataset such that X0, X1 and Y0 have a very complex dependence
+	structure.
+	
+	Parameters
+	----------
+	n_samples : integer
+		Number of samples in X0, X1 and Y0
+	
+	Returns
+	-------
+	Y0,X0,X1 : tuple
+		- Y0 reference dataset in calibration period
+		- X0 biased dataset in calibration period
+		- X1 biased dataset in projection period
+	"""
+	
+	Y0 = np.zeros( (n_samples,2) )
+	X0 = np.zeros( (n_samples,2) )
+	X1 = np.zeros( (n_samples,2) )
+	
+	##
+	dsize0 = int(n_samples/2)
+	dsize1 = n_samples - dsize0
+	Y0[:dsize0,0] = np.linspace(-1,1,dsize0)
+	Y0[:dsize0,1] = np.linspace(-1,1,dsize0)
+	Y0[dsize0:,0] = np.linspace(-1,1,dsize1)
+	Y0[dsize0:,1] = np.linspace(-1,1,dsize1)[::-1]
+	Y0 += np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) )
+	
+	##
+	X0[:,0] = np.cos( np.linspace( 0 , 2*np.pi , n_samples ) )
+	X0[:,1] = np.sin( np.linspace( 0 , 2*np.pi , n_samples ) )
+	X0 += np.random.exponential( scale = 0.1 , size = (n_samples,2) )
+	
+	##
+	X1[:,0] = np.linspace( 0 , 2 , n_samples )
+	X1[:,1] = np.sin(np.linspace(0,4*np.pi,n_samples))
+	X1 += np.random.normal( loc = 0 , scale = 0.05 , size = (n_samples,2) )
+	
+	## Center scale
+	Y0 = (Y0 - Y0.mean(0)) / Y0.std(0)
+	X0 = (X0 - X0.mean(0)) / X0.std(0)
+	X1 = (X1 - X1.mean(0)) / X1.std(0)
+	
+	## Add change in mean std
+	Y0 = Y0 * np.array([1.5,0.5]) + np.array([-1,-0.5])
+	X1 = X1 * np.array([1.5,1]) + np.array([2,1])
+	
+	return Y0,X0,X1
+##}}}
+
 

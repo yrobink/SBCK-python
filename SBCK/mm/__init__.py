@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -17,12 +16,9 @@
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
-from .__univariates   import gaussian_exp_mixture_1d
-from .__univariates   import gaussian_VS_exp_1d
-from .__multivariates import gaussian_exp_2d
-from .__multivariates import gaussian_L_2d
-from .__multivariates import bimodal_reverse_2d
-from .__multivariates import gaussian_dd
-from .__multivariates import like_tas_pr
-from .__multivariates import weird_dep_structure
-from .__multivariates import gaussian_scale_problem
+#############
+## Imports ##
+#############
+
+from .__AlphaPooling import AlphaPooling
+

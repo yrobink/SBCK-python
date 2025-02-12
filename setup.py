@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2023 Yoann Robin
+## Copyright(c) 2021 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -25,7 +25,9 @@
 import os
 import sys
 import sysconfig
-from setuptools import setup, Extension
+#from setuptools import setup, Extension
+from setuptools import Extension
+from distutils.core import setup
 from setuptools.command.build_ext import build_ext
 import setuptools
 from pathlib import Path
@@ -169,13 +171,8 @@ ext_modules = [
 ## Compilation ##
 #################
 
-list_packages = [
-	"SBCK",
-	"SBCK.ppp",
-	"SBCK.tools",
-	"SBCK.metrics",
-	"SBCK.datasets"
-]
+list_packages = setuptools.find_packages()
+package_dir = { "SBCK": "SBCK" }
 
 ########################
 ## Infos from release ##
@@ -221,11 +218,11 @@ setup(
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
 	ext_modules      = ext_modules,
-	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
+	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0" , "deprecated" ],
 	cmdclass         = {'build_ext': BuildExt},
 	zip_safe         = False,
 	packages         = list_packages,
-	package_dir      = { "SBCK" : "./SBCK" }
+	package_dir      = package_dir
 )
 
 

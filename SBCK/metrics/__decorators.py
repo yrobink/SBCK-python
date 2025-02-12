@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -22,8 +22,8 @@
 ###############
 
 import numpy as np
-from SBCK.tools.__bin_width_estimator import bin_width_estimator
-from SBCK.tools.__tools_cpp import SparseHist
+from SBCK.tools.__stats import bin_width_estimator
+from SBCK.tools.__SparseHist import SparseHist
 
 
 
@@ -35,8 +35,8 @@ def _to_SparseHist( func ):
 	def wrapper( *args , **kwargs ):
 		muX = args[0]
 		muY = args[1]
-		testX = type(muX) == SparseHist
-		testY = type(muY) == SparseHist
+		testX = isinstance(muX,SparseHist)
+		testY = isinstance(muY,SparseHist)
 		
 		if not testX and testY:
 			muXX = SparseHist( muX , muY.bin_width )

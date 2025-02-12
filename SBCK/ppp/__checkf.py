@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 Yoann Robin
+## Copyright(c) 2022 / 2024 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,6 +20,7 @@
 ## Libraries ##
 ###############
 
+import deprecated
 import numpy as np
 
 
@@ -27,10 +28,10 @@ import numpy as np
 ## Functions ##
 ###############
 
-def skipNotValid(X):
+def allfinite(X):##{{{
 	"""
-	SBCK.ppp.skipNotValid
-	=====================
+	SBCK.ppp.allfinite
+	==================
 	
 	Parameters
 	----------
@@ -45,3 +46,36 @@ def skipNotValid(X):
 	
 	"""
 	return np.all(np.isfinite(X))
+	##}}}
+
+def atleastonefinite(X):##{{{
+	"""
+	SBCK.ppp.atleastonefinite
+	=========================
+	
+	Parameters
+	----------
+	X:
+		Input numpy array
+	
+	Returns
+	-------
+	bool:
+		Return true if any values of X are finite (numpy.finite), else return
+		False.
+	
+	"""
+	return np.any(np.isfinite(X))
+	##}}}
+
+
+################
+## Deprecated ##
+################
+
+@deprecated.deprecated( reason = "skipNotValid is renamed allfinite" , version = "2.0.0" )
+def skipNotValid(X):##{{{
+	return allfinite(X)
+##}}}
+
+

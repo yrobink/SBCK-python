@@ -52,9 +52,9 @@ def gaussian_exp_mixture_1d( n_samples ):
 		- X0 biased dataset in calibration period
 		- X1 biased dataset in projection period
 	"""
-	rvY0 = rv_mixture( [sc.expon(scale = 1),sc.norm(loc = 10,scale = 1)] , weights = [0.75,0.25] )
+	rvY0 = rv_mixture( *[sc.expon(scale = 1),sc.norm(loc = 10,scale = 1)] , weights = [0.75,0.25] )
 	rvX0 = sc.norm( loc = 7 , scale = 1 )
-	rvX1 = rv_mixture( [sc.norm(loc = 5,scale = 1),sc.norm(loc = 9 , scale = 1)] , weights = [0.75,0.25] )
+	rvX1 = rv_mixture( *[sc.norm(loc = 5,scale = 1),sc.norm(loc = 9 , scale = 1)] , weights = [0.75,0.25] )
 	Y0 = rvY0.rvs(n_samples).reshape(-1,1)
 	X0 = rvX0.rvs(n_samples).reshape(-1,1)
 	X1 = rvX1.rvs(n_samples).reshape(-1,1)

@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 Yoann Robin
+## Copyright(c) 2022 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,14 +20,18 @@
 ## Libraries ##
 ###############
 
-from .__checkf import skipNotValid
-from ..__IdBC import IdBC
+from ..__AbstractBC import AbstractBC
+from ..__miscBC import IdBC
+
+from .__checkf import allfinite
+
+
 
 ###########
 ## Class ##
 ###########
 
-class PrePostProcessing:##{{{
+class PrePostProcessing(AbstractBC):##{{{
 	
 	"""
 	SBCK.ppp.PrePostProcessing
@@ -52,7 +56,7 @@ class PrePostProcessing:##{{{
 	
 	Now, if we want to pre-post process with the SSR method (0 are replaced by
 	random values between 0 (excluded) and the minimal non zero value), we write:
-	>>> ppp = SBCK.ppp.PPPSSR( bc_method = SBCK.QM , cols = [2] )
+	>>> ppp = SBCK.ppp.SSR( bc_method = SBCK.QM , cols = [2] )
 	>>> ppp.fit(Y0,X0)
 	>>> Z0 = ppp.predict(X0)
 	
@@ -62,25 +66,25 @@ class PrePostProcessing:##{{{
 	Imagine now that we want to apply the SSR, and to ensure the positivity of CDFt
 	for precipitation, we also want to use the LogLinLink pre-post processing
 	method. This can be done with the following syntax:
-	>>> ppp = SBCK.ppp.PPPLogLinLink( bc_method = SBCK.CDFt , cols = [2] ,
-	>>>                               pipe = [SBCK.ppp.PPPSSR] ,
-	>>>                               pipe_kwargs = [{"cols" : 2}] )
+	>>> ppp = SBCK.ppp.LFLoglin( bc_method = SBCK.CDFt , cols = [2] ,
+	>>>                          pipe = [SBCK.ppp.SSR] ,
+	>>>                          pipe_kwargs = [{"cols" : 2}] )
 	>>> ppp.fit(Y0,X0,X1)
 	>>> Z = ppp.predict(X1,X0)
 	
 	With this syntax, the pre processing operation is
-	PPPLogLinLink.transform(PPPSSR.transform(data)) and post processing operation
-	PPPSSR.itransform(PPPLogLinLink.itransform(bc_data)). So the formula can read
+	LFLoglin.transform(SSR.transform(data)) and post processing operation
+	SSR.itransform(LFLoglin.itransform(bc_data)). So the formula can read
 	from right to left (as the mathematical composition). Note it is equivalent
 	to define:
 	>>> ppp = SBCK.ppp.PrePostProcessing( bc_method = SBCK.CDFt,
-	>>>                     pipe = [SBCK.ppp.PPPLogLinLink,SBCK.ppp.PPPSSR],
+	>>>                     pipe = [SBCK.ppp.LFLoglin,SBCK.ppp.SSR],
 	>>>                     pipe_kwargs = [ {"cols":2} , {"cols":2} ] )
 	
 	"""
 	
 	
-	def __init__( self , bc_method = None , bc_method_kwargs = {} , pipe = [] , pipe_kwargs = [] , checkf = skipNotValid ):##{{{
+	def __init__( self , bc_method = None , bc_method_kwargs = {} , pipe = [] , pipe_kwargs = [] , checkf = allfinite ):##{{{
 		"""
 		Constructor
 		===========
@@ -95,17 +99,27 @@ class PrePostProcessing:##{{{
 			List of preprocessing class to apply to data before / after bias
 			correction.
 		pipe_kwargs: [list of dict]
-			List of keyword arguments to pass to each PreProcessing class
+			List of keyword arguments to pass to each PreProcessing class. This
+			argument must either be an empty list, or a list of the same length
+			as 'pipe'.
 		checkf: [function]
 			Boolean function controlling if the fit can occurs. Intercept
 			'bc_method' and 'pipe' before their applications. If check return
 			False on the dataset fitted, the fit doesn't occurs, and the predict
 			return the input.
 		"""
-		if not type(pipe) == list:
-			pipe = [pipe]
-		if not type(pipe_kwargs) == list:
-			pipe_kwargs = [pipe_kwargs]
+		
+		super().__init__( "PrePostProcessing" )
+		
+		if not isinstance( pipe , (list,tuple) ):
+			raise ValueError( f"pipe argument must be a list or a tuple" )
+		if not isinstance( pipe_kwargs , (list,tuple) ):
+			raise ValueError( f"pipe_kwargs argument must be a list or a tuple" )
+		if not len(pipe) == len(pipe_kwargs):
+			if len(pipe_kwargs) == 0:
+				pipe_kwargs = [ {} for _ in range(len(pipe)) ]
+			else:
+				raise ValueError( "Incoherent length between pipe and pipe_kwargs" )
 		
 		self._pipe = [ p(**kwargs) for p,kwargs in zip(pipe,pipe_kwargs) ]
 		if bc_method is not None:
@@ -116,7 +130,6 @@ class PrePostProcessing:##{{{
 		self._kind   = None
 		self._checkf = lambda x : True if x is None else checkf(x)
 		self._check  = None
-		
 		##}}}
 	
 	def transform( self , X ):##{{{
@@ -140,7 +153,8 @@ class PrePostProcessing:##{{{
 		
 		self._kind = kind
 		for p in self._pipe[::-1]:
-			p._kind = kind
+			p._kind      = kind
+			p._bc_method = self._bc_method
 			Xt = p.transform(Xt)
 		
 		Xt = self.transform(Xt)
@@ -156,7 +170,8 @@ class PrePostProcessing:##{{{
 		self._kind = kind
 		X = self.itransform(X)
 		for p in self._pipe:
-			p._kind = kind
+			p._kind      = kind
+			p._bc_method = self._bc_method
 			X = p.itransform(X)
 		
 		return X
@@ -171,7 +186,7 @@ class PrePostProcessing:##{{{
 		self._check = all([self._checkf(K) for K in [Y0,X0,X1]])
 		
 		if not self._check:
-			return
+			raise ValueError( f"PrePostProcessing: invalid check (see the 'checkf' parameter" )
 		
 		## The transform
 		Y0t = self._pipe_transform( Y0 , "Y0" )
@@ -183,6 +198,8 @@ class PrePostProcessing:##{{{
 			self._bc_method.fit( Y0t , X0t )
 		else:
 			self._bc_method.fit( Y0t , X0t , X1t )
+		
+		return self
 	##}}}
 	
 	def predict( self , X1 = None , X0 = None ):##{{{
@@ -215,6 +232,14 @@ class PrePostProcessing:##{{{
 			Z0 = self._pipe_itransform( Z0t , "X0" )
 			return Z1,Z0
 	##}}}
+	
+	@property
+	def name(self):
+		name = self._name
+		if len(self._pipe) > 0:
+			name = name + ":" + ":".join([ p.name for p in self._pipe ])
+		name = name + f":{self._bc_method.name}"
+		return name
 	
 ##}}}
 

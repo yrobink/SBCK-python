@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2023 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -37,26 +37,473 @@
 ## Libraries ##
 ###############
 
+import itertools as itt
+
 import numpy       as np
 import scipy.stats as sc
 import scipy.interpolate as sci
 
-from .tools.__Dist import _Dist
+from .__AbstractBC import AbstractBC
+from .__AbstractBC import MultiUBC
+from .tools.__rv_extend import WrapperStatisticalDistribution
+from .tools.__rv_extend import rv_empirical
 
 
 ###########
 ## Class ##
 ###########
 
-class CDFt:
+class Univariate_CDFt(AbstractBC):##{{{
+	
+	class OoB:##{{{
+		
+		def __init__( self , method , **kwargs ):##{{{
+			self.method = str(method)
+			self.pmin   = float(kwargs.get( "oob_pmin" ,     1e-6 ))
+			self.pmax   = float(kwargs.get( "oob_pmax" , 1 - 1e-6 ))
+			self.NCC    =   int(kwargs.get( "oob_NCC"  ,        1 ))
+			if self.method[:2] == "CC":
+				if len(self.method) > 2:
+					self.NCC    = int(self.method[2:])
+					self.method = "CC"
+			if self.method not in ["None","CC","Y0","Y0CC"]:
+				raise ValueError( f"Unknow Out Of Bounds method: '{method}'" )
+		##}}}
+		
+	##}}}
+	
+	class Norm:##{{{
+		
+		def __init__( self , method , **kwargs ):##{{{
+			self.method    = str(method)
+			self.dynamical = self.method[:2] == "d-"
+			self.e         = kwargs.get("norm_e")
+			
+			if self.dynamical:
+				self.method = self.method[2:]
+			
+			if self.method not in ["None","mean","meanstd","quant","minmax","origin"]:
+				raise ValueError( f"Unknow normalization method: '{method}'" )
+			
+		##}}}
+		
+	##}}}
+	
+	def __init__( self , rvY = rv_empirical , rvX = rv_empirical , norm = "origin" , oob = "Y0" , **kwargs ):##{{{
+		
+		super().__init__( "Univariate_CDFt" )
+		
+		self._rvY = rvY
+		self._rvX = rvX
+		self.rvY0 = None
+		self.rvY1 = None
+		self.rvX0 = None
+		self.rvX1 = None
+		
+		self.oob    = self.OoB(   oob , **kwargs )
+		self.norm   = self.Norm( norm , **kwargs )
+		self._tools = {}
+		
+	##}}}
+	
+	## Normalization methods ##{{{
+	
+	def _norm_default( self ):##{{{
+		self._tools["Y0s"] = self._tools["Y0"]
+		self._tools["X0s"] = self._tools["X0"]
+		self._tools["X1s"] = self._tools["X1"]
+	##}}}
+	
+	def _norm_origin(self):##{{{
+		
+		Y0 = self._tools["Y0"]
+		X0 = self._tools["X0"]
+		X1 = self._tools["X1"]
+		
+		mY0 = Y0.mean()
+		mX0 = X0.mean()
+		mX1 = X1.mean()
+		sY0 = Y0.std()
+		sX0 = X0.std()
+		sX1 = X1.std()
+		
+		X0s = (X0 - mX0) * sY0 / sX0 + mY0
+		X1s = (X1 - mX1) * sY0 / sX0 + mX1 + mY0 - mX0
+		
+		self._tools["Y0s"] = Y0
+		self._tools["X0s"] = X0s
+		self._tools["X1s"] = X1s
+	
+	##}}}
+	
+	def _norm_mean( self ):##{{{
+		
+		Y0 = self._tools["Y0"]
+		X0 = self._tools["X0"]
+		X1 = self._tools["X1"]
+		
+		mY0 = Y0.mean()
+		mX0 = X0.mean()
+		mX1 = X1.mean()
+		
+		normX0Y0 = lambda x: ( x - mX0 ) + mY0
+		normX1X0 = lambda x: ( x - mX1 ) + mX0
+		normX0X1 = lambda x: ( x - mX0 ) + mX1
+		
+		X0s = normX0Y0(X0)
+		if not self.norm.dynamical:
+			X1s = normX0Y0(X1)
+		else:
+			X1s = normX0X1(normX0Y0(normX1X0(X1)))
+		
+		self._tools["Y0s"] = Y0
+		self._tools["X0s"] = X0s
+		self._tools["X1s"] = X1s
+	##}}}
+	
+	def _norm_meanstd( self ):##{{{
+		
+		Y0 = self._tools["Y0"]
+		X0 = self._tools["X0"]
+		X1 = self._tools["X1"]
+		
+		mY0 = Y0.mean()
+		mX0 = X0.mean()
+		mX1 = X1.mean()
+		sY0 = Y0.std()
+		sX0 = X0.std()
+		sX1 = X1.std()
+		
+		normX0Y0 = lambda x: ( x - mX0 ) / sX0 * sY0 + mY0
+		normX1X0 = lambda x: ( x - mX1 ) / sX1 * sX0 + mX0
+		normX0X1 = lambda x: ( x - mX0 ) / sX0 * sX1 + mX1
+		
+		X0s = normX0Y0(X0)
+		if not self.norm.dynamical:
+			X1s = normX0Y0(X1)
+		else:
+			X1s = normX0X1(normX0Y0(normX1X0(X1)))
+		
+		self._tools["Y0s"] = Y0
+		self._tools["X0s"] = X0s
+		self._tools["X1s"] = X1s
+	##}}}
+	
+	def _norm_quant( self ):##{{{
+		
+		Y0 = self._tools["Y0"]
+		X0 = self._tools["X0"]
+		X1 = self._tools["X1"]
+		
+		e = self.norm.e
+		if not isinstance(e,float):
+			e = 5 * max( 1 / Y0.size , 1 / X0.size , 1 / X1.size )
+		
+		lX0 = np.quantile( X0 , e )
+		lY0 = np.quantile( Y0 , e )
+		lX1 = np.quantile( X1 , e )
+		
+		uX0 = np.quantile( X0 , 1 - e )
+		uY0 = np.quantile( Y0 , 1 - e )
+		uX1 = np.quantile( X1 , 1 - e )
+		
+		normX0Y0 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uY0 - lY0 ) + lY0
+		normX1X0 = lambda x: ( x - lX1 ) / ( uX1 - lX1 ) * ( uX0 - lX0 ) + lX0
+		normX0X1 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uX1 - lX1 ) + lX1
+		
+		X0s = normX0Y0(X0)
+		if not self.norm.dynamical:
+			X1s = normX0Y0(X1)
+		else:
+			X1s = normX0X1(normX0Y0(normX1X0(X1)))
+		
+		self._tools["Y0s"] = Y0
+		self._tools["X0s"] = X0s
+		self._tools["X1s"] = X1s
+	##}}}
+	
+	def _norm_minmax( self ):##{{{
+		
+		Y0 = self._tools["Y0"]
+		X0 = self._tools["X0"]
+		X1 = self._tools["X1"]
+		
+		lX0 = np.min(X0)
+		lY0 = np.min(Y0)
+		lX1 = np.min(X1)
+		uX0 = np.max(X0)
+		uY0 = np.max(Y0)
+		uX1 = np.max(X1)
+		
+		normX0Y0 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uY0 - lY0 ) + lY0
+		normX1X0 = lambda x: ( x - lX1 ) / ( uX1 - lX1 ) * ( uX0 - lX0 ) + lX0
+		normX0X1 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uX1 - lX1 ) + lX1
+		
+		X0s = normX0Y0(X0)
+		if not self.norm.dynamical:
+			X1s = normX0Y0(X1)
+		else:
+			X1s = normX0X1(normX0Y0(normX1X0(X1)))
+		
+		self._tools["Y0s"] = Y0
+		self._tools["X0s"] = X0s
+		self._tools["X1s"] = X1s
+	##}}}
+	
+	##}}}
+	
+	## Out of Bounds method ##{{{
+	
+	def _find_support(self):##{{{
+		
+		rvY0s = self._tools["rvY0s"]
+		rvX0s = self._tools["rvX0s"]
+		rvX1s = self._tools["rvX1s"]
+		
+		## First estimation of the support
+		qmin = min([rv.icdf(0) for rv in [rvY0s,rvX0s,rvX1s]])
+		qmax = max([rv.icdf(1) for rv in [rvY0s,rvX0s,rvX1s]])
+		dq   = 0.05 * (qmax - qmin)
+		nq   = 1000
+		q    = np.linspace( qmin - dq , qmax + dq , nq )
+		
+		## Find the associated probabilities
+		cdf = lambda q: rvY0s.cdf( rvX0s.icdf( rvX1s.cdf( q ) ) )
+		p   = cdf(q)
+		
+		## Cut the support
+		i0 = max( np.sum(p == p[ 0]) - 1 , 0 )
+		i1 = p.size - np.sum(p == p[-1])
+		q  = np.linspace( q[i0] , q[i1] , nq )
+		p  = cdf(q)
+		
+		return q,p
+	##}}}
+	
+	def _oob_default(self):##{{{
+		rvY0s = self._tools["rvY0s"]
+		rvX0s = self._tools["rvX0s"]
+		rvX1s = self._tools["rvX1s"]
+		cdf  = lambda q: rvY0s.cdf(  rvX0s.icdf( rvX1s.cdf(  q ) ) )
+		icdf = lambda p: rvX1s.icdf( rvX0s.cdf(  rvY0s.icdf( p ) ) )
+		self.rvY1 = WrapperStatisticalDistribution( rv_empirical( cdf = cdf , icdf = icdf , no_pdf = True ) )
+	##}}}
+	
+	def _oob_Y0(self):##{{{
+		
+		rvY0s = self._tools["rvY0s"]
+		rvX0s = self._tools["rvX0s"]
+		rvX1s = self._tools["rvX1s"]
+		
+		q,p = self._find_support()
+		
+		## Correct the left tail
+		if p[0] > self.oob.pmin:
+			qmin = q[0] - (rvY0s.icdf(p[0]) - rvY0s.icdf(0))
+			qL   = np.linspace( qmin , q[0] , 1000 )
+			pL   = rvY0s.cdf( np.linspace( rvY0s.icdf(0) , rvY0s.icdf(p[0]) , 1000 ) )
+			p    = np.hstack( (pL,p) )
+			q    = np.hstack( (qL,q) )
+		
+		## Correct the right tail
+		if p[-1] < self.oob.pmax:
+			qmax = q[-1] + (rvY0s.icdf(1) - rvY0s.icdf(p[-1]))
+			qR   = np.linspace( q[-1] , qmax , 1000 )
+			pR   = rvY0s.cdf( np.linspace( rvY0s.icdf(p[-1]) , rvY0s.icdf(1) , 1000 ) )
+			p    = np.hstack( (p,pR) )
+			q    = np.hstack( (q,qR) )
+		
+		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (p[0],p[-1]) )
+		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
+		self.rvY1 = WrapperStatisticalDistribution( rv_empirical( cdf = cdf , icdf = icdf , no_pdf = True ) )
+	##}}}
+	
+	def _oob_Y0CC(self):##{{{
+		
+		rvY0s = self._tools["rvY0s"]
+		rvX0s = self._tools["rvX0s"]
+		rvX1s = self._tools["rvX1s"]
+		
+		q,p = self._find_support()
+		
+		## Correct the left tail
+		if p[0] > self.oob.pmin:
+			r    = (rvX1s.icdf(p[0]) - rvX1s.icdf(0)) / (rvX0s.icdf(p[0]) - rvX0s.icdf(0))
+			if r == 0: r = 1
+			qmin = q[0] - (rvY0s.icdf(p[0]) - rvY0s.icdf(0)) * r
+			qL   = np.linspace( qmin , q[0] , 1000 )
+			pL   = rvY0s.cdf( np.linspace( rvY0s.icdf(0) , rvY0s.icdf(p[0]) , 1000 ) )
+			p    = np.hstack( (pL,p) )
+			q    = np.hstack( (qL,q) )
+		
+		## Correct the right tail
+		if p[-1] < self.oob.pmax:
+			r    = (rvX1s.icdf(1) - rvX1s.icdf(p[-1])) / (rvX0s.icdf(1) - rvX0s.icdf(p[-1]))
+			if r == 0: r = 1
+			qmax = q[-1] + (rvY0s.icdf(1) - rvY0s.icdf(p[-1])) * r
+			qR   = np.linspace( q[-1] , qmax , 1000 )
+			pR   = rvY0s.cdf( np.linspace( rvY0s.icdf(p[-1]) , rvY0s.icdf(1) , 1000 ) )
+			p    = np.hstack( (p,pR) )
+			q    = np.hstack( (q,qR) )
+		
+		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (p[0],p[-1]) )
+		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
+		self.rvY1 = WrapperStatisticalDistribution( rv_empirical( cdf = cdf , icdf = icdf , no_pdf = True ) )
+	##}}}
+	
+	def _oob_CC(self):##{{{
+		
+		Y0s   = self._tools["Y0s"]
+		X0s   = self._tools["X0s"]
+		X1s   = self._tools["X1s"]
+		rvY0s = self._tools["rvY0s"]
+		rvX0s = self._tools["rvX0s"]
+		rvX1s = self._tools["rvX1s"]
+		NCC   = self.oob.NCC
+		
+		q,p = self._find_support()
+		
+		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (-np.inf,np.inf) )
+		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (-np.inf,np.inf) )
+		
+		Z1   = icdf( rvX1s.cdf(X1s) )
+		idxF = np.argsort(Z1.squeeze())
+		idxF = idxF[np.isfinite(Z1.squeeze()[idxF])]
+		idxL = idxF[:NCC]
+		idxR = idxF[-NCC:]
+		
+		## Left tail
+		iL = ~np.isfinite(Z1) & (Z1 < 0)
+		if np.any(iL):
+			## Find D
+			D = np.sum( Z1[idxL] - X1s[idxL] ) / NCC
+			
+			## Apply factor
+			Z1[iL] = X1s[iL] + D
+		
+		## Right tail
+		iR = ~np.isfinite(Z1) & (Z1 > 0)
+		if np.any(iR):
+			## Find D
+			D = np.sum( Z1[idxR] - X1s[idxR] ) / NCC
+			
+			## Apply factor
+			Z1[iR] = X1s[iR] + D
+		
+		self.rvY1 = WrapperStatisticalDistribution().fit(Z1)
+	##}}}
+	
+	##}}}
+	
+	## Fit / predict functions ##{{{
+	
+	def fit( self , Y0 , X0 , X1 ):##{{{
+		
+		## Init shared variable
+		self._tools["Y0"]   = Y0
+		self._tools["X0"]   = X0
+		self._tools["X1"]   = X1
+		self._tools["Y0s"]  = Y0
+		self._tools["X0s"]  = X0
+		self._tools["X1s"]  = X1
+		self._tools["rvY0"]  = WrapperStatisticalDistribution(self._rvY)
+		self._tools["rvX0"]  = WrapperStatisticalDistribution(self._rvX)
+		self._tools["rvX1"]  = WrapperStatisticalDistribution(self._rvX)
+		self._tools["rvY0s"] = WrapperStatisticalDistribution(self._rvY)
+		self._tools["rvX0s"] = WrapperStatisticalDistribution(self._rvX)
+		self._tools["rvX1s"] = WrapperStatisticalDistribution(self._rvX)
+		
+		## Normalization step
+		if self.norm.method == "mean":
+			self._norm_mean()
+		elif self.norm.method == "meanstd":
+			self._norm_meanstd()
+		elif self.norm.method == "quant":
+			self._norm_quant()
+		elif self.norm.method == "minmax":
+			self._norm_minmax()
+		elif self.norm.method == "origin":
+			self._norm_origin()
+		else:
+			self._norm_default()
+		
+		## Define CDF
+		for K,s in itt.product(["Y0","X0","X1"],["","s"]):
+			YX   = self._tools[f"{K}{s}"]
+			rvYX = self._tools[f"rv{K}{s}"]
+			rvYX.fit(YX)
+			self._tools[f"rv{K}{s}"]  = rvYX
+		self.rvY0  = self._tools["rvY0"]
+		self.rvX0  = self._tools["rvX0"]
+		self.rvX1  = self._tools["rvX1"]
+		
+		## Find rvY1 with Out of Bounds conditions
+		if self.oob.method == "Y0":
+			self._oob_Y0()
+		elif self.oob.method == "Y0CC":
+			self._oob_Y0CC()
+		elif self.oob.method == "CC":
+			self._oob_CC()
+		else:
+			self._oob_default()
+		
+		##
+		del self._tools
+		
+		return self
+	##}}}
+	
+	def predict( self , X1 , X0 = None ):##{{{
+		
+		Z1,Z0 = None,None
+		if X1 is not None:
+			Z1 = self.rvY1.icdf( self.rvX1.cdf(X1) )
+		if X0 is not None:
+			Z0 = self.rvY0.icdf( self.rvX0.cdf(X0) )
+		
+		if Z1 is not None and Z0 is None:
+			return Z1
+		if Z0 is not None and Z1 is None:
+			return Z0
+		return Z1,Z0
+	##}}}
+	
+	##}}}
+	
+##}}}
+
+class CDFt(MultiUBC):##{{{
+	
 	"""
 	SBCK.CDFt
 	=========
-	
 	Description
 	-----------
 	Quantile Mapping bias corrector, taking account of an evolution of the
 	distribution, see [1].
+	
+	Normalization
+	-------------
+	Data can be normalized before applying the CDFt correction. Available
+	methods are:
+	- 'None' : No normalization,
+	- 'mean' : Change the mean of X0 to that of Y0. The change in mean between
+	  X0 and X1 is preserved.
+	- 'meanstd': same as mean, but change also the standard deviation.
+	- 'minmax': map the support of X0 to Y0. Apply the same transformation to X1
+	- 'quant': Same as 'minmax', but instead of min and max, use some extreme
+	  quantiles given by the parameter 'e'.
+	- 'origin' original normalization use in old versions (< 2.0.0) of SBCK.
+	
+	Out Of Bounds
+	-------------
+	Correct the tails of the corrections. Available methods are:
+	- 'None': no change,
+	- 'CCN': Apply the delta change of the mean of the N last valids values to
+	  the tail.
+	- 'Y0': Copy the tail of the reference.
+	- 'Y0CC': Copy a scaled tail of Y0, such that the change between the tail
+	  of Y0 and Z1 is the change between X0 and X1.
 	
 	References
 	----------
@@ -70,401 +517,69 @@ class CDFt:
 	developped by Mathieu Vrac, available at
 	https://cran.r-project.org/web/packages/CDFt/index.htmm
 	"""
-	def __init__( self , **kwargs ):##{{{
-		"""
-		Initialisation of CDFt bias corrector. All arguments must be named.
-		
-		Parameters
-		----------
-		distY0 : A statistical distribution from scipy.stats or SBCK.tools.rv_*
-			The distribution of references in calibration period. Default is rv_histogram.
-		distX0 : A statistical distribution from scipy.stats or SBCK.tools.rv_*
-			The distribution of biased dataset in calibration period. Default is rv_histogram.
-		distY1 : A statistical distribution from scipy.stats or SBCK.tools.rv_*
-			The distribution of references in projection period. Default is rv_histogram, and Y1 is estimated during fit
-		distX1 : A statistical distribution from scipy.stats or SBCK.tools.rv_*
-			The distribution of biased dataset in projection period. Default is rv_histogram.
-		kwargsY0 : dict
-			Arguments passed to distY0
-		kwargsX0 : dict
-			Arguments passed to distX0
-		kwargsY1 : dict
-			Arguments passed to distY1
-		kwargsX1 : dict
-			Arguments passed to distX1
-		n_features: None or integer
-			Numbers of features, optional because it is determined during fit
-			if X0 and Y0 are not None.
-		tol : float
-			Numerical tolerance, default 1e-6
-		version: int, optional
-			...
-		scale_left_tail: float, optional
-			Scale applied on the left support (min to median) between
-			calibration and projection period. If None (default), it is
-			determined during the fit. If == 1, equivalent to the original
-			algorithm of CDFt.
-		scale_right_tail: float, optional
-			Scale applied on the right support (median to max) between
-			calibration and projection period. If None (default), it is
-			determined during the fit. If == 1, equivalent to the original
-			algorithm of CDFt.
-		normalize_cdf: bool or list of bool
-			If a normalization is applied to the data to maximize the overlap
-			of the support. Can be a bool (True or False, applied for all
-			colums), or a list of bool of size 'n_features' to distinguished
-			each columns.
-		
-		"""
-		self.n_features  = kwargs.get("n_features")
-		self._tol        = kwargs.get( "tol"       , 1e-6  )
-		self._dsupp      = kwargs.get( "dsupp"     , 1000  )
-		self._samples_Y1 = kwargs.get("samples_Y1" , 10000 )
-		self._version    = kwargs.get("version"    , 3     )
-		self._v3_e       = kwargs.get("v3_e"       , "auto"  )
-		
-		self._distY0 = _Dist( dist = kwargs.get("distY0") , kwargs = kwargs.get("kwargsY0") )
-		self._distY1 = _Dist( dist = kwargs.get("distY1") , kwargs = kwargs.get("kwargsY1") )
-		self._distX0 = _Dist( dist = kwargs.get("distX0") , kwargs = kwargs.get("kwargsX0") )
-		self._distX1 = _Dist( dist = kwargs.get("distX1") , kwargs = kwargs.get("kwargsX1") )
-		self._scale_left_tail  = kwargs.get("scale_left_tail")
-		self._scale_right_tail = kwargs.get("scale_right_tail")
-		self._normalize_cdf    = kwargs.get("normalize_cdf")
-		if ~(type(self._normalize_cdf) in [bool,list]):
-			self._normalize_cdf = True
-		self._p_left  = 0
-		self._p_right = 1
-	##}}}
 	
-	def fit( self , Y0 , X0 , X1 ):##{{{
+	def __init__( self , rvY = rv_empirical , rvX = rv_empirical , norm = "origin" , oob = "Y0" , **kwargs ):##{{{
 		"""
-		Fit of CDFt model
+		SBCK.CDFt.__init__
+		==================
 		
-		Parameters
-		----------
-		Y0	: np.array[ shape = (n_samples,n_features) ]
-			Reference dataset during calibration period
-		X0	: np.array[ shape = (n_samples,n_features) ]
-			Biased dataset during calibration period
-		X1	: np.array[ shape = (n_samples,n_features) ]
-			Biased dataset during projection period
+		Arguments
+		---------
+		rvY: SBCK.tools.<law> | scipy.stats.<law>
+			Law of references
+		rvX: SBCK.tools.<law> | scipy.stats.<law>
+			Law of models
+		norm: str
+			Normalisation method
+		oob: str
+			Out Of Bounds conditions
 		
-		Note
-		----
-		The fit is performed margins by margins (without taking into account the dependance structure, see R2D2 or dOTC)
+		Optional arguments
+		------------------
+		norm_e: float
+			Quantile used in the 'quant' method
+		oob_pmin: float
+			Minimal value of 'valid' quantile in oob.
+		oob_pmax: float
+			Maximal value of 'valid' quantile in oob.
+		
 		"""
-		
-		## Reshape data in matrix form
-		if Y0 is not None and Y0.ndim == 1 : Y0 = Y0.reshape(-1,1)
-		if X0 is not None and X0.ndim == 1 : X0 = X0.reshape(-1,1)
-		if X1 is not None and X1.ndim == 1 : X1 = X1.reshape(-1,1)
-		
-		## Find n_features
-		if self.n_features is None:
-			if Y0 is None and X0 is None and X1 is None:
-				print( "n_features must be set during initialization if Y0 = X0 = X1 = None" )
-			elif Y0 is not None: self.n_features = Y0.shape[1]
-			elif X0 is not None: self.n_features = X0.shape[1]
-			else:                self.n_features = X1.shape[1]
-		
-		## Set normalizations
-		if type(self._normalize_cdf) == bool:
-			self._normalize_cdf = [self._normalize_cdf for _ in range(self.n_features)]
-		
-		## Find laws
-		self._distY0.set_features(self.n_features)
-		self._distY1.set_features(self.n_features)
-		self._distX0.set_features(self.n_features)
-		self._distX1.set_features(self.n_features)
-		
-		## Start fit itself
-		for i in range(self.n_features):
-			self._distY0.fit( Y0[:,i] , i )
-			self._distX0.fit( X0[:,i] , i )
-			self._distX1.fit( X1[:,i] , i )
-			## Fit Y1
-			if self._distY1.is_frozen(i):
-				self._distY1.law.append(self._dist.distY1[i])
+		## Build args for MultiUBC
+		if not isinstance( rvY , (list,tuple) ):
+			if isinstance( rvX , (list,tuple) ):
+				rvY = [rvY for _ in range(len(rvX))]
 			else:
-				if self._distY0.is_parametric(i) and self._distX0.is_parametric(i) and self._distX1.is_parametric(i):
-					Y1 = self._distX1.law[i].ppf( self._distX0.law[i].cdf( self._distY0.law[i].ppf( self._distX1.law[i].cdf(X1[:,i].squeeze()) ) ) )
+				rvY = [rvY]
+		if not isinstance( rvX , (list,tuple) ):
+			if isinstance( rvY , (list,tuple) ):
+				rvX = [rvX for _ in range(len(rvY))]
+			else:
+				rvX = [rvX]
+		if not len(rvX) == len(rvY):
+			raise ValueError( f"Incoherent arguments between rvY and rvX" )
+		args = [ (rvy,rvx) for rvy,rvx in zip(rvY,rvX) ]
+		
+		## Build kwargs for MultiUBC
+		ncorr   = len(args)
+		ikwargs = kwargs
+		ikwargs["norm"] = norm
+		ikwargs["oob"]  = oob
+		kwargs = [{} for _ in range(ncorr)]
+		for key in ikwargs:
+			kwarg = ikwargs[key]
+			if isinstance( kwarg , (list,tuple) ):
+				if len(kwarg) == ncorr:
+					for i in range(ncorr):
+						kwargs[i][key] = kwarg[i]
 				else:
-					Y0uni = Y0[:,i] if Y0 is not None else self._distY0.law[-1].rvs(10000)
-					X0uni = X0[:,i] if X0 is not None else self._distX0.law[-1].rvs(10000)
-					X1uni = X1[:,i] if X1 is not None else self._distX1.law[-1].rvs(10000)
-					Y1 = self._infer_Y1( Y0uni , X0uni , X1uni , i )
-				self._distY1.fit( Y1 , i )
+					raise ValueError( f"Invalid format for kwargs '{key}'" )
+			else:
+				for i in range(ncorr):
+					kwargs[i][key] = kwarg
+		
+		## And init upper class
+		super().__init__( "CDFt" , Univariate_CDFt , args = args , kwargs = kwargs )
 	##}}}
 	
-	def predict( self , X1 , X0 = None ):##{{{
-		"""
-		Perform the bias correction
-		Return Z1 if X0 is None, else return a tuple Z1,Z0
-		
-		Parameters
-		----------
-		X1 : np.array[ shape = (n_sample,n_features) ]
-			Array of value to be corrected in projection period
-		X0 : np.array[ shape = (n_sample,n_features) ] or None
-			Array of value to be corrected in calibration period, optional
-		
-		Returns
-		-------
-		Z1 : np.array[ shape = (n_sample,n_features) ]
-			Return an array of correction in projection period
-		Z0 : np.array[ shape = (n_sample,n_features) ] or None
-			Return an array of correction in calibration period
-		
-		Note
-		----
-		The correction is performed margins by margins (without taking into account the dependance structure, see R2D2 or dOTC)
-		"""
-		if X1.ndim == 1 : X1 = X1.reshape(-1,1)
-		Z1 = np.zeros_like(X1)
-		for i in range(self.n_features):
-			cdf = self._distX1.law[i].cdf(X1[:,i])
-			cdf[np.logical_not(cdf < 1)] = 1 - self._tol
-			cdf[np.logical_not(cdf > 0)] = self._tol
-			Z1[:,i] = self._distY1.law[i].ppf( cdf )
-		
-		if X0 is not None:
-			if X0.ndim == 1 : X0 = X0.reshape(-1,1)
-			Z0 = np.zeros_like(X0)
-			for i in range(self.n_features):
-				cdf = self._distX0.law[i].cdf(X0[:,i])
-				cdf[np.logical_not(cdf < 1)] = 1 - self._tol
-				cdf[np.logical_not(cdf > 0)] = self._tol
-				Z0[:,i] = self._distY0.law[i].ppf( cdf )
-			return Z1,Z0
-		return Z1
-	##}}}
-	
-	def _CDFt_V1( self , Y0 , X0 , X1 , idist ):##{{{
-		
-		## CDF
-		rvY0 = self._distY0.law[idist]
-		rvX0 = self._distX0.dist[idist]( *self._distX0.dist[idist].fit( X0.squeeze()) , **self._distX0.kwargs )
-		rvX1 = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1.squeeze()) , **self._distX1.kwargs )
-		
-		hY1 = rvX1.ppf( rvX0.cdf( rvY0.ppf( rvX1.cdf( X1 ) ) ) )
-		
-		return hY1
-	##}}}
-	
-	def _CDFt_V2( self , Y0 , X0 , X1 , idist ):##{{{
-		
-		dsupp = self._dsupp
-		
-		## Normalization
-		if self._normalize_cdf[idist]:
-			mY0 = np.mean(Y0)
-			mX0 = np.mean(X0)
-			mX1 = np.mean(X1)
-			sY0 = np.std(Y0)
-			sX0 = np.std(X0)
-			
-			X0s = (X0 - mX0) * sY0 / sX0 + mY0
-			X1s = (X1 - mX1) * sY0 / sX0 + mX1 + mY0 - mX0
-		
-		## CDF
-		rvY0  = self._distY0.law[idist]
-		rvX0s = self._distX0.dist[idist]( *self._distX0.dist[idist].fit( X0s.squeeze()) , **self._distX0.kwargs )
-		rvX1s = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1s.squeeze()) , **self._distX1.kwargs )
-		
-		## Support
-		## Here the support is such that the CDF of Y0, X0s and X1s start from 0
-		## and go to 1
-		x_min = min([T.min() for T in [Y0,X0s,X1s,X0,X1]])
-		x_max = max([T.max() for T in [Y0,X0s,X1s,X0,X1]])
-		x_eps = 0.05 * (x_max - x_min)
-		x_fac = 1
-		x = np.linspace( x_min - x_fac * x_eps , x_max + x_fac * x_eps , dsupp )
-		
-		def support_test( rv , x ):
-			if not abs(rv.cdf(x[0])) < self._tol:
-				return False
-			if not abs(rv.cdf(x[-1])-1) < self._tol:
-				return False
-			return True
-		
-		while (not support_test(rvY0,x)) or (not support_test(rvX0s,x)) or (not support_test(rvX1s,x)):
-			x_fac *= 2
-			x = np.linspace( x_min - x_fac * x_eps , x_max + x_fac * x_eps , dsupp )
-		x_fac /= 2
-		
-		## Loop to check the support
-		extend_support = True
-		p_min = 0
-		p_max = 1
-		while extend_support:
-			extend_support = False
-			
-			## Inference of the CDF of Y1
-			cdfY1 = rvY0.cdf(rvX0s.ppf(rvX1s.cdf(x)))
-			
-			## Correction of the CDF, we want that the CDF of Y1 start from 0 and goto 1
-			if cdfY1[0] > p_min:
-				## CDF not start at 0
-				idx  = np.max(np.argwhere(np.abs(cdfY1[0] - cdfY1) < self._tol))
-				if idx == 0:
-					extend_support = True
-				else:
-					if self._scale_left_tail is None:
-						supp_l_X0s = rvX0s.ppf(cdfY1[0]) - rvX0s.ppf(p_min)
-						supp_l_X1s = rvX1s.ppf(cdfY1[0]) - rvX1s.ppf(p_min)
-						supp_l_Y0  = rvY0.ppf(cdfY1[0])  - rvY0.ppf(p_min)
-						scale_left_tail = supp_l_X1s / supp_l_X0s
-					else:
-						scale_left_tail = self._scale_left_tail
-					supp_l_Y1  = supp_l_Y0 * scale_left_tail
-					if x[idx] - supp_l_Y1 < x[0]:
-						extend_support = True
-					else:
-						idxl = np.argmin(np.abs(x - (x[idx] - supp_l_Y1)))
-						cdfY1[:idxl] = 0
-						cdfY1[idxl:idx] = rvY0.cdf( np.linspace( rvY0.ppf(p_min) , rvY0.ppf(cdfY1[idx]) , idx - idxl ) )
-			
-			if cdfY1[-1] < p_max:
-				## CDF not finished at 1
-				idx = np.min(np.argwhere(np.abs(cdfY1[-1] - cdfY1) < self._tol))
-				if idx == dsupp -1:
-					extend_support = True
-				else:
-					supp_r_Y0  = rvY0.ppf(p_max)  - rvY0.ppf(cdfY1[-1])
-					if self._scale_right_tail is None:
-						supp_r_X0s = rvX0s.ppf(p_max) - rvX0s.ppf(cdfY1[-1]) 
-						supp_r_X1s = rvX1s.ppf(p_max) - rvX1s.ppf(cdfY1[-1]) 
-						scale_right_tail = supp_r_X1s / supp_r_X0s
-					else:
-						scale_right_tail = self._scale_right_tail
-					supp_r_Y1  = supp_r_Y0 * scale_right_tail
-					if x[idx] + supp_r_Y1 > x[-1]:
-						extend_support = True
-					else:
-						idxr = np.argmin(np.abs(x - (x[idx] + supp_r_Y1)))
-						cdfY1[idxr:] = 1
-						cdfY1[idx:idxr] = rvY0.cdf( np.linspace( rvY0.ppf(cdfY1[idx]) , rvY0.ppf(p_max) , idxr - idx ) )
-			
-			## Support
-			if extend_support:
-				dsupp  = int(dsupp*1.2)
-				x_fac *= 2
-				x      = np.linspace( x_min - x_fac * x_eps , x_max + x_fac * x_eps , dsupp )
-		
-		## Cut the support to remove identical values
-		try:
-			idxl  = np.max( np.argwhere( np.abs( cdfY1 - cdfY1[0] ) < self._tol ) )
-			x     = x[idxl:]
-			cdfY1 = cdfY1[idxl:]
-		except:
-			pass
-		try:
-			idxr  = np.min( np.argwhere( np.abs( cdfY1 - cdfY1[-1] ) < self._tol ) ) + 1
-			x     = x[:idxr]
-			cdfY1 = cdfY1[:idxr]
-		except:
-			pass
-		
-		## Inverse of the CDF
-		icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
-		
-#		## Now find cut
-#		lsuppl_Y0  = np.median(Y0) - np.quantile(Y0,self._p_left)
-#		lsuppl_X0  = np.median(X0) - np.quantile(X0,self._p_left)
-#		lsuppl_X1  = np.median(X1) - np.quantile(X1,self._p_left)
-#		lsuppl_Y1  = lsuppl_Y0 * lsuppl_X1 / lsuppl_X0
-#		lsuppl_pY1 = icdfY1(0.5) - icdfY1(self._p_left)
-#		lsuppr_Y0  = np.quantile(Y0,self._p_right) - np.median(Y0)
-#		lsuppr_X0  = np.quantile(X0,self._p_right) - np.median(X0)
-#		lsuppr_X1  = np.quantile(X1,self._p_right) - np.median(X1)
-#		lsuppr_Y1  = lsuppr_Y0 * lsuppr_X1 / lsuppr_X0
-#		lsuppr_pY1 = icdfY1(self._p_right) - icdfY1(0.5)
-#		
-#		if lsuppl_pY1 > lsuppl_Y1 or lsuppr_pY1 > lsuppr_Y1:
-#			
-#			## Find p_min
-#			p_min = 0
-#			if lsuppl_pY1 > lsuppl_Y1:
-#				pl  = np.linspace( 0 , 0.5 , 10000 )
-#				ql  = icdfY1(pl)
-#				ql  = ql[-1] - ql
-#				idxl = np.argmin( np.abs( ql - lsuppl_Y1 ) )
-#				p_min = pl[idxl]
-#			
-#			## Find p_max
-#			p_max = 1
-#			if lsuppr_pY1 > lsuppr_Y1:
-#				pr  = np.linspace( 0.5 , 1 , 10000 )
-#				qr  = icdfY1(pr)
-#				qr  = qr - qr[0]
-#				idxr = np.argmin( np.abs( qr - lsuppr_Y1 ) )
-#				p_max = pr[idxr]
-#			
-#			## Final: Replace by 0 / 1 bellow / behind p_min / p_max
-#			cdfY1[cdfY1 < p_min] = 0
-#			cdfY1[cdfY1 > p_max] = 1
-#			
-#			## Cut values and new icdf
-#			try:
-#				idxl  = np.max(np.argwhere(cdfY1 < p_min))
-#				x     = x[idxl:]
-#				cdfY1 = cdfY1[idxl:]
-#			except:
-#				pass
-#			try:
-#				idxr  = np.min(np.argwhere(cdfY1 > p_max)) + 1
-#				x     = x[:idxr]
-#				cdfY1 = cdfY1[:idxr]
-#			except:
-#				pass
-#			icdfY1 = sci.interp1d( cdfY1 , x , fill_value = (x[0],x[-1]) , bounds_error = False )
-#		print(cdfY1[0])
-#		print(cdfY1[-1])
-		
-		## Draw hY1
-		rvX1 = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1.squeeze()) , **self._distX1.kwargs )
-		hY1  = icdfY1( rvX1.cdf(X1) )
-		
-		return hY1
-	##}}}
-	
-	def _CDFt_V3( self , Y0 , X0 , X1 , idist ):##{{{
-		
-		if (X0.min() <= Y0.min()) and (X0.max() >= Y0.max()):
-			return self._CDFt_V1( Y0 , X0 , X1 , idist )
-		
-		if not type(self._v3_e) is float:
-			self._v3_e = 5 * max( 1 / Y0.size , 1 / X0.size , 1 / X1.size )
-		e   = self._v3_e
-		
-		lX0 = np.quantile( X0 , e )
-		lY0 = np.quantile( Y0 , e )
-		lX1 = np.quantile( X1 , e )
-		
-		uX0 = np.quantile( X0 , 1 - e )
-		uY0 = np.quantile( Y0 , 1 - e )
-		uX1 = np.quantile( X1 , 1 - e )
-		
-		X0s = ( X0 - lX0 ) / ( uX0 - lX0 ) * ( uY0 - lY0 ) + lY0 
-		X1s = ( X1 - lX1 ) / ( uX0 - lX0 ) * ( uY0 - lY0 ) + lY0 + lX1 - lX0
-		
-		rvY0  = self._distY0.law[idist]
-		rvX0s = self._distX0.dist[idist]( *self._distX0.dist[idist].fit( X0s.squeeze()) , **self._distX0.kwargs )
-		rvX1s = self._distX1.dist[idist]( *self._distX1.dist[idist].fit( X1s.squeeze()) , **self._distX1.kwargs )
-		
-		hY1 = rvX1s.ppf( rvX0s.cdf( rvY0.ppf( rvX1s.cdf( X1s ) ) ) )
-		
-		return hY1
-	##}}}
-	
-	def _infer_Y1( self , Y0 , X0 , X1 , idist ):##{{{
-		
-		if self._version == 1:
-			return self._CDFt_V1( Y0 , X0 , X1 , idist )
-		elif self._version == 2:
-			return self._CDFt_V2( Y0 , X0 , X1 , idist )
-		else:
-			return self._CDFt_V3( Y0 , X0 , X1 , idist )
-	##}}}
-	
+##}}}
 

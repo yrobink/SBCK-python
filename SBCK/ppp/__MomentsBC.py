@@ -94,3 +94,58 @@ class DCS(PrePostProcessing):##{{{
 	
 ##}}}
 
+class MNormalAdjust(PrePostProcessing):##{{{
+	"""
+	SBCK.ppp.MNormalAdjust
+	======================
+	
+	Multivariate Normal Adjustement. Data are centered scale, then the mean and
+	covariance matrix are corrected at the end.
+	
+	"""
+	
+	def __init__( self , *args , **kwargs ):##{{{
+		PrePostProcessing.__init__( self , *args , **kwargs )
+		self._name      = "MNormalAdjust"
+		
+		self._m = { "Y0" : 0 , "X0" : 0 , "X1" : 0 }
+		self._c = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
+		self._s = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
+		self._i = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
+		
+	##}}}
+	
+	def transform( self , X ):##{{{
+		
+		k = self._kind
+		
+		self._m[k] = X.mean( axis = 0 ).reshape(-1,1)
+		self._c[k] = np.cov(X.T)
+		self._s[k] = np.linalg.cholesky(self._c[k])
+		self._i[k] = np.linalg.pinv(self._s[k])
+		
+		Xt = self._i[k] @ ( X.T - self._m[k] )
+		
+		return Xt.T
+	##}}}
+	
+	def itransform( self , Xt ):##{{{
+		k = self._kind
+		
+		match k:
+			case "Y0":
+				X = self._s[k] @ ( Xt.T + self._m[k] )
+			case "X0":
+				k0 = "Y0"
+				X = self._s[k0] @ ( Xt.T + self._m[k0] )
+			case "X1":
+				cF  = np.diag( np.diag(self._s["Y0"]) / np.diag(self._i["X0"]) )
+				D01 = cF @ (self._m['X1'] - self._m['X0'])
+				X   = self._s['X1'] @ self._i['X0'] @ self._s['Y0'] @ Xt.T + D01 + self._m['Y0']
+		
+		return X.T
+		##}}}
+	
+##}}}
+
+

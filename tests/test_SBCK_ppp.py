@@ -702,6 +702,102 @@ class Test_DeltaRef(SBCKTestParameters,unittest.TestCase):##{{{
 	
 ##}}}
 
+class Test_MNormal(SBCKTestParameters,unittest.TestCase):##{{{
+	
+	def __init__( self , *args, **kwargs ):##{{{
+		SBCKTestParameters.__init__( self )
+		unittest.TestCase.__init__( self , *args , **kwargs )
+	##}}}
+	
+	def test_add_noise(self):##{{{
+		
+		## Parameters
+		size = 5_000
+		
+		## Data
+		np.random.seed(42)
+		Y0,X0,X1 = bc.datasets.gaussian_L_2d(size)
+		
+		## Parameters of the ppp
+		bc_method        = bc.IdBC
+		bc_method_kwargs = {}
+		pipe             = [bcp.MNormalAdjust]
+		pipe_kwargs      = [{}]
+		
+		## Correction with the ppp
+		cppp  = bcp.PrePostProcessing( bc_method = bc_method , bc_method_kwargs = bc_method_kwargs , pipe = pipe , pipe_kwargs = pipe_kwargs ).fit( Y0 , X0 , X1 )
+		Z1p,Z0p = cppp.predict( X1 , X0 )
+		
+		## Direct correction
+		Z1d,Z0d = bc_method( **bc_method_kwargs ).fit( Y0 , X0 , X1 ).predict( X1 , X0 )
+		
+		## xylim
+		xylim = [-5,11]
+		dxy   = 0.1
+		bins  = np.linspace( xylim[0] , xylim[1] , 100 )
+		
+		## Figure
+		titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
+		colors = ["blue","red","purple","green"]
+		fig = plt.figure()
+		grid = mplg.GridSpec(5,5)
+		for ij,K in enumerate([Z0p,Z0d,Z1p,Z1d]):
+			j = ij  % 2
+			i = ij // 2
+			ax  = fig.add_subplot(grid[2*i+1,2*j+1])
+			for iK,K in enumerate([Y0,X0,X1,K]):
+				ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.5 )
+#			ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+			
+			if i == 1:
+				ax.set_xlabel(r"$x_0$")
+			else:
+				ax.set_xticks([])
+			if j == 0:
+				ax.set_ylabel(r"$x_1$")
+			else:
+				ax.set_yticks([])
+			ax.spines[['right', 'top']].set_visible(False)
+			ax.set_xlim(xylim)
+			ax.set_ylim(xylim)
+		
+		## Title
+		ax = fig.add_subplot(grid[0,1:4])
+		ax.text( 0 , 0 , "MNormal" , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
+		ax.set_xlim(-1,1)
+		ax.set_ylim(-1,1)
+		ax.set_axis_off()
+		
+		## Figsize
+		mm = 1. / 25.4
+		pt = 1. / 72
+		
+		width  = 180*mm
+		w_l    = 30*pt
+		w_m    =  5*pt
+		w_r    =  5*pt
+		w_ax   = (width - (w_l + w_m + w_r)) / 2
+		widths = [w_l,w_ax,w_m,w_ax,w_r]
+		
+		h_ax    = w_ax
+		h_t     = 17*pt
+		h_m     =  5*pt
+		h_b     = 30*pt
+		heights = [h_t,h_ax,h_m,h_ax,h_b]
+		height  = sum(heights)
+		
+		grid.set_height_ratios(heights)
+		grid.set_width_ratios(widths)
+		fig.set_figheight(height)
+		fig.set_figwidth(width)
+		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+		
+		plt.savefig( os.path.join( self.opath , f"{self.prefix}MNormal.png" ) , dpi = 600 )
+		plt.close(fig)
+		
+	##}}}
+	
+##}}}
 
 ##########
 ## main ##

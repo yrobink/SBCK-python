@@ -142,7 +142,7 @@ class BuildExt(build_ext):##{{{
 		# Ensure the Eigen submodule is initialized and updated
 		if not os.path.exists("external/eigen"):
 			print("Updating Eigen submodule...")
-			subprocess.run(["git", "submodule", "update", "--init", "--recursive"], check=True)
+			subprocess.run(["git", "submodule", "update", "--init", "--recursive", "--depth", "1"], check=True)
 
 		# Call the original run method to proceed with the build
 		super().run()

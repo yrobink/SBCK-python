@@ -26,6 +26,8 @@ import os
 import sys
 import sysconfig
 import subprocess
+import tempfile
+import shutil
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import setuptools
@@ -127,6 +129,14 @@ class BuildExt(build_ext):##{{{
 	
 	if sys.platform == 'darwin':
 		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+
+	def initialize_options(self):
+		if os.environ.get("SBCK_TEMP_DIR") is not None:
+			self.build_temp = os.environ.get("SBCK_TEMP_DIR")
+		else:
+			# Set the build_temp directory to the system's temporary directory
+			self.build_temp = tempfile.mkdtemp(prefix='sbck_build_')
+		super().initialize_options()
 
 	def run(self):
 		# Ensure the Eigen submodule is initialized and updated

@@ -27,7 +27,7 @@ import sys
 import sysconfig
 import subprocess
 import tempfile
-import shutil
+import uuid
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import setuptools
@@ -132,8 +132,8 @@ class BuildExt(build_ext):##{{{
 
 	def initialize_options(self):
 		temp_dir = tempfile.gettempdir()
-		random_suffix = str( os.getpid() ) + str( os.getuid() )
-		self.build_temp = os.path.join(temp_dir, 'sbck_build_temp_' + random_suffix)
+		random_suffix = str(uuid.uuid4())  # More robust and unique than using pid or uid
+		self.build_temp = os.path.join(temp_dir, f'sbck_build_temp_{random_suffix}')
 		super().initialize_options()
 
 	def run(self):

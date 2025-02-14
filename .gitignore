@@ -15,5 +15,5 @@ R/*.tar.gz
 R/*.Rcheck
 R/.Rd2pdf*
 R/*.pdf
-
 .idea/
+*.pyd

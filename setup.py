@@ -231,7 +231,6 @@ setup(
 		"Programming Language :: Python :: 3.10",
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
-	build_requires   = ["pybind11>=2.2"],
 	ext_modules      = ext_modules,
 	install_requires = ["numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
 	cmdclass         = {'build_ext': BuildExt},

@@ -131,11 +131,9 @@ class BuildExt(build_ext):##{{{
 		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
 
 	def initialize_options(self):
-		if os.environ.get("SBCK_TEMP_DIR") is not None:
-			self.build_temp = os.environ.get("SBCK_TEMP_DIR")
-		else:
-			# Set the build_temp directory to the system's temporary directory
-			self.build_temp = tempfile.mkdtemp(prefix='sbck_build_')
+		temp_dir = tempfile.gettempdir()
+		random_suffix = str( os.getpid() ) + str( os.getuid() )
+		self.build_temp = os.path.join(temp_dir, 'sbck_build_temp_' + random_suffix)
 		super().initialize_options()
 
 	def run(self):

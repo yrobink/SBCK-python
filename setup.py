@@ -25,6 +25,7 @@
 import os
 import sys
 import sysconfig
+import subprocess
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import setuptools
@@ -72,7 +73,8 @@ class get_pybind_include(object):##{{{
 ##}}}
 
 def get_eigen_include( propose_path = "" ):##{{{
-	possible_path = [ propose_path , os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/" , "/usr/local/include/" ]
+	possible_path = [propose_path, os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/",
+					 "/usr/local/include/", "external/eigen"]
 	if os.environ.get("HOME") is not None:
 		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
 	
@@ -125,12 +127,21 @@ class BuildExt(build_ext):##{{{
 	
 	if sys.platform == 'darwin':
 		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+
+	def run(self):
+		# Ensure the Eigen submodule is initialized and updated
+		if not os.path.exists("external/eigen"):
+			print("Updating Eigen submodule...")
+			subprocess.run(["git", "submodule", "update", "--init", "--recursive"], check=True)
+
+		# Call the original run method to proceed with the build
+		super().run()
 	
 	def build_extensions(self):
 		ct = self.compiler.compiler_type
 		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
 		if ct == 'unix':
+			opts.append( "-O3" )
 			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
 			opts.append(cpp_flag(self.compiler))
 			if has_flag(self.compiler, '-fvisibility=hidden'):
@@ -220,8 +231,9 @@ setup(
 		"Programming Language :: Python :: 3.10",
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
+	build_requires   = ["pybind11>=2.2"],
 	ext_modules      = ext_modules,
-	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
+	install_requires = ["numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
 	cmdclass         = {'build_ext': BuildExt},
 	zip_safe         = False,
 	packages         = list_packages,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -23,7 +23,7 @@
 
 import numpy as np
 
-from .__AbstractBC import AbstractBC
+from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
 from .tools.__rv_extend import WrapperStatisticalDistribution
 from .tools.__rv_extend import rv_empirical
@@ -33,10 +33,10 @@ from .tools.__rv_extend import rv_empirical
 ## Class ##
 ###########
 
-class Univariate_QM(AbstractBC):##{{{
+class Univariate_QM(UnivariateBC):##{{{
 	
 	def __init__( self , rvY = rv_empirical , rvX = rv_empirical ):
-		super().__init__( "Univariate_QM" )
+		super().__init__( "Univariate_QM" , "S" )
 		self._rvY = rvY
 		self._rvX = rvX
 		self.rvY0 = WrapperStatisticalDistribution(self._rvY)
@@ -48,7 +48,9 @@ class Univariate_QM(AbstractBC):##{{{
 		
 		return self
 	
-	def predict( self , X0 ):
+	def _predictZ0( self , X0 , **kwargs ):
+		if X0 is None:
+			return None
 		eps  = np.sqrt(np.finfo(X0.dtype).resolution)
 		cdf  = self.rvX0.cdf(X0)
 		cdfx = max( 1 - ( 1 - cdf[cdf < 1].max() / 10 ) , 1 - eps )
@@ -144,7 +146,7 @@ class QM(MultiUBC):##{{{
 			else:
 				rvX = [rvX]
 		if not len(rvX) == len(rvY):
-			raise ValueError( f"Incoherent arguments between rvY and rvX" )
+			raise ValueError( "Incoherent arguments between rvY and rvX" )
 		args = [ (rvy,rvx) for rvy,rvx in zip(rvY,rvX) ]
 		
 		## And init upper class

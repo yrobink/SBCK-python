@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,7 +21,6 @@
 ## Libraries ##
 ###############
 
-import numpy as np
 import deprecated
 
 from .__AbstractBC import AbstractBC
@@ -80,7 +79,7 @@ class R2D2(AbstractBC):##{{{
 		**bckwargs: ...
 			all others named arguments are passed to bc_method
 		"""
-		super().__init__("R2D2")
+		super().__init__( "R2D2" , "SNS" )
 		if shuffle == "quantile":
 			self.mvq = MVQuantilesShuffle( col_cond , lag_search , lag_keep )
 		else:
@@ -129,7 +128,7 @@ class R2D2(AbstractBC):##{{{
 		return self._fit( Y0 , X0 , X1 )
 	##}}}
 	
-	def _predict( self , X1 , X0 ):##{{{
+	def _predict( self , X1 , X0 , **kwargs ):##{{{
 		if X0 is None and X1 is None:
 			return
 		if X0 is None:
@@ -157,7 +156,7 @@ class R2D2(AbstractBC):##{{{
 	##}}}
 	
 	@io_predict
-	def predict( self , X1 = None , X0 = None ):##{{{
+	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
 		"""
 		Perform the bias correction
 		Return Z1 if X0 is None (and vice-versa), else return a tuple Z1,Z0
@@ -176,7 +175,7 @@ class R2D2(AbstractBC):##{{{
 		Z0 : np.ndarray or None
 			Return an array of correction in calibration period
 		"""
-		return self._predict( X1 , X0 )
+		return self._predict( X1 , X0 ,**kwargs )
 	##}}}
 	
 ##}}}

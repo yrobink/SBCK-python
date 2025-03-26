@@ -109,12 +109,12 @@ class PrePostProcessing(AbstractBC):##{{{
 			return the input.
 		"""
 		
-		super().__init__( "PrePostProcessing" )
+		super().__init__( "PrePostProcessing" , "ppp" )
 		
 		if not isinstance( pipe , (list,tuple) ):
-			raise ValueError( f"pipe argument must be a list or a tuple" )
+			raise ValueError( "pipe argument must be a list or a tuple" )
 		if not isinstance( pipe_kwargs , (list,tuple) ):
-			raise ValueError( f"pipe_kwargs argument must be a list or a tuple" )
+			raise ValueError( "pipe_kwargs argument must be a list or a tuple" )
 		if not len(pipe) == len(pipe_kwargs):
 			if len(pipe_kwargs) == 0:
 				pipe_kwargs = [ {} for _ in range(len(pipe)) ]
@@ -186,7 +186,7 @@ class PrePostProcessing(AbstractBC):##{{{
 		self._check = all([self._checkf(K) for K in [Y0,X0,X1]])
 		
 		if not self._check:
-			raise ValueError( f"PrePostProcessing: invalid check (see the 'checkf' parameter" )
+			raise ValueError( "PrePostProcessing: invalid check (see the 'checkf' parameter" )
 		
 		## The transform
 		Y0t = self._pipe_transform( Y0 , "Y0" )
@@ -202,36 +202,50 @@ class PrePostProcessing(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def predict( self , X1 = None , X0 = None ):##{{{
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if not self._check:
+			return X0
+		if X0 is None:
+			return None
+		
+		X0t = self._pipe_transform( X0 , "X0" )
+		Z0t = self._bc_method._predictZ0( X0t , **kwargs )
+		Z0  = self._pipe_itransform( Z0t , "X0" )
+
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if not self._check:
+			return X1
+		if X1 is None:
+			return None
+		
+		X1t = self._pipe_transform( X1 , "X1" )
+		Z1t = self._bc_method._predictZ1( X1t , **kwargs )
+		Z1  = self._pipe_itransform( Z1t , "X1" )
+		
+		return Z1
+	##}}}
+	
+	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
 		"""
 		Predict the bias correction method after the pre-processing, then apply
 		the post-processing operation.
 		"""
 		
-		if not self._check:
-			if X0 is None:
-				return X1
-			elif X1 is None:
-				return X0
-			return X1,X0
-		
-		X0t = self._pipe_transform( X0 , "X0" )
-		X1t = self._pipe_transform( X1 , "X1" )
-		Z0t = None
-		Z1t = None
+		Z0 = self._predictZ0( X0 , **kwargs )
+		Z1 = self._predictZ1( X1 , **kwargs )
 		
 		if X0 is None:
-			Z1t = self._bc_method.predict(X1t)
-			return self._pipe_itransform( Z1t , "X1" )
+			return Z1
 		elif X1 is None:
-			Z0t = self._bc_method.predict(X0t)
-			return self._pipe_itransform( Z0t , "X0" )
+			return Z0
 		else:
-			Z1t,Z0t = self._bc_method.predict(X1t,X0t)
-			Z1 = self._pipe_itransform( Z1t , "X1" )
-			Z0 = self._pipe_itransform( Z0t , "X0" )
 			return Z1,Z0
 	##}}}
+	
+	## Properties ##{{{
 	
 	@property
 	def name(self):
@@ -240,6 +254,8 @@ class PrePostProcessing(AbstractBC):##{{{
 			name = name + ":" + ":".join([ p.name for p in self._pipe ])
 		name = name + f":{self._bc_method.name}"
 		return name
+	
+	##}}}
 	
 ##}}}
 

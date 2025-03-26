@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -52,7 +52,7 @@ class IdBC(AbstractBC):##{{{
 		Attributes
 		----------
 		"""
-		super().__init__("IdBC")
+		super().__init__( "IdBC" , "SNS" )
 	##}}}
 	
 	@io_fit
@@ -73,8 +73,16 @@ class IdBC(AbstractBC):##{{{
 		return self
 	##}}}
 	
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		return X0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		return X1
+	##}}}
+	
 	@io_predict
-	def predict( self , X1 = None , X0 = None ):##{{{
+	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
 		"""
 		Perform the bias correction
 		
@@ -135,7 +143,7 @@ class RBC(AbstractBC):##{{{
 		Attributes
 		----------
 		"""
-		super().__init__("RBC")
+		super().__init__( "RBC" , "SNS" )
 		self._Y = None
 	##}}}
 	
@@ -158,8 +166,22 @@ class RBC(AbstractBC):##{{{
 		return self
 	##}}}
 	
+	
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		return self._Y[np.random.choice( self._Y.shape[0] , X0.shape[0] ),:]
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if X1 is None:
+			return None
+		return self._Y[np.random.choice( self._Y.shape[0] , X1.shape[0] ),:]
+	##}}}
+	
+	
 	@io_predict
-	def predict( self , X1 = None , X0 = None ):##{{{
+	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
 		"""
 		Perform the bias correction
 		
@@ -182,8 +204,8 @@ class RBC(AbstractBC):##{{{
 			Return an array of correction in calibration period, or None
 		"""
 		
-		Z0 = None if X0 is None else self._Y[np.random.choice( self._Y.shape[0] , X0.shape[0] ),:]
-		Z1 = None if X1 is None else self._Y[np.random.choice( self._Y.shape[0] , X1.shape[0] ),:]
+		Z0 = self._predictZ0( X0 , **kwargs )
+		Z1 = self._predictZ1( X1 , **kwargs )
 		
 		if X0 is not None and X1 is not None:
 			return Z1,Z0

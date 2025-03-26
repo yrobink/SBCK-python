@@ -1,6 +1,6 @@
 #!/usr/bin/env python3 -m unittest
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -23,8 +23,10 @@
 #############
 
 import os
+import sys
 import itertools as itt
 import unittest
+import argparse
 
 import numpy as np
 import scipy.stats as sc
@@ -34,22 +36,28 @@ import SBCK.tools as bct
 import SBCK.datasets as bcd
 import SBCK.metrics as bcm
 
-import matplotlib as mpl
-import matplotlib.pyplot   as plt
-import matplotlib.gridspec as mplg
-
+has_mpl = True
+try:
+	import matplotlib as mpl
+	import matplotlib.pyplot   as plt
+	import matplotlib.gridspec as mplg
+except Exception:
+	has_mpl = False
 
 ########################
 ## Set mpl parameters ##
 ########################
 
-mpl.rcdefaults()
-mpl.rcParams['font.size'] = 7
-mpl.rcParams['axes.linewidth']  = 0.5
-mpl.rcParams['lines.linewidth'] = 0.5
-mpl.rcParams['patch.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
+try:
+	mpl.rcdefaults()
+	mpl.rcParams['font.size'] = 7
+	mpl.rcParams['axes.linewidth']  = 0.5
+	mpl.rcParams['lines.linewidth'] = 0.5
+	mpl.rcParams['patch.linewidth'] = 0.5
+	mpl.rcParams['xtick.major.width'] = 0.5
+	mpl.rcParams['ytick.major.width'] = 0.5
+except Exception:
+	has_mpl = False
 
 
 ######################
@@ -57,6 +65,8 @@ mpl.rcParams['ytick.major.width'] = 0.5
 ######################
 
 class SBCKTestParameters:##{{{
+	
+	PLOTFIG = False
 	
 	def __init__( self ):##{{{
 		lpath = os.path.join( *os.path.basename(__file__).split(".")[0].split("_")[1:] )
@@ -104,83 +114,84 @@ class StationaryBCTest(SBCKTestParameters):##{{{
 	
 	def fig_BCX0(self):##{{{
 		
-		## Data
-		np.random.seed(42)
-		Y0,X0,X1 = bcd.gaussian_L_2d(10000)
-		
-		## Correction
-		corr = self.corr_class(**self.corr_kwargs).fit( Y0 , X0 , X1 )
-		Z1 = corr.predict(X1)
-		
-		## xylim
-		xylim = [-5,11]
-		dxy   = 0.1
-		bins  = np.linspace( xylim[0] , xylim[1] , 100 )
-		
-		## Figure
-		titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
-		colors = ["blue","red","green","purple"]
-		fig = plt.figure()
-		grid = mplg.GridSpec(5,5+2)
-		for iK,K in enumerate([Y0,X0,Z1,X1]):
-			j = iK  % 2
-			i = iK // 2
-			ax  = fig.add_subplot(grid[2*i+1,2*j+1])
-			im  = ax.hist2d( K[:,0] , K[:,1] , bins , density = True , vmin = 0 , vmax = 0.2 , cmap = plt.cm.Blues )
-			ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.05 )
-			ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+		if self.PLOTFIG:
+			## Data
+			np.random.seed(42)
+			Y0,X0,X1 = bcd.gaussian_L_2d(10000)
 			
-			if i == 1:
-				ax.set_xlabel(r"$x_0$")
-			else:
-				ax.set_xticks([])
-			if j == 0:
-				ax.set_ylabel(r"$x_1$")
-			else:
-				ax.set_yticks([])
-			ax.spines[['right', 'top']].set_visible(False)
-			ax.set_xlim(xylim)
-			ax.set_ylim(xylim)
-		
-		## Title
-		ax = fig.add_subplot(grid[0,1:4])
-		ax.text( 0 , 0 , self.name , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
-		ax.set_xlim(-1,1)
-		ax.set_ylim(-1,1)
-		ax.set_axis_off()
-		
-		## Colorbar
-		cax  = fig.add_subplot( grid[1:-1,5].subgridspec( 3 , 1 , height_ratios = [0.1,0.8,0.1] )[1,0] )
-		cbar = plt.colorbar( mappable = im[-1] , cax = cax , ticks = [0,0.05,0.1,0.15,0.2] , label = "Density" )
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 180*mm
-		w_l    = 30*pt
-		w_m    =  5*pt
-		w_cl   =  5*pt
-		w_cm   =  5*pt
-		w_cr   = 35*pt
-		w_ax   = (width - (w_l + w_m + w_cl + w_cm + w_cr)) / 2
-		widths = [w_l,w_ax,w_m,w_ax,w_cl,w_cm,w_cr]
-		
-		h_ax    = w_ax
-		h_t     = 15*pt
-		h_m     =  5*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_m,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}_fig_BCX0.png" ) , dpi = 600 )
-		plt.close(fig)
+			## Correction
+			corr = self.corr_class(**self.corr_kwargs).fit( Y0 , X0 , X1 )
+			Z1 = corr.predict(X1)
+			
+			## xylim
+			xylim = [-5,11]
+			dxy   = 0.1
+			bins  = np.linspace( xylim[0] , xylim[1] , 100 )
+			
+			## Figure
+			titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
+			colors = ["blue","red","green","purple"]
+			fig = plt.figure()
+			grid = mplg.GridSpec(5,5+2)
+			for iK,K in enumerate([Y0,X0,Z1,X1]):
+				j = iK  % 2
+				i = iK // 2
+				ax  = fig.add_subplot(grid[2*i+1,2*j+1])
+				im  = ax.hist2d( K[:,0] , K[:,1] , bins , density = True , vmin = 0 , vmax = 0.2 , cmap = plt.cm.Blues )
+				ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.05 )
+				ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+				
+				if i == 1:
+					ax.set_xlabel(r"$x_0$")
+				else:
+					ax.set_xticks([])
+				if j == 0:
+					ax.set_ylabel(r"$x_1$")
+				else:
+					ax.set_yticks([])
+				ax.spines[['right', 'top']].set_visible(False)
+				ax.set_xlim(xylim)
+				ax.set_ylim(xylim)
+			
+			## Title
+			ax = fig.add_subplot(grid[0,1:4])
+			ax.text( 0 , 0 , self.name , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
+			ax.set_xlim(-1,1)
+			ax.set_ylim(-1,1)
+			ax.set_axis_off()
+			
+			## Colorbar
+			cax  = fig.add_subplot( grid[1:-1,5].subgridspec( 3 , 1 , height_ratios = [0.1,0.8,0.1] )[1,0] )
+			cbar = plt.colorbar( mappable = im[-1] , cax = cax , ticks = [0,0.05,0.1,0.15,0.2] , label = "Density" )
+			
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
+			
+			width  = 180*mm
+			w_l    = 30*pt
+			w_m    =  5*pt
+			w_cl   =  5*pt
+			w_cm   =  5*pt
+			w_cr   = 35*pt
+			w_ax   = (width - (w_l + w_m + w_cl + w_cm + w_cr)) / 2
+			widths = [w_l,w_ax,w_m,w_ax,w_cl,w_cm,w_cr]
+			
+			h_ax    = w_ax
+			h_t     = 15*pt
+			h_m     =  5*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_m,h_ax,h_b]
+			height  = sum(heights)
+			
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}_fig_BCX0.png" ) , dpi = 600 )
+			plt.close(fig)
 	##}}}
 	
 ##}}}
@@ -226,51 +237,52 @@ class Test_QM(StationaryBCTest,unittest.TestCase):##{{{
 		Z0_Yh = qm4.predict(X0)
 		
 		##
-		colors  = ["blue","red","green"]
-		markers = ["o","x","+"]
-		titles  = ["First component","Second component"]
-		labels  = [r"Par. $Y^0$",r"Freeze $Y^0$","Mix"]
-		fig = plt.figure()
-		grid = mplg.GridSpec(3,5)
-		for i in range(2):
-			ax  = fig.add_subplot(grid[1,2*i+1])
-			for iZ,Z in enumerate([Z0_Y0,Z0_Y2,Z0_Yh]):
-				ax.plot( Z0_h[:,i] , Z[:,i] , color = colors[iZ] , linestyle = "" , marker = markers[iZ] , label = labels[iZ] )
-			ax.set_xlabel( "Empirical" )
-			ax.set_ylabel( "Custom Quantile Mapping" )
-			ax.set_title( titles[i] )
-			ax.legend( loc = "upper left" , ncols = 1 )
-			xylim    = list(ax.get_xlim())
-			xylim[0] = min(xylim[0],ax.get_ylim()[0])
-			xylim[1] = max(xylim[1],ax.get_ylim()[1])
-			ax.plot( xylim , xylim , color = "black" )
-			ax.set_xlim(xylim)
-			ax.set_ylim(xylim)
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 180*mm
-		w_l    = 35*pt
-		w_m    = 35*pt
-		w_r    =  1*pt
-		w_ax   = (width - (w_l + w_m + w_r)) / 2
-		widths = [w_l,w_ax,w_m,w_ax,w_r]
-		
-		h_ax    = w_ax
-		h_t     = 20*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}_test_wrapperQM.png" ) , dpi = 600 )
-		plt.close(fig)
+		if self.PLOTFIG:
+			colors  = ["blue","red","green"]
+			markers = ["o","x","+"]
+			titles  = ["First component","Second component"]
+			labels  = [r"Par. $Y^0$",r"Freeze $Y^0$","Mix"]
+			fig = plt.figure()
+			grid = mplg.GridSpec(3,5)
+			for i in range(2):
+				ax  = fig.add_subplot(grid[1,2*i+1])
+				for iZ,Z in enumerate([Z0_Y0,Z0_Y2,Z0_Yh]):
+					ax.plot( Z0_h[:,i] , Z[:,i] , color = colors[iZ] , linestyle = "" , marker = markers[iZ] , label = labels[iZ] )
+				ax.set_xlabel( "Empirical" )
+				ax.set_ylabel( "Custom Quantile Mapping" )
+				ax.set_title( titles[i] )
+				ax.legend( loc = "upper left" , ncols = 1 )
+				xylim    = list(ax.get_xlim())
+				xylim[0] = min(xylim[0],ax.get_ylim()[0])
+				xylim[1] = max(xylim[1],ax.get_ylim()[1])
+				ax.plot( xylim , xylim , color = "black" )
+				ax.set_xlim(xylim)
+				ax.set_ylim(xylim)
+			
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
+			
+			width  = 180*mm
+			w_l    = 35*pt
+			w_m    = 35*pt
+			w_r    =  1*pt
+			w_ax   = (width - (w_l + w_m + w_r)) / 2
+			widths = [w_l,w_ax,w_m,w_ax,w_r]
+			
+			h_ax    = w_ax
+			h_t     = 20*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_b]
+			height  = sum(heights)
+			
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}_test_wrapperQM.png" ) , dpi = 600 )
+			plt.close(fig)
 	##}}}
 	
 ##}}}
@@ -308,83 +320,84 @@ class NonStationaryBCTest(SBCKTestParameters):##{{{
 	
 	def test_fig_BCX1(self):##{{{
 		
-		## Data
-		np.random.seed(42)
-		Y0,X0,X1 = bcd.gaussian_L_2d(10000)
-		
-		## Correction
-		corr = self.corr_class(**self.corr_kwargs).fit( Y0 , X0 , X1 )
-		Z1 = corr.predict(X1)
-		
-		## xylim
-		xylim = [-5,11]
-		dxy   = 0.1
-		bins  = np.linspace( xylim[0] , xylim[1] , 100 )
-		
-		## Figure
-		titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
-		colors = ["blue","red","green","purple"]
-		fig = plt.figure()
-		grid = mplg.GridSpec(5,5+2)
-		for iK,K in enumerate([Y0,X0,Z1,X1]):
-			j = iK  % 2
-			i = iK // 2
-			ax  = fig.add_subplot(grid[2*i+1,2*j+1])
-			im  = ax.hist2d( K[:,0] , K[:,1] , bins , density = True , vmin = 0 , vmax = 0.2 , cmap = plt.cm.Blues )
-			ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.05 )
-			ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+		if self.PLOTFIG:
+			## Data
+			np.random.seed(42)
+			Y0,X0,X1 = bcd.gaussian_L_2d(10000)
 			
-			if i == 1:
-				ax.set_xlabel(r"$x_0$")
-			else:
-				ax.set_xticks([])
-			if j == 0:
-				ax.set_ylabel(r"$x_1$")
-			else:
-				ax.set_yticks([])
-			ax.spines[['right', 'top']].set_visible(False)
-			ax.set_xlim(xylim)
-			ax.set_ylim(xylim)
-		
-		## Title
-		ax = fig.add_subplot(grid[0,1:4])
-		ax.text( 0 , 0 , self.tex_name , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
-		ax.set_xlim(-1,1)
-		ax.set_ylim(-1,1)
-		ax.set_axis_off()
-		
-		## Colorbar
-		cax  = fig.add_subplot( grid[1:-1,5].subgridspec( 3 , 1 , height_ratios = [0.1,0.8,0.1] )[1,0] )
-		cbar = plt.colorbar( mappable = im[-1] , cax = cax , ticks = [0,0.05,0.1,0.15,0.2] , label = "Density" )
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 180*mm
-		w_l    = 30*pt
-		w_m    =  5*pt
-		w_cl   =  5*pt
-		w_cm   =  5*pt
-		w_cr   = 35*pt
-		w_ax   = (width - (w_l + w_m + w_cl + w_cm + w_cr)) / 2
-		widths = [w_l,w_ax,w_m,w_ax,w_cl,w_cm,w_cr]
-		
-		h_ax    = w_ax
-		h_t     = 17*pt
-		h_m     =  5*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_m,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}_fig_BCX1.png" ) , dpi = 600 )
-		plt.close(fig)
+			## Correction
+			corr = self.corr_class(**self.corr_kwargs).fit( Y0 , X0 , X1 )
+			Z1 = corr.predict(X1)
+			
+			## xylim
+			xylim = [-5,11]
+			dxy   = 0.1
+			bins  = np.linspace( xylim[0] , xylim[1] , 100 )
+			
+			## Figure
+			titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
+			colors = ["blue","red","green","purple"]
+			fig = plt.figure()
+			grid = mplg.GridSpec(5,5+2)
+			for iK,K in enumerate([Y0,X0,Z1,X1]):
+				j = iK  % 2
+				i = iK // 2
+				ax  = fig.add_subplot(grid[2*i+1,2*j+1])
+				im  = ax.hist2d( K[:,0] , K[:,1] , bins , density = True , vmin = 0 , vmax = 0.2 , cmap = plt.cm.Blues )
+				ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.05 )
+				ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+				
+				if i == 1:
+					ax.set_xlabel(r"$x_0$")
+				else:
+					ax.set_xticks([])
+				if j == 0:
+					ax.set_ylabel(r"$x_1$")
+				else:
+					ax.set_yticks([])
+				ax.spines[['right', 'top']].set_visible(False)
+				ax.set_xlim(xylim)
+				ax.set_ylim(xylim)
+			
+			## Title
+			ax = fig.add_subplot(grid[0,1:4])
+			ax.text( 0 , 0 , self.tex_name , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
+			ax.set_xlim(-1,1)
+			ax.set_ylim(-1,1)
+			ax.set_axis_off()
+			
+			## Colorbar
+			cax  = fig.add_subplot( grid[1:-1,5].subgridspec( 3 , 1 , height_ratios = [0.1,0.8,0.1] )[1,0] )
+			cbar = plt.colorbar( mappable = im[-1] , cax = cax , ticks = [0,0.05,0.1,0.15,0.2] , label = "Density" )
+			
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
+			
+			width  = 180*mm
+			w_l    = 30*pt
+			w_m    =  5*pt
+			w_cl   =  5*pt
+			w_cm   =  5*pt
+			w_cr   = 35*pt
+			w_ax   = (width - (w_l + w_m + w_cl + w_cm + w_cr)) / 2
+			widths = [w_l,w_ax,w_m,w_ax,w_cl,w_cm,w_cr]
+			
+			h_ax    = w_ax
+			h_t     = 17*pt
+			h_m     =  5*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_m,h_ax,h_b]
+			height  = sum(heights)
+			
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}_fig_BCX1.png" ) , dpi = 600 )
+			plt.close(fig)
 	##}}}
 	
 ##}}}
@@ -424,8 +437,9 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 			colors = ["blue","red","purple","green"]
 			
 			## Figure
-			fig = plt.figure( dpi = 120 )
-			grid = mplg.GridSpec( 1 + 2 * noobs + 1 , 1 + 2 * nnorms + 1 )
+			if self.PLOTFIG:
+				fig = plt.figure( dpi = 120 )
+				grid = mplg.GridSpec( 1 + 2 * noobs + 1 , 1 + 2 * nnorms + 1 )
 			
 			## Loop on corrections
 			for (inorm,norm),(ioob,oob) in itt.product(enumerate(norms),enumerate(oobs)):
@@ -437,79 +451,82 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 				Z1 = corr.predict(X1)
 				rvZ1 = bct.rv_density( X = Z1[:,col] )
 				
-				## Figure
-				ax = fig.add_subplot( grid[1+2*ioob+1,1+2*inorm+1] )
-				ax.hist( Z1[:,col] , bins , color = "green" , alpha = 0.5 , density = True )
-				for iK,(K,rvK) in enumerate(zip([Y0,X0,X1,Z1],[rvY0,rvX0,rvX1,rvZ1])):
-					Kn = K[:,col].min()
-					Kx = K[:,col].max()
-					x  = np.linspace( Kn, Kx , 1000 )
-					ax.plot( x , rvK.pdf(x) , color = colors[iK] )
+				if self.PLOTFIG:
+					## Figure
+					ax = fig.add_subplot( grid[1+2*ioob+1,1+2*inorm+1] )
+					ax.hist( Z1[:,col] , bins , color = "green" , alpha = 0.5 , density = True )
+					for iK,(K,rvK) in enumerate(zip([Y0,X0,X1,Z1],[rvY0,rvX0,rvX1,rvZ1])):
+						Kn = K[:,col].min()
+						Kx = K[:,col].max()
+						x  = np.linspace( Kn, Kx , 1000 )
+						ax.plot( x , rvK.pdf(x) , color = colors[iK] )
+					
+					if ioob < noobs - 1:
+						ax.set_xticks([])
+					else:
+						ax.set_xlabel(r"$x$")
+					if inorm == 0:
+						ax.set_ylabel("Density")
+					else:
+						ax.set_yticks([])
+					ax.set_xlim(-6,12)
+					ax.set_ylim(0,0.65)
+					
+					ax.spines[['right', 'top']].set_visible(False)
+			
+			if self.PLOTFIG:
+				for inorm,norm in enumerate(norms):
+					ax = fig.add_subplot( grid[0,1+2*inorm+1] )
+					ax.text( 0 , 0 , norm , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
+					ax.set_xlim(-1,1)
+					ax.set_ylim(-1,1)
+					ax.set_axis_off()
 				
-				if ioob < noobs - 1:
-					ax.set_xticks([])
-				else:
-					ax.set_xlabel(r"$x$")
-				if inorm == 0:
-					ax.set_ylabel("Density")
-				else:
-					ax.set_yticks([])
-				ax.set_xlim(-6,12)
-				ax.set_ylim(0,0.65)
+				for ioob,oob in enumerate(oobs):
+					ax = fig.add_subplot( grid[1+2*ioob+1,0] )
+					ax.text( 0 , 0 , oob , rotation = 90 , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
+					ax.set_xlim(-1,1)
+					ax.set_ylim(-1,1)
+					ax.set_axis_off()
+			
+			
+			if self.PLOTFIG:
+				## Figsize
+				mm = 1. / 25.4
+				pt = 1. / 72
 				
-				ax.spines[['right', 'top']].set_visible(False)
-			
-			for inorm,norm in enumerate(norms):
-				ax = fig.add_subplot( grid[0,1+2*inorm+1] )
-				ax.text( 0 , 0 , norm , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
-				ax.set_xlim(-1,1)
-				ax.set_ylim(-1,1)
-				ax.set_axis_off()
-			
-			for ioob,oob in enumerate(oobs):
-				ax = fig.add_subplot( grid[1+2*ioob+1,0] )
-				ax.text( 0 , 0 , oob , rotation = 90 , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
-				ax.set_xlim(-1,1)
-				ax.set_ylim(-1,1)
-				ax.set_axis_off()
-			
-			
-			## Figsize
-			mm = 1. / 25.4
-			pt = 1. / 72
-			
-			width  = 210*mm
-			w_ll   = 12*pt
-			w_l    = 30*pt
-			w_m    =  5*pt
-			w_r    =  5*pt
-			w_ax   = (width - (w_ll + w_l + w_m + w_r)) / nnorms
-			widths = [w_ll,w_l]
-			for _ in range(nnorms):
-				widths.append(w_ax)
-				widths.append(w_m)
-			widths[-1] = w_r
-			
-			h_ax    = w_ax / (16 / 11)
-			h_tit   = 12*pt
-			h_t     =  1*pt
-			h_m     =  5*pt
-			h_b     = 30*pt
-			heights = [h_tit,h_t]
-			for _ in range(noobs):
-				heights.append(h_ax)
-				heights.append(h_m)
-			heights[-1] = h_b
-			height  = sum(heights)
-			
-			grid.set_height_ratios(heights)
-			grid.set_width_ratios(widths)
-			fig.set_figheight(height)
-			fig.set_figwidth(width)
-			
-			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-			plt.savefig( os.path.join( self.opath , f"{self.prefix}_col{col}_norm_oob.png" ) , dpi = 600 )
-			plt.close(fig)
+				width  = 210*mm
+				w_ll   = 12*pt
+				w_l    = 30*pt
+				w_m    =  5*pt
+				w_r    =  5*pt
+				w_ax   = (width - (w_ll + w_l + w_m + w_r)) / nnorms
+				widths = [w_ll,w_l]
+				for _ in range(nnorms):
+					widths.append(w_ax)
+					widths.append(w_m)
+				widths[-1] = w_r
+				
+				h_ax    = w_ax / (16 / 11)
+				h_tit   = 12*pt
+				h_t     =  1*pt
+				h_m     =  5*pt
+				h_b     = 30*pt
+				heights = [h_tit,h_t]
+				for _ in range(noobs):
+					heights.append(h_ax)
+					heights.append(h_m)
+				heights[-1] = h_b
+				height  = sum(heights)
+				
+				grid.set_height_ratios(heights)
+				grid.set_width_ratios(widths)
+				fig.set_figheight(height)
+				fig.set_figwidth(width)
+				
+				plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+				plt.savefig( os.path.join( self.opath , f"{self.prefix}_col{col}_norm_oob.png" ) , dpi = 600 )
+				plt.close(fig)
 		
 	##}}}
 	
@@ -537,12 +554,13 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 			rvX0 = bct.rv_density( X = X0[:,col] )
 			rvX1 = bct.rv_density( X = X1[:,col] )
 			
-			## Fig parameters
-			colors = ["blue","red","purple","green"]
-			
-			## Figure
-			fig = plt.figure( dpi = 120 )
-			grid = mplg.GridSpec( 1 + 2 * noobs + 1 , 1 + 2 * nnorms + 1 )
+			if self.PLOTFIG:
+				## Fig parameters
+				colors = ["blue","red","purple","green"]
+				
+				## Figure
+				fig = plt.figure( dpi = 120 )
+				grid = mplg.GridSpec( 1 + 2 * noobs + 1 , 1 + 2 * nnorms + 1 )
 			
 			## Loop on corrections
 			for (inorm,norm),(ioob,oob) in itt.product(enumerate(norms),enumerate(oobs)):
@@ -552,83 +570,87 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 				corr_kwargs["oob"]  = oob
 				corr = self.corr_class(**corr_kwargs).fit( Y0 , X0 , X1 )
 				Z1 = corr.predict(X1)
-				rvZ1 = bct.rv_density( X = Z1[:,col] )
 				
-				## Figure
-				ax = fig.add_subplot( grid[1+2*ioob+1,1+2*inorm+1] )
-				ax.hist( Z1[:,col] , bins , color = "green" , alpha = 0.5 , density = True )
-				for iK,(K,rvK) in enumerate(zip([Y0,X0,X1,Z1],[rvY0,rvX0,rvX1,rvZ1])):
-					Kn = K[:,col].min()
-					Kx = K[:,col].max()
-					x  = np.linspace( Kn, Kx , 1000 )
-					ax.plot( x , rvK.pdf(x) , color = colors[iK] )
+				if self.PLOTFIG:
+					rvZ1 = bct.rv_density( X = Z1[:,col] )
+					
+					## Figure
+					ax = fig.add_subplot( grid[1+2*ioob+1,1+2*inorm+1] )
+					ax.hist( Z1[:,col] , bins , color = "green" , alpha = 0.5 , density = True )
+					for iK,(K,rvK) in enumerate(zip([Y0,X0,X1,Z1],[rvY0,rvX0,rvX1,rvZ1])):
+						Kn = K[:,col].min()
+						Kx = K[:,col].max()
+						x  = np.linspace( Kn, Kx , 1000 )
+						ax.plot( x , rvK.pdf(x) , color = colors[iK] )
+					
+					if ioob < noobs - 1:
+						ax.set_xticks([])
+					else:
+						ax.set_xlabel(r"$x$")
+					if inorm == 0:
+						ax.set_ylabel("Density")
+					else:
+						ax.set_yticks([])
+					
+					ax.set_xlim(-6,12)
+					ax.set_ylim(0,0.65)
+					
+					ax.spines[['right', 'top']].set_visible(False)
+			
+			if self.PLOTFIG:
+				for inorm,norm in enumerate(norms):
+					ax = fig.add_subplot( grid[0,1+2*inorm+1] )
+					ax.text( 0 , 0 , norm , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
+					ax.set_xlim(-1,1)
+					ax.set_ylim(-1,1)
+					ax.set_axis_off()
 				
-				if ioob < noobs - 1:
-					ax.set_xticks([])
-				else:
-					ax.set_xlabel(r"$x$")
-				if inorm == 0:
-					ax.set_ylabel("Density")
-				else:
-					ax.set_yticks([])
+				for ioob,oob in enumerate(oobs):
+					ax = fig.add_subplot( grid[1+2*ioob+1,0] )
+					ax.text( 0 , 0 , oob , rotation = 90 , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
+					ax.set_xlim(-1,1)
+					ax.set_ylim(-1,1)
+					ax.set_axis_off()
+			
+			
+			if self.PLOTFIG:
+				## Figsize
+				mm = 1. / 25.4
+				pt = 1. / 72
 				
-				ax.set_xlim(-6,12)
-				ax.set_ylim(0,0.65)
+				width  = 210*mm
+				w_ll   = 12*pt
+				w_l    = 30*pt
+				w_m    =  5*pt
+				w_r    =  5*pt
+				w_ax   = (width - (w_ll + w_l + w_m + w_r)) / nnorms
+				widths = [w_ll,w_l]
+				for _ in range(nnorms):
+					widths.append(w_ax)
+					widths.append(w_m)
+				widths[-1] = w_r
 				
-				ax.spines[['right', 'top']].set_visible(False)
+				h_ax    = w_ax / (16 / 11)
+				h_tit   = 12*pt
+				h_t     =  1*pt
+				h_m     =  5*pt
+				h_b     = 30*pt
+				heights = [h_tit,h_t]
+				for _ in range(noobs):
+					heights.append(h_ax)
+					heights.append(h_m)
+				heights[-1] = h_b
+				height  = sum(heights)
+				
+				grid.set_height_ratios(heights)
+				grid.set_width_ratios(widths)
+				fig.set_figheight(height)
+				fig.set_figwidth(width)
+				
+				plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+				plt.savefig( os.path.join( self.opath , f"{self.prefix}_col{col}_dnorm_oob.png" ) , dpi = 600 )
+				plt.close(fig)
 			
-			for inorm,norm in enumerate(norms):
-				ax = fig.add_subplot( grid[0,1+2*inorm+1] )
-				ax.text( 0 , 0 , norm , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
-				ax.set_xlim(-1,1)
-				ax.set_ylim(-1,1)
-				ax.set_axis_off()
-			
-			for ioob,oob in enumerate(oobs):
-				ax = fig.add_subplot( grid[1+2*ioob+1,0] )
-				ax.text( 0 , 0 , oob , rotation = 90 , ha = "center" , va = "center" , fontdict = { "family" : "monospace" , "weight" : "bold" , "size" : 9 } )
-				ax.set_xlim(-1,1)
-				ax.set_ylim(-1,1)
-				ax.set_axis_off()
-			
-			
-			## Figsize
-			mm = 1. / 25.4
-			pt = 1. / 72
-			
-			width  = 210*mm
-			w_ll   = 12*pt
-			w_l    = 30*pt
-			w_m    =  5*pt
-			w_r    =  5*pt
-			w_ax   = (width - (w_ll + w_l + w_m + w_r)) / nnorms
-			widths = [w_ll,w_l]
-			for _ in range(nnorms):
-				widths.append(w_ax)
-				widths.append(w_m)
-			widths[-1] = w_r
-			
-			h_ax    = w_ax / (16 / 11)
-			h_tit   = 12*pt
-			h_t     =  1*pt
-			h_m     =  5*pt
-			h_b     = 30*pt
-			heights = [h_tit,h_t]
-			for _ in range(noobs):
-				heights.append(h_ax)
-				heights.append(h_m)
-			heights[-1] = h_b
-			height  = sum(heights)
-			
-			grid.set_height_ratios(heights)
-			grid.set_width_ratios(widths)
-			fig.set_figheight(height)
-			fig.set_figwidth(width)
-			
-			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-			plt.savefig( os.path.join( self.opath , f"{self.prefix}_col{col}_dnorm_oob.png" ) , dpi = 600 )
-			plt.close(fig)
-		
 	##}}}
 	
 ##}}}
@@ -644,7 +666,15 @@ class Test_R2D2(NonStationaryBCTest,unittest.TestCase):##{{{
 class Test_dOTC(NonStationaryBCTest,unittest.TestCase):##{{{
 	
 	def __init__( self , *args, **kwargs ):
-		NonStationaryBCTest.__init__( self , "dOTC" , bc.dOTC , cov_factor = 'cholesky' )
+		NonStationaryBCTest.__init__( self , "dOTC" , bc.dOTC , cov_factor = 'std' )
+		unittest.TestCase.__init__( self , *args , **kwargs )
+	
+##}}}
+
+class Test_dOTC1d(NonStationaryBCTest,unittest.TestCase):##{{{
+	
+	def __init__( self , *args, **kwargs ):
+		NonStationaryBCTest.__init__( self , "dOTC1d" , bc.dOTC1d )
 		unittest.TestCase.__init__( self , *args , **kwargs )
 	
 ##}}}
@@ -652,7 +682,7 @@ class Test_dOTC(NonStationaryBCTest,unittest.TestCase):##{{{
 class Test_dTSMBC(NonStationaryBCTest,unittest.TestCase):##{{{
 	
 	def __init__( self , *args, **kwargs ):
-		NonStationaryBCTest.__init__( self , "TSMBC" , bc.dTSMBC , lag = 3 , cov_factor = 'cholesky' )
+		NonStationaryBCTest.__init__( self , "TSMBC" , bc.dTSMBC , lag = 3 , cov_factor = 'std' )
 		unittest.TestCase.__init__( self , *args , **kwargs )
 	
 	def test_fig_BCX1(self):
@@ -674,6 +704,14 @@ class Test_RBC(NonStationaryBCTest,unittest.TestCase):##{{{
 	
 	def __init__( self , *args, **kwargs ):
 		NonStationaryBCTest.__init__( self , "RBC" , bc.RBC )
+		unittest.TestCase.__init__( self , *args , **kwargs )
+	
+##}}}
+
+class Test_QQD(NonStationaryBCTest,unittest.TestCase):##{{{
+	
+	def __init__( self , *args, **kwargs ):
+		NonStationaryBCTest.__init__( self , r"QQD" , bc.QQD )
 		unittest.TestCase.__init__( self , *args , **kwargs )
 	
 ##}}}
@@ -716,4 +754,13 @@ class Test_ECBC(NonStationaryBCTest,unittest.TestCase):##{{{
 ##########
 
 if __name__ == "__main__":
+	## Custom parser to pass arguments for figures
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--figures', action = "store_true" )
+	parser.add_argument('unittest_args', nargs='*')
+	args = parser.parse_args()
+	sys.argv[1:] = args.unittest_args
+	SBCKTestParameters.PLOTFIG = args.figures and has_mpl
+	
+	## And run
 	unittest.main()

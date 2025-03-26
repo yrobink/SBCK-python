@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -38,7 +38,7 @@ def io_fit(func):##{{{
 	transform the input array to 2-d array (or None if None).
 	
 	"""
-	def wrapper( self , *iargs ):
+	def wrapper( self , *iargs , **kwargs ):
 		
 		## Pre
 		#* Transform data in 2d
@@ -59,7 +59,7 @@ def io_fit(func):##{{{
 				iargs2d.append(np.zeros((1,self._ndim)) + np.nan)
 		
 		## Exec
-		return func( self , *iargs2d )
+		return func( self , *iargs2d , **kwargs )
 	
 	return wrapper
 ##}}}
@@ -75,7 +75,7 @@ def io_predict(func):##{{{
 	
 	"""
 	
-	def wrapper( self , *iargs ):
+	def wrapper( self , *iargs , **kwargs ):
 		
 		## Pre
 		#* Transform data in 2d
@@ -91,7 +91,7 @@ def io_predict(func):##{{{
 			raise ValueError( f"Incoherent numbers of dimensions between fitted distributions and data to correct '{self._ndim} != {ndim}" )
 		
 		## Exec
-		oargs2d = func( self , *iargs2d )
+		oargs2d = func( self , *iargs2d , **kwargs )
 		
 		if isinstance(oargs2d,np.ndarray):
 			oargs2d = [oargs2d]

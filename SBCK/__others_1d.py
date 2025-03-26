@@ -22,7 +22,7 @@
 ###############
 
 import numpy as np
-from .__AbstractBC import AbstractBC
+from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
 from .__QM import Univariate_QM
 from .tools.__rv_extend import rv_empirical
@@ -33,10 +33,10 @@ from SBCK.tools.__rv_extend import WrapperStatisticalDistribution
 ## Class ##
 ###########
 
-class Univariate_QDM(AbstractBC):##{{{
+class Univariate_QDM(UnivariateBC):##{{{
 	
 	def __init__( self , delta = "additive" , rvY = np.histogram , rvX = np.histogram ):##{{{
-		super().__init__( "Univariate_QDM" )
+		super().__init__( "Univariate_QDM" , "NS" )
 		self._delta_method  = np.add
 		self._idelta_method = np.subtract
 		if delta == "multiplicative":
@@ -57,18 +57,24 @@ class Univariate_QDM(AbstractBC):##{{{
 		qmX1Y0 = Univariate_QM(**self._qm_kwargs).fit( Y0 , X1 )
 		qmX1X0 = Univariate_QM(**self._qm_kwargs).fit( X0 , X1 )
 		
-		self._delta  = self._idelta_method( X1 , qmX1X0.predict(X1) )
+		self._delta  = self._idelta_method( X1 , qmX1X0.predict(X1) ).reshape(-1,1)
 		self._qmX0Y0 = qmX0Y0
 		self._qmX1Y0 = qmX1Y0
 		
 		return self
 	##}}}
 	
-	def predict( self , X1 , X0 = None ):##{{{
-		Z0 = None if X0 is None else self._qmX0Y0.predict(X0)
-		Z1 = self._delta_method( self._qmX1Y0.predict(X1) , self._delta )
-		if Z0 is not None:
-			return Z1,Z0
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		Z0 = self._qmX0Y0.predict(X0)
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if X1 is None:
+			return None
+		Z1 = self._delta_method( self._qmX1Y0.predict(X1).reshape(-1,1) , self._delta.reshape(-1,1) ).reshape(X1.shape)
 		return Z1
 	##}}}
 	
@@ -133,7 +139,7 @@ class QDM(MultiUBC):##{{{
 			else:
 				rvX = [rvX]
 		if not len(set({len(delta),len(rvX),len(rvY)})) == 1:
-			raise ValueError( f"Incoherent arguments between delta, rvY and rvX" )
+			raise ValueError( "Incoherent arguments between delta, rvY and rvX" )
 		args = [ (dlta,rvy,rvx) for dlta,rvy,rvx in zip(delta,rvY,rvX) ]
 		
 		## And init upper class
@@ -143,10 +149,10 @@ class QDM(MultiUBC):##{{{
 ##}}}
 
 
-class Univariate_QQD(AbstractBC):##{{{
+class Univariate_QQD(UnivariateBC):##{{{
 	
 	def __init__( self , p_left = 0.01 , p_right = 0.99 ):##{{{
-		super().__init__( "Univariate_QQ" )
+		super().__init__( "Univariate_QQ" , "NS" )
 		self.p_left  = p_left
 		self.p_right = p_right
 		self._corr_left  = 0
@@ -169,7 +175,9 @@ class Univariate_QQD(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def _predict( self , X ):##{{{
+	def _predictZ10( self , X , **kwargs ):##{{{
+		if X is None:
+			return None
 		cdfX = self.rvX0.cdf(X)
 		Z    = self.rvY0.icdf(cdfX)
 		
@@ -186,14 +194,12 @@ class Univariate_QQD(AbstractBC):##{{{
 		return Z
 	##}}}
 	
-	def predict( self , X1 , X0 = None ):##{{{
-		
-		Z1 = self._predict(X1)
-		if X0 is None:
-			return Z1
-		Z0 = self._predict(X0)
-		
-		return Z1,Z0
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		return self._predictZ10( X0 , **kwargs )
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		return self._predictZ10( X1 , **kwargs )
 	##}}}
 	
 ##}}}

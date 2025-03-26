@@ -1,5 +1,5 @@
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -25,7 +25,7 @@ import numpy as np
 import scipy.interpolate as sci
 import scipy.optimize as sco
 
-from ..__AbstractBC import AbstractBC
+from ..__AbstractBC import UnivariateBC
 from ..__AbstractBC import MultiUBC
 from ..__QM import Univariate_QM
 from ..tools.__rv_extend import rv_empirical
@@ -36,10 +36,10 @@ from ..tools.__rv_extend import WrapperStatisticalDistribution
 ## Classes ##
 #############
 
-class Univariate_AlphaPooling(AbstractBC):##{{{
+class Univariate_AlphaPooling(UnivariateBC):##{{{
 	
 	def __init__( self , alpha = None , rvY = rv_empirical , rvX = rv_empirical ):##{{{
-		super().__init__( "Univariate_AlphaPooling" )
+		super().__init__( "Univariate_AlphaPooling" , "SNS" )
 		self._rvY = rvY
 		self._rvX = rvX
 		

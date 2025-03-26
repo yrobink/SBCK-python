@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -39,9 +39,14 @@ class AbstractBC:##{{{
 	to check if a variable is an instance of a bias correction methods.
 	"""
 	
-	def __init__( self , name , *args , **kwargs ):##{{{
+	def __init__( self , name , non_stationarity_kind , *args , **kwargs ):##{{{
 		self._name = name
+		self._nsk  = non_stationarity_kind
 		self._ndim = 0
+		
+		if self._nsk not in ["S","NS","SNS","ppp"]:
+			raise ValueError("non_stationarity_kind must be 'S', 'NS', 'SNS' or 'ppp'")
+		
 	##}}}
 	
 	## sys ##{{{
@@ -64,6 +69,81 @@ class AbstractBC:##{{{
 	def name(self):
 		return self._name
 	
+	@property
+	def is_non_stationary(self):
+		return self._nsk in ["NS","SNS"]
+	
+	@property
+	def is_stationary(self):
+		return self._nsk in ["S","SNS"]
+	
+	@property
+	def is_only_non_stationary(self):
+		return self._nsk == "NS"
+	
+	@property
+	def is_only_stationary(self):
+		return self._nsk == "S"
+	
+	@property
+	def is_stationary_and_non_stationary(self):
+		return self._nsk == "SNS"
+	
+	##}}}
+	
+	## Predict methods ##{{{
+	
+	def _predictZ0( self , Z0 , **kwargs ):
+		raise NotImplementedError
+	
+	def _predictZ1( self , Z1 , **kwargs ):
+		raise NotImplementedError
+	
+	@io_predict
+	def predict( self , *args , **kwargs ):
+		
+		if self.is_stationary_and_non_stationary:
+			raise NotImplementedError("The predict method of SBCK.AbstractBC can not be used by SNS methods")
+		
+		if self.is_only_stationary:
+			if len(args) > 1:
+				raise ValueError("Too many positional arguments, only 0 or 1 can be given")
+			X0 = kwargs.get("X0")
+			if len(args) == 1:
+				X0 = args[0]
+			Z0 = self._predictZ0( X0 , **kwargs )
+			return Z0
+		
+		if self.is_only_non_stationary:
+			if len(args) > 2:
+				raise ValueError("Too many positional arguments, only 0, 1 or 2 can be given")
+			X1 = kwargs.get("X1")
+			X0 = kwargs.get("X0")
+			if len(args) == 1:
+				X1 = args[0]
+			elif len(args) == 2:
+				X1,X0 = args
+			Z1 = self._predictZ1( X1 , **kwargs )
+			Z0 = self._predictZ0( X0 , **kwargs )
+			if Z0 is None:
+				return Z1
+			return Z1,Z0
+	##}}}
+	
+##}}}
+
+class UnivariateBC(AbstractBC):##{{{
+	"""
+	SBCK.UnivariateBC
+	=================
+	Base class of univaruate Bias Correction methods. Can be used only to be derived, or
+	to check if a variable is an instance of a univariate bias correction methods.
+	"""
+	
+	def __init__( self , name , non_stationarity_kind , *args , **kwargs ):##{{{
+		super().__init__( name , non_stationarity_kind )
+		self._ndim = 1
+		
 	##}}}
 	
 ##}}}
@@ -96,7 +176,7 @@ class MultiUBC(AbstractBC):##{{{
 			List of kwargs for at each dimensions given at 'ubcm'. If kwargs is
 			not a list or a tuple, it is duplicated for each dimensions.
 		"""
-		super().__init__(name)
+		super().__init__( name , ubcm()._nsk )
 		self.ubcm_class  = ubcm
 		self.ubcm        = []
 		self.ubcm_args   = args
@@ -118,7 +198,7 @@ class MultiUBC(AbstractBC):##{{{
 			self.ubcm_args = [ self.ubcm_args for _ in range(self.ndim) ]
 		for arg in self.ubcm_args:
 			if not isinstance(arg,(list,tuple)):
-				raise ValueError( f"args must be a list of a tuple of list or tuple" )
+				raise ValueError( "args must be a list of a tuple of list or tuple" )
 		
 		## Check kwargs
 		if self.ubcm_kwargs is None:
@@ -133,11 +213,11 @@ class MultiUBC(AbstractBC):##{{{
 			self.ubcm_kwargs = [ self.ubcm_kwargs for _ in range(self.ndim) ]
 		for kwarg in self.ubcm_kwargs:
 			if not isinstance(kwarg,dict):
-				raise ValueError( f"kwargs must be a list of dict" )
+				raise ValueError( "kwargs must be a list of dict" )
 	##}}}
 	
 	@io_fit
-	def fit( self , *args ):##{{{
+	def fit( self , *args , **kwargs ):##{{{
 		"""
 		Fit the bias correction method
 		
@@ -156,13 +236,31 @@ class MultiUBC(AbstractBC):##{{{
 		
 		## Loop of fit
 		for i in range(self.ndim):
-			self.ubcm.append( self.ubcm_class( *self.ubcm_args[i] , **self.ubcm_kwargs[i] ).fit( *[X[:,i] for X in args] ) )
+			self.ubcm.append( self.ubcm_class( *self.ubcm_args[i] , **self.ubcm_kwargs[i] ).fit( *[X[:,i] for X in args] , **kwargs ) )
 		
 		return self
 	##}}}
 	
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		X0 = X0.reshape(-1,self.ndim)
+		Z0 = np.zeros_like(X0)
+		## Loop of fit
+		for i in range(self.ndim):
+			Z0[:,i] = self.ubcm[i]._predictZ0( X0[:,i] , **kwargs )
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		X1 = X1.reshape(-1,self.ndim)
+		Z1 = np.zeros_like(X1)
+		## Loop of fit
+		for i in range(self.ndim):
+			Z1[:,i] = self.ubcm[i]._predictZ1( X1[:,i] , **kwargs )
+		return Z1
+	##}}}
+	
 	@io_predict
-	def predict( self , *args ):##{{{
+	def predict( self , *args , **kwargs ):##{{{
 		"""
 		Predict the correction
 		
@@ -179,7 +277,7 @@ class MultiUBC(AbstractBC):##{{{
 		
 		## Loop of fit
 		for i in range(self.ndim):
-			res = self.ubcm[i].predict( *[X[:,i] for X in args] )
+			res = self.ubcm[i].predict( *[X[:,i] for X in args] , **kwargs )
 			if len(args) == 1:
 				res = [res]
 			for j in range(len(res)):

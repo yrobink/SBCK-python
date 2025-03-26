@@ -1,6 +1,6 @@
 #!/usr/bin/env python3 -m unittest
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -27,7 +27,6 @@ import itertools as itt
 import unittest
 
 import numpy as np
-import scipy.stats as sc
 import xarray as xr
 import pandas as pd
 
@@ -35,7 +34,6 @@ import SBCK as bc
 import SBCK.ppp as bcp
 import SBCK.tools as bct
 import SBCK.datasets as bcd
-import SBCK.metrics as bcm
 
 import matplotlib as mpl
 import matplotlib.pyplot   as plt
@@ -246,7 +244,7 @@ class Test_OTCNoise(SBCKTestParameters,unittest.TestCase):##{{{
 		
 		## Parameters of the ppp
 		bc_method        = bc.dOTC
-		bc_method_kwargs = { "cov_factor" : "cholesky" }
+		bc_method_kwargs = { "cov_factor" : "std" }
 		pipe             = [bcp.OTCNoise]
 		pipe_kwargs      = [{}]
 		

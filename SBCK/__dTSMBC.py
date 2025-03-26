@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,11 +21,11 @@
 ## Libraries ##
 ###############
 
-import numpy as np
 from .__AbstractBC import AbstractBC
 from .__dOTC import OTC
 from .__dOTC import dOTC
 from .tools.__misc import Shift
+from .__decorators import io_fit
 
 
 ###########
@@ -72,7 +72,7 @@ class TSMBC(AbstractBC):##{{{
 		shift     : Shift class
 			class used to shift and un-shift data
 		"""
-		super().__init__("TSMBC")
+		super().__init__( "TSMBC" , "S" )
 		self.bc_method = bc_method(**kwargs)
 		if ref == "middle": ref = int(0.5*(lag+1))
 		self.shift     = Shift( lag , method , ref )
@@ -115,20 +115,9 @@ class TSMBC(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def predict( self , X0 ):##{{{
-		"""
-		Perform the bias correction
-		
-		Parameters
-		----------
-		X0  : np.ndarray
-			Array of values to be corrected
-		
-		Returns
-		-------
-		Z0 : np.ndarray
-			Return an array of correction
-		"""
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
 		Xs = self.shift.transform(X0)
 		return self.shift.inverse( self.bc_method.predict(Xs) )
 	##}}}
@@ -175,7 +164,7 @@ class dTSMBC(AbstractBC):##{{{
 		shift     : Shift class
 			class used to shift and un-shift data
 		"""
-		super().__init__("dTSMBC")
+		super().__init__( "dTSMBC" , "NS" )
 		self.bc_method = bc_method(**kwargs)
 		if ref == "middle": ref = int(0.5*(lag+1))
 		self.shift     = Shift( lag , method , ref )
@@ -200,6 +189,7 @@ class dTSMBC(AbstractBC):##{{{
 		self.shift.method = _method
 	##}}}
 	
+	@io_fit
 	def fit( self , Y0 , X0 , X1 ):##{{{
 		"""
 		Fit of the bc_method model on shifted X1, with learning shifted pair of Y0 and X0
@@ -221,35 +211,22 @@ class dTSMBC(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def predict( self , X1 , X0 = None ):##{{{
-		"""
-		Perform the bias correction of the shifted X1, and return the unshift correction
-		Return Z1 if X0 is None, else return a tuple Z1,Z0
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		X0s = self.shift.transform(X0)
+		Z0s = self.bc_method._predictZ0( X0s , **kwargs )
+		Z0  = self.shift.inverse(Z0s)
 		
-		Parameters
-		----------
-		X1  : np.ndarray
-			Array of values to be corrected in projection period
-		X0  : np.ndarray or None
-			Array of values to be corrected in calibration period
-		
-		Returns
-		-------
-		Z1 : np.ndarray
-			Return an array of correction in projection period
-		Z0 : np.ndarray or None
-			Return an array of correction in calibration period, or None
-		"""
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if X1 is None:
+			return None
 		X1s = self.shift.transform(X1)
-		if X0 is not None:
-			X0s = self.shift.transform(X0)
-			Z1s,Z0s = self.bc_method.predict(X1s,X0s)
-			Z1 = self.shift.inverse(Z1s)
-			Z0 = self.shift.inverse(Z0s)
-			return Z1,Z0
-		
-		Z1s = self.bc_method.predict(X1s)
-		Z1 = self.shift.inverse(Z1s)
+		Z1s = self.bc_method._predictZ1( X1s , **kwargs )
+		Z1  = self.shift.inverse(Z1s)
 		return Z1
 	##}}}
 	

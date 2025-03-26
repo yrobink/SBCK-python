@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -84,7 +84,7 @@ class MBCn(AbstractBC):##{{{
 		Attributes
 		----------
 		"""
-		super().__init__( "MBCn" )
+		super().__init__( "MBCn" , "NS" )
 		self.iter_stop = stopping_criteria(**stopping_criteria_params)
 		self.metric = metric
 		self.bc = bc
@@ -165,59 +165,34 @@ class MBCn(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	@io_predict
-	def predict( self , X1 , X0 = None ):##{{{
-		"""
-		Perform the bias correction
-		Return Z1 if X0 is None, else return a tuple Z1,Z0
+	def _predictZ1( self , X1 , **kwargs ):##{{{
 		
-		Parameters
-		----------
-		X1  : np.ndarray
-			Array of value to be corrected in projection period
-		X0  : np.ndarray or None
-			Array of value to be corrected in calibration period
+		if X1 is None:
+			return None
 		
-		Returns
-		-------
-		Z1 : np.ndarray
-			Return an array of correction in projection period
-		Z0 : np.ndarray or None
-			Return an array of correction in calibration period
-		"""
-		if X0 is None:
-			return self._predict_X1(X1)
-		else:
-			return self._predict_X1_X0(X1,X0)
-		
-	##}}}
-	
-	def _predict_X1( self , X1 ):##{{{
-		if X1.ndim == 1: X1 = X1.reshape(-1,1)
-		
-		Z1_o = np.transpose( self.ortho_mat[0,:,:] @ X1.T ) if X1 is not None else None
-		
-		for i in range(self.nit):
-			Z1_o = self._lbc[i].predict(Z1_o)
-			Z1_o = np.transpose( self.tips[i,:,:] @ Z1_o.T )
-		
-		Z1 = self._lbc[-1].predict(Z1_o)
-		return Z1
-	##}}}
-	
-	def _predict_X1_X0( self , X1 , X0 ):##{{{
-		if X0.ndim == 1: X0 = X0.reshape(-1,1)
-		if X1.ndim == 1: X1 = X1.reshape(-1,1)
-		
-		Z0_o = np.transpose( self.ortho_mat[0,:,:] @ X0.T )
 		Z1_o = np.transpose( self.ortho_mat[0,:,:] @ X1.T )
 		
 		for i in range(self.nit):
-			Z1_o,Z0_o = self._lbc[i].predict(Z1_o,Z0_o)
-			Z0_o = np.transpose( self.tips[i,:,:] @ Z0_o.T )
+			Z1_o = self._lbc[i]._predictZ1( Z1_o, **kwargs )
 			Z1_o = np.transpose( self.tips[i,:,:] @ Z1_o.T )
 		
-		return self._lbc[-1].predict(Z1_o,Z0_o)
+		Z1 = self._lbc[-1]._predictZ1( Z1_o, **kwargs )
+		return Z1
+	##}}}
+	
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		
+		if X0 is None:
+			return None
+		
+		Z0_o = np.transpose( self.ortho_mat[0,:,:] @ X0.T )
+		
+		for i in range(self.nit):
+			Z0_o = self._lbc[i]._predictZ0( Z0_o , **kwargs )
+			Z0_o = np.transpose( self.tips[i,:,:] @ Z0_o.T )
+		
+		Z0 = self._lbc[-1]._predictZ0( Z0_o , **kwargs )
+		return Z0
 	##}}}
 	
 ##}}}
@@ -251,7 +226,7 @@ class MRec(AbstractBC):##{{{
 			Law of models
 		
 		"""
-		super().__init__( "MRec" )
+		super().__init__( "MRec" , "NS" )
 		self._qmX0 = None
 		self._qmX1 = None
 		self._qmY0 = None
@@ -285,7 +260,7 @@ class MRec(AbstractBC):##{{{
 		self._qmX1 = QM( rvY = sc.norm(0,1) , rvX = self._rvX ).fit( None , X1 )
 		Y0g = self._qmY0.predict(Y0)
 		X0g = self._qmX0.predict(X0)
-		X1g = self._qmX1.predict(X1)
+#		X1g = self._qmX1.predict(X1)
 		
 		## Correlation matrix
 		CY0g = np.corrcoef( Y0g.T )
@@ -301,7 +276,7 @@ class MRec(AbstractBC):##{{{
 		## Decor-recor-relation
 		self._re_un_mat = self._S_CY0g @ self._Si_CX0g
 		X0_recor = np.transpose( self._re_un_mat @ X0g.T )
-		X1_recor = np.transpose( self._re_un_mat @ X1g.T )
+#		X1_recor = np.transpose( self._re_un_mat @ X1g.T )
 		
 		## Final QM
 		self._qmY0 = QM( rvY = self._rvY , rvX = sc.norm ).fit( Y0 , X0_recor )
@@ -309,45 +284,27 @@ class MRec(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	@io_predict
-	def predict( self , X1 , X0 = None ):##{{{
-		"""
-		Perform the bias correction
-		Return Z1 if X0 is None, else return a tuple Z1,Z0
-		
-		Parameters
-		----------
-		X1 : np.ndarray
-			Array of value to be corrected in projection period
-		X0 : np.ndarray | None
-			Array of value to be corrected in calibration period, optional
-		
-		Returns
-		-------
-		Z1 : np.ndarray
-			Return an array of correction in projection period
-		Z0 : np.ndarray
-			Return an array of correction in calibration period
-		"""
-		if X0 is not None and X0.ndim == 1 : X0 = X0.reshape(-1,1)
-		if X1.ndim == 1 : X1 = X1.reshape(-1,1)
-		
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		X0g = self._qmX0.predict(X0)
+		X0r = np.transpose( self._re_un_mat @ X0g.T )
+		Z0  = self._qmY0.predict(X0r)
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if X1 is None:
+			return None
 		X1g = self._qmX1.predict(X1)
-		X1_recor = np.transpose( self._re_un_mat @ X1g.T )
-		Z1 = self._qmY0.predict(X1_recor)
-		
-		Z0 = None
-		if X0 is not None:
-			X0g = self._qmX0.predict(X0)
-			X0_recor = np.transpose( self._re_un_mat @ X0g.T )
-			Z0 = self._qmY0.predict(X0_recor)
-			return Z1,Z0
+		X1r = np.transpose( self._re_un_mat @ X1g.T )
+		Z1  = self._qmY0.predict(X1r)
 		return Z1
 	##}}}
 	
 ##}}}
 
-class ECBC(CDFt):##{{{
+class ECBC(AbstractBC):##{{{
 	"""
 	SBCK.ECBC
 	=========
@@ -363,7 +320,7 @@ class ECBC(CDFt):##{{{
 	https://doi.org/10.1175/JCLI-D-14-00059.1
 	"""
 	
-	def __init__( self , **kwargs ):##{{{
+	def __init__( self , bc_method = CDFt , **kwargs ):##{{{
 		"""
 		Initialisation of ECBC
 		
@@ -376,13 +333,13 @@ class ECBC(CDFt):##{{{
 		Attributes
 		----------
 		"""
-		CDFt.__init__( self , **kwargs )
-		self._name = "ECBC"
-		self._ss = SchaakeShuffle()
+		super().__init__( "ECBC" , "SNS" )
+		self._bcm = bc_method(**kwargs)
+		self._ss  = SchaakeShuffle()
 	##}}}
 	
 	@io_fit
-	def fit( self , Y0 , X0 , X1 = None ):##{{{
+	def fit( self , *args ):##{{{
 		"""
 		Fit ECBC
 		
@@ -395,14 +352,14 @@ class ECBC(CDFt):##{{{
 		X1	: np.ndarray or None
 			Biased dataset during projection period. Can be None to use as a stationary bias correction method
 		"""
-		CDFt.fit( self , Y0 , X0 , X1 )
-		self._ss.fit(Y0)
+		self._bcm.fit( *args )
+		self._ss.fit(args[0])
 		
 		return self
 	##}}}
 	
 	@io_predict
-	def predict( self , X1 , X0 = None ):##{{{
+	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
 		"""
 		Perform the bias correction
 		
@@ -421,14 +378,20 @@ class ECBC(CDFt):##{{{
 			Return an array of correction in calibration period, or None
 		"""
 		
-		if X0 is not None:
-			Z1,Z0 = CDFt.predict( self , X1 , X0 )
+		if X0 is None and X1 is not None:
+			Z1 = self._bcm.predict(X1)
+			Z1 = self._ss.predict(Z1)
+			return Z1
+		elif X1 is None and X1 is not None:
+			Z0 = self._bcm.predict(X0)
+			Z0 = self._ss.predict(Z0)
+			return Z0
+		else:
+			Z1 = self._bcm.predict(X1)
+			Z0 = self._bcm.predict(X0)
 			Z1 = self._ss.predict(Z1)
 			Z0 = self._ss.predict(Z0)
 			return Z1,Z0
-		Z1 = CDFt.predict( self , X1 )
-		Z1 = self._ss.predict(Z1)
-		return Z1
 	##}}}
 	
 ##}}}

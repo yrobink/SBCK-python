@@ -40,10 +40,9 @@
 import itertools as itt
 
 import numpy       as np
-import scipy.stats as sc
 import scipy.interpolate as sci
 
-from .__AbstractBC import AbstractBC
+from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
 from .tools.__rv_extend import WrapperStatisticalDistribution
 from .tools.__rv_extend import rv_empirical
@@ -53,7 +52,7 @@ from .tools.__rv_extend import rv_empirical
 ## Class ##
 ###########
 
-class Univariate_CDFt(AbstractBC):##{{{
+class Univariate_CDFt(UnivariateBC):##{{{
 	
 	class OoB:##{{{
 		
@@ -91,7 +90,7 @@ class Univariate_CDFt(AbstractBC):##{{{
 	
 	def __init__( self , rvY = rv_empirical , rvX = rv_empirical , norm = "origin" , oob = "Y0" , **kwargs ):##{{{
 		
-		super().__init__( "Univariate_CDFt" )
+		super().__init__( "Univariate_CDFt" , "NS" )
 		
 		self._rvY = rvY
 		self._rvX = rvX
@@ -414,18 +413,19 @@ class Univariate_CDFt(AbstractBC):##{{{
 		self._tools["rvX1s"] = WrapperStatisticalDistribution(self._rvX)
 		
 		## Normalization step
-		if self.norm.method == "mean":
-			self._norm_mean()
-		elif self.norm.method == "meanstd":
-			self._norm_meanstd()
-		elif self.norm.method == "quant":
-			self._norm_quant()
-		elif self.norm.method == "minmax":
-			self._norm_minmax()
-		elif self.norm.method == "origin":
-			self._norm_origin()
-		else:
-			self._norm_default()
+		match self.norm.method:
+			case "mean":
+				self._norm_mean()
+			case "meanstd":
+				self._norm_meanstd()
+			case "quant":
+				self._norm_quant()
+			case "minmax":
+				self._norm_minmax()
+			case "origin":
+				self._norm_origin()
+			case _:
+				self._norm_default()
 		
 		## Define CDF
 		for K,s in itt.product(["Y0","X0","X1"],["","s"]):
@@ -438,14 +438,15 @@ class Univariate_CDFt(AbstractBC):##{{{
 		self.rvX1  = self._tools["rvX1"]
 		
 		## Find rvY1 with Out of Bounds conditions
-		if self.oob.method == "Y0":
-			self._oob_Y0()
-		elif self.oob.method == "Y0CC":
-			self._oob_Y0CC()
-		elif self.oob.method == "CC":
-			self._oob_CC()
-		else:
-			self._oob_default()
+		match self.oob.method:
+			case "Y0":
+				self._oob_Y0()
+			case "Y0CC":
+				self._oob_Y0CC()
+			case "CC":
+				self._oob_CC()
+			case _:
+				self._oob_default()
 		
 		##
 		del self._tools
@@ -453,19 +454,16 @@ class Univariate_CDFt(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def predict( self , X1 , X0 = None ):##{{{
-		
-		Z1,Z0 = None,None
-		if X1 is not None:
-			Z1 = self.rvY1.icdf( self.rvX1.cdf(X1) )
-		if X0 is not None:
-			Z0 = self.rvY0.icdf( self.rvX0.cdf(X0) )
-		
-		if Z1 is not None and Z0 is None:
-			return Z1
-		if Z0 is not None and Z1 is None:
-			return Z0
-		return Z1,Z0
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		return self.rvY0.icdf( self.rvX0.cdf(X0) )
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if X1 is None:
+			return None
+		return self.rvY1.icdf( self.rvX1.cdf(X1) )
 	##}}}
 	
 	##}}}
@@ -556,7 +554,7 @@ class CDFt(MultiUBC):##{{{
 			else:
 				rvX = [rvX]
 		if not len(rvX) == len(rvY):
-			raise ValueError( f"Incoherent arguments between rvY and rvX" )
+			raise ValueError( "Incoherent arguments between rvY and rvX" )
 		args = [ (rvy,rvx) for rvy,rvx in zip(rvY,rvX) ]
 		
 		## Build kwargs for MultiUBC

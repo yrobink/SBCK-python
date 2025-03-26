@@ -22,12 +22,12 @@
 ###############
 
 import numpy       as np
-
+import scipy.stats as sc
 from .__AbstractBC import AbstractBC
+from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
 from .__QM         import QM
 from .__decorators import io_fit
-from .__decorators import io_predict
 
 from .tools.__SparseHist import SparseHist
 from .tools.__stats      import bin_width_estimator
@@ -48,6 +48,11 @@ class OTC(AbstractBC):##{{{
 	Description
 	-----------
 	Optimal Transport bias Corrector, see [1]
+	
+	Note: Only the center of the bins associated to the corrected points are
+	returned, but all corrections of the form:
+	>> otc.predict(X0) + np.random.uniform( low = - otc.bin_width / 2 , high = otc.bin_width / 2 , size = X0.shape[0] )
+	are equivalent for OTC.
 	
 	References
 	----------
@@ -77,7 +82,7 @@ class OTC(AbstractBC):##{{{
 			Multivariate histogram of biased dataset
 		"""
 		
-		super().__init__("OTC")
+		super().__init__( "OTC" , "S" )
 		self.muX = None
 		self.muY = None
 		self.bin_width  = bin_width
@@ -120,26 +125,7 @@ class OTC(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	@io_predict
-	def predict( self , X0 ):##{{{
-		"""
-		Perform the bias correction.
-		
-		Note: Only the center of the bins associated to the corrected points are
-		returned, but all corrections of the form:
-		>> otc.predict(X0) + np.random.uniform( low = - otc.bin_width / 2 , high = otc.bin_width / 2 , size = X0.shape[0] )
-		are equivalent for OTC.
-		
-		Parameters
-		----------
-		X0  : np.ndarray
-			Array of values to be corrected
-		
-		Returns
-		-------
-		Z0 : np.ndarray
-			Return an array of correction
-		"""
+	def _predictZ0( self , X0 , **kwargs ):##{{{
 		indx = self.muX.argwhere(X0)
 		indy = np.zeros_like(indx)
 		for i,ix in enumerate(indx):
@@ -157,6 +143,11 @@ class dOTC(AbstractBC):##{{{
 	Description
 	-----------
 	Dynamical Optimal Transport bias Corrector, taking account of an evolution of the distribution. see [1]
+	
+	Note: Only the center of the bins associated to the corrected points are
+	returned, but all corrections of the form:
+	>> dotc.predict(X1) + np.random.uniform( low = - dotc.bin_width / 2 , high = dotc.bin_width / 2 , size = X1.shape[0] )
+	are equivalent for dOTC.
 	
 	References
 	----------
@@ -189,18 +180,18 @@ class dOTC(AbstractBC):##{{{
 		otc   : SBCK.OTC
 			OTC corrector between X1 and the estimation of Y1
 		"""
-		super().__init__("dOTC")
+		super().__init__("dOTC","NS")
 		self._cov_factor_str = None
 		self._cov_factor     = None
 		if type(cov_factor) is str:
 			if cov_factor not in ["cholesky","sqrtm","std","id"]:
-				raise ValueError(f"'cov_factor' must be 'cholesky', 'sqrtm', 'std' or 'id'")
+				raise ValueError("'cov_factor' must be 'cholesky', 'sqrtm', 'std' or 'id'")
 			self._cov_factor_str = cov_factor
 		else:
 			try:
 				self._cov_factor = np.array([cov_factor])
-			except:
-				raise ValueError(f"cov_factor not a string and not castable to numpy array")
+			except Exception:
+				raise ValueError("cov_factor not a string and not castable to numpy array")
 		
 		self.bin_width  = bin_width
 		self.bin_origin = bin_origin
@@ -273,44 +264,26 @@ class dOTC(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	@io_predict
-	def predict( self , X1 , X0 = None ):##{{{
-		"""
-		Perform the bias correction
-		Return Z1 if X0 is None, else return a tuple Z1,Z0
-		
-		Note: Only the center of the bins associated to the corrected points are
-		returned, but all corrections of the form:
-		>> dotc.predict(X1) + np.random.uniform( low = - dotc.bin_width / 2 , high = dotc.bin_width / 2 , size = X1.shape[0] )
-		are equivalent for dOTC.
-		
-		Parameters
-		----------
-		X1  : np.ndarray
-			Array of value to be corrected in projection period
-		X0  : np.ndarray or None
-			Array of value to be corrected in calibration period
-		
-		Returns
-		-------
-		Z1 : np.ndarray
-			Return an array of correction in projection period
-		Z0 : np.ndarray
-			Return an array of correction in calibration period
-		"""
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		Z0 = self._otcX0Y0.predict(X0)
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1, **kwargs ):##{{{
+		if X1 is None:
+			return None
 		Z1 = self.otc.predict( X1 )
-		if X0 is not None:
-			Z0 = self._otcX0Y0.predict(X0)
-			return Z1,Z0
 		return Z1
 	##}}}
 	
 ##}}}
 
 
-class Univariate_dOTC1d(AbstractBC):##{{{
+class Univariate_dOTC1d(UnivariateBC):##{{{
 	def __init__( self , cov_factor = "std" ):
-		super().__init__( "dOTC1d" )
+		super().__init__( "dOTC1d" , "NS" )
 		self._planX0Y0 = None
 		self._planX1Y1 = None
 		self._cov_factor = cov_factor
@@ -336,11 +309,27 @@ class Univariate_dOTC1d(AbstractBC):##{{{
 		
 		return self
 	
-	def predict( self , X1 , X0 = None ):
-		Z1 = self._planX1Y1.predict(X1)
-		if X0 is None: return Z1
-		Z0 = self._planX0Y0.predict(X0)
-		return Z1,Z0
+	def _predictZ1( self , X1 , reinfer_X1 = False , **kwargs ):
+		if X1 is None:
+			return None
+		if reinfer_X1:
+			plan = QM( rvY = sc.norm() ).fit(None,X1)
+			plan.ubcm[0].rvY0 = self._planX1Y1.ubcm[0].rvY0
+			Z1 = plan.predict(X1)
+		else:
+			Z1 = self._planX1Y1.predict(X1)
+		return Z1
+	
+	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):
+		if X0 is None:
+			return None
+		if reinfer_X0:
+			plan = QM( rvY = sc.norm() ).fit(None,X0)
+			plan.ubcm[0].rvY0 = self._planX0Y0.ubcm[0].rvY0
+			Z0 = plan.predict(X0)
+		else:
+			Z0 = self._planX0Y0.predict(X0)
+		return Z0
 ##}}}
 
 class dOTC1d(MultiUBC):##{{{

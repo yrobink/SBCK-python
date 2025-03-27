@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -178,7 +178,8 @@ package_dir = { "SBCK": "SBCK" }
 ## Infos from release ##
 ########################
 
-exec( (cpath / "SBCK" / "__release.py").read_text() )
+release = {}
+exec( (cpath / "SBCK" / "__release.py").read_text() , {} , release )
 
 
 #################
@@ -195,14 +196,14 @@ long_description = long_description.replace(":warning:"," ~       ")
 #######################
 
 setup(
-	name         = name,
-	description  = description,
+	name         = release['name'],
+	description  = release['description'],
 	long_description = long_description,
 	long_description_content_type = 'text/markdown',
-	version      = version,
-	author       = author,
-	author_email = author_email,
-	license      = license,
+	version      = release['version'],
+	author       = release['author'],
+	author_email = release['author_email'],
+	license      = release['license'],
 	platforms        = [ "linux" , "macosx" ],
 	classifiers      = [
 		"Development Status :: 5 - Production/Stable",

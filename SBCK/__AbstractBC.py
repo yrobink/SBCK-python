@@ -44,8 +44,8 @@ class AbstractBC:##{{{
 		self._nsk  = non_stationarity_kind
 		self._ndim = 0
 		
-		if self._nsk not in ["S","NS","SNS","ppp"]:
-			raise ValueError("non_stationarity_kind must be 'S', 'NS', 'SNS' or 'ppp'")
+		if self._nsk not in ["S","NS","SNS","None"]:
+			raise ValueError("non_stationarity_kind must be 'S', 'NS', 'SNS' or 'None'")
 		
 	##}}}
 	
@@ -88,6 +88,10 @@ class AbstractBC:##{{{
 	@property
 	def is_stationary_and_non_stationary(self):
 		return self._nsk == "SNS"
+	
+	@property
+	def stationarity_is_not_relevant(self):
+		return self._nsk == "None"
 	
 	##}}}
 	

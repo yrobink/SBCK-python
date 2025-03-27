@@ -47,20 +47,16 @@ def io_type(func):##{{{
 	def wrapper( self , x ):
 		
 		## Transform to 1d array
-		xt = np.atleast_1d( np.asarray(x) ).ravel()
+		xt = np.atleast_1d( np.asarray(x) ).astype(float).ravel()
 		
 		## Apply function
 		yt = func( self , xt )
 		
 		## And go back to x
 		if np.isscalar(x):
-			try:
-				y = type(x)(yt[0])
-			except:
-				y = float(yt[0])
-			return y
+			return float(yt[0])
 		
-		y = x.copy() + np.nan
+		y = x.copy().astype(float) + np.nan
 		y[:] = yt.reshape(y.shape)
 		
 		return y

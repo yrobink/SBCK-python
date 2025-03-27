@@ -109,7 +109,7 @@ class PrePostProcessing(AbstractBC):##{{{
 			return the input.
 		"""
 		
-		super().__init__( "PrePostProcessing" , "ppp" )
+		super().__init__( "PrePostProcessing" , "None" )
 		
 		if not isinstance( pipe , (list,tuple) ):
 			raise ValueError( "pipe argument must be a list or a tuple" )

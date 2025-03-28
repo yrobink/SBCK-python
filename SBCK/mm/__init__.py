@@ -1,5 +1,5 @@
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,4 +21,7 @@
 #############
 
 from .__AlphaPooling import AlphaPooling
+
+from .__EnsBC import EnsITE
+from .__EnsBC import EnsCTE
 

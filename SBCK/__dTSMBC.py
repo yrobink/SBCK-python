@@ -119,7 +119,7 @@ class TSMBC(AbstractBC):##{{{
 		if X0 is None:
 			return None
 		Xs = self.shift.transform(X0)
-		return self.shift.inverse( self.bc_method.predict(Xs) )
+		return self.shift.inverse( self.bc_method.predict( Xs , **kwargs ) )
 	##}}}
 	
 ##}}}

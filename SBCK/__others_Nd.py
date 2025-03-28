@@ -287,7 +287,7 @@ class MRec(AbstractBC):##{{{
 	def _predictZ0( self , X0 , **kwargs ):##{{{
 		if X0 is None:
 			return None
-		X0g = self._qmX0.predict(X0)
+		X0g = self._qmX0.predict( X0 , **kwargs )
 		X0r = np.transpose( self._re_un_mat @ X0g.T )
 		Z0  = self._qmY0.predict(X0r)
 		return Z0
@@ -296,7 +296,10 @@ class MRec(AbstractBC):##{{{
 	def _predictZ1( self , X1 , **kwargs ):##{{{
 		if X1 is None:
 			return None
-		X1g = self._qmX1.predict(X1)
+		okwargs = dict(kwargs)
+		if okwargs.get("reinfer_X1",False):
+			okwargs["reinfer_X0"] = True
+		X1g = self._qmX1.predict( X1 , **okwargs )
 		X1r = np.transpose( self._re_un_mat @ X1g.T )
 		Z1  = self._qmY0.predict(X1r)
 		return Z1
@@ -379,16 +382,16 @@ class ECBC(AbstractBC):##{{{
 		"""
 		
 		if X0 is None and X1 is not None:
-			Z1 = self._bcm.predict(X1)
+			Z1 = self._bcm.predict( X1 , **kwargs )
 			Z1 = self._ss.predict(Z1)
 			return Z1
 		elif X1 is None and X1 is not None:
-			Z0 = self._bcm.predict(X0)
+			Z0 = self._bcm.predict( X0 , **kwargs )
 			Z0 = self._ss.predict(Z0)
 			return Z0
 		else:
-			Z1 = self._bcm.predict(X1)
-			Z0 = self._bcm.predict(X0)
+			Z1 = self._bcm.predict( X1 , **kwargs )
+			Z0 = self._bcm.predict( X0 , **kwargs )
 			Z1 = self._ss.predict(Z1)
 			Z0 = self._ss.predict(Z0)
 			return Z1,Z0

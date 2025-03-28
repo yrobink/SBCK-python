@@ -134,24 +134,24 @@ class R2D2(AbstractBC):##{{{
 		if X0 is None:
 			if self._reverse:
 				Z1 = self.mvq.transform(X1)
-				return self._bcm.predict(Z1)
+				return self._bcm.predict( Z1 , **kwargs )
 			else:
-				Z1b = self._bcm.predict(X1)
+				Z1b = self._bcm.predict( X1 , **kwargs )
 				return self.mvq.transform(Z1b)
 		if X1 is None:
 			if self._reverse:
 				Z0 = self.mvq.transform(X0)
-				return self._bcm.predict(Z0)
+				return self._bcm.predict( Z0 , **kwargs )
 			else:
-				Z0b = self._bcm.predict(X0)
+				Z0b = self._bcm.predict( X0 , **kwargs )
 				return self.mvq.transform(Z0b)
 		
 		if self._reverse:
 			Z0 = self.mvq.transform(X0)
 			Z1 = self.mvq.transform(X1)
-			return self._bcm.predict(Z1,Z0)
+			return self._bcm.predict( Z1 , Z0 , **kwargs )
 		else:
-			Z1b,Z0b = self._bcm.predict(X1,X0)
+			Z1b,Z0b = self._bcm.predict( X1 , X0 , **kwargs )
 			return self.mvq.transform(Z1b),self.mvq.transform(Z0b)
 	##}}}
 	

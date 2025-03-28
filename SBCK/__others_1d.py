@@ -46,9 +46,8 @@ class Univariate_QDM(UnivariateBC):##{{{
 			self._delta_method  = delta[0]
 			self._idelta_method = delta[1]
 		
-		self._delta  = None
 		self._qmX0Y0 = None
-		self._qmX1Y0 = None
+		self._qmX1Y1 = None
 		self._qm_kwargs = { "rvY" : rvY , "rvX" : rvX }
 	##}}}
 	
@@ -57,9 +56,14 @@ class Univariate_QDM(UnivariateBC):##{{{
 		qmX1Y0 = Univariate_QM(**self._qm_kwargs).fit( Y0 , X1 )
 		qmX1X0 = Univariate_QM(**self._qm_kwargs).fit( X0 , X1 )
 		
-		self._delta  = self._idelta_method( X1 , qmX1X0.predict(X1) ).reshape(-1,1)
+		## Infer Y1
+		D01 = self._idelta_method( X1.reshape(-1,1) , qmX1X0.predict(X1).reshape(-1,1) ).reshape(-1,1)
+		Y1  = self._delta_method( qmX1Y0.predict( X1 ).reshape(-1,1) , D01 ).reshape(X1.shape)
+		
+		## store
+		self._Y1 = Y1
+		self._qmX1Y1 = Univariate_QM(**self._qm_kwargs).fit( Y1 , X1 )
 		self._qmX0Y0 = qmX0Y0
-		self._qmX1Y0 = qmX1Y0
 		
 		return self
 	##}}}
@@ -67,14 +71,17 @@ class Univariate_QDM(UnivariateBC):##{{{
 	def _predictZ0( self , X0 , **kwargs ):##{{{
 		if X0 is None:
 			return None
-		Z0 = self._qmX0Y0.predict(X0)
+		Z0 = self._qmX0Y0.predict( X0 , **kwargs )
 		return Z0
 	##}}}
 	
 	def _predictZ1( self , X1 , **kwargs ):##{{{
 		if X1 is None:
 			return None
-		Z1 = self._delta_method( self._qmX1Y0.predict(X1).reshape(-1,1) , self._delta.reshape(-1,1) ).reshape(X1.shape)
+		okwargs = dict(kwargs)
+		if okwargs.get("reinfer_X1",False):
+			okwargs["reinfer_X0"] = True
+		Z1 = self._qmX1Y1.predict( X1 , **okwargs )
 		return Z1
 	##}}}
 	
@@ -161,45 +168,64 @@ class Univariate_QQD(UnivariateBC):##{{{
 		self._rvX    = rv_empirical
 		self._rvY    = rv_empirical
 		self.rvY0 = WrapperStatisticalDistribution(self._rvY)
+		self.rvY1 = WrapperStatisticalDistribution(self._rvY)
 		self.rvX0 = WrapperStatisticalDistribution(self._rvX)
 	##}}}
 	
 	def fit( self , Y0 , X0 , X1 ):##{{{
 		
-		self.rvX0.fit(X0)
 		self.rvY0.fit(Y0)
+		self.rvX0.fit(X0)
+		rvX1 = WrapperStatisticalDistribution(self._rvX).fit(X1)
 		
 		self._corr_left  = self.rvY0.icdf(self.p_left)  - self.rvX0.icdf(self.p_left)
 		self._corr_right = self.rvY0.icdf(self.p_right) - self.rvX0.icdf(self.p_right)
 		
+		## First estimation of Y1
+		cdfX1 = self.rvX0.cdf(X1)
+		Y1    = self.rvY0.icdf(cdfX1)
+		
+		## Correction of left tail
+		idxL = cdfX1 < self.p_left
+		if idxL.any():
+			Y1[idxL] = self.rvX0.icdf(rvX1.cdf(X1[idxL])) + self._corr_left
+		
+		## Correction of right tail
+		idxR = cdfX1 > self.p_right
+		if idxR.any():
+			Y1[idxR] = self.rvX0.icdf(rvX1.cdf(X1[idxR])) + self._corr_right
+		
+		## And store cdf
+		self.rvY1.fit(Y1)
+		self._Y1 = Y1
+		
 		return self
 	##}}}
 	
-	def _predictZ10( self , X , **kwargs ):##{{{
-		if X is None:
-			return None
-		cdfX = self.rvX0.cdf(X)
-		Z    = self.rvY0.icdf(cdfX)
-		
-		## Correction of left tail
-		idxL = cdfX < self.p_left
-		if idxL.any():
-			Z[idxL] = X[idxL] + self._corr_left
-		
-		## Correction of right tail
-		idxR = cdfX > self.p_right
-		if idxR.any():
-			Z[idxR] = X[idxR] + self._corr_right
-		
-		return Z
-	##}}}
-	
 	def _predictZ0( self , X0 , **kwargs ):##{{{
-		return self._predictZ10( X0 , **kwargs )
+		
+		if X0 is None:
+			return None
+		
+		rvX0 = self.rvX0
+		if kwargs.get("reinfer_X0",False):
+			rvX0 = WrapperStatisticalDistribution(self._rvX).fit(X0)
+		Z0 = self.rvY0.icdf(rvX0.cdf(X0))
+		
+		return Z0
 	##}}}
 	
 	def _predictZ1( self , X1 , **kwargs ):##{{{
-		return self._predictZ10( X1 , **kwargs )
+		
+		if X1 is None:
+			return None
+		
+		rvX1 = self.rvX0 ## Because in QQD rvX1 dont exist!!!
+		if kwargs.get("reinfer_X1",False):
+			rvX1 = WrapperStatisticalDistribution(self._rvX).fit(X1)
+		Z1 = self.rvY1.icdf(rvX1.cdf(X1))
+		
+		return Z1
 	##}}}
 	
 ##}}}

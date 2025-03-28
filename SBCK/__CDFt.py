@@ -454,16 +454,32 @@ class Univariate_CDFt(UnivariateBC):##{{{
 		return self
 	##}}}
 	
-	def _predictZ0( self , X0 , **kwargs ):##{{{
+	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):##{{{
 		if X0 is None:
 			return None
-		return self.rvY0.icdf( self.rvX0.cdf(X0) )
+		
+		cdfX0 = self.rvX0.cdf
+		if reinfer_X0:
+			rvX0 = WrapperStatisticalDistribution(self._rvX)
+			rvX0.fit(X0)
+			cdfX0 = rvX0.cdf
+		Z0 = self.rvY0.icdf( cdfX0(X0) )
+		
+		return Z0
 	##}}}
 	
-	def _predictZ1( self , X1 , **kwargs ):##{{{
+	def _predictZ1( self , X1 , reinfer_X1 = False , **kwargs ):##{{{
 		if X1 is None:
 			return None
-		return self.rvY1.icdf( self.rvX1.cdf(X1) )
+		
+		cdfX1 = self.rvX1.cdf
+		if reinfer_X1:
+			rvX1 = WrapperStatisticalDistribution(self._rvX)
+			rvX1.fit(X1)
+			cdfX1 = rvX1.cdf
+		Z1 = self.rvY1.icdf( cdfX1(X1) )
+		
+		return Z1
 	##}}}
 	
 	##}}}

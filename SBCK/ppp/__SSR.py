@@ -41,6 +41,8 @@ class SSR(PrePostProcessing): ##{{{
 	takes the value `Y0` (reference in calibration period), or `X0` (biased in
 	calibration period), or `X1` (biased in projection period)
 	
+	Note that SSR is generally incompatible with the SBCK.dOTC method.
+	
 	>>> ## Start with data
 	>>> Y0,X0,X1 = SBCK.datasets.like_tas_pr(2000)
 	>>> 
@@ -97,7 +99,7 @@ class SSR(PrePostProcessing): ##{{{
 			self._cols = np.array( [i for i in range(X.shape[1])] , dtype = int ).squeeze()
 		cols = self._cols
 		
-		Xn = np.array( [np.nanmin( np.where( X[:,cols] > 0 , X[:,cols] , np.nan ) , axis = 0 )] )
+		Xn = np.array( [np.nanmin( np.where( X[:,cols] > 0 , X[:,cols] , np.nan ) , axis = 0 )] ).reshape(-1,1)
 		
 		if np.any(np.isnan(Xn)):
 			Xn[np.isnan(Xn)] = 1

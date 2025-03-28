@@ -48,11 +48,16 @@ class Univariate_QM(UnivariateBC):##{{{
 		
 		return self
 	
-	def _predictZ0( self , X0 , **kwargs ):
+	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):
 		if X0 is None:
 			return None
+		cdfX0 = self.rvX0.cdf
+		if reinfer_X0:
+			rvX0 = WrapperStatisticalDistribution(self._rvX)
+			rvX0.fit(X0)
+			cdfX0 = rvX0.cdf
 		eps  = np.sqrt(np.finfo(X0.dtype).resolution)
-		cdf  = self.rvX0.cdf(X0)
+		cdf  = cdfX0(X0)
 		cdfx = max( 1 - ( 1 - cdf[cdf < 1].max() / 10 ) , 1 - eps )
 		cdfn = min(           cdf[cdf > 0].min() / 10   ,     eps )
 		cdf = np.where( cdf < 1 , cdf , cdfx )

@@ -125,12 +125,25 @@ class OTC(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def _predictZ0( self , X0 , **kwargs ):##{{{
-		indx = self.muX.argwhere(X0)
+	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):##{{{
+		
+		if reinfer_X0:
+			muX = SparseHist( X0 , bin_width = self.bin_width , bin_origin = self.bin_origin )
+			ot  = type(self._ot)()
+			ot.fit( muX , self.muY )
+			plan = np.copy( ot.plan() )
+			plan = ( plan.T / plan.sum( axis = 1) ).T
+		else:
+			muX = self.muX
+			plan = self._plan
+	
+		indx = muX.argwhere(X0)
 		indy = np.zeros_like(indx)
 		for i,ix in enumerate(indx):
-			indy[i] = np.random.choice( range(self.muY.sizep) , p = self._plan[ix,:] )
-		return self.muY.c[indy,:]
+			indy[i] = np.random.choice( range(self.muY.sizep) , p = plan[ix,:] )
+		Z0 = self.muY.c[indy,:]
+		
+		return Z0
 	##}}}
 	
 ##}}}
@@ -267,14 +280,17 @@ class dOTC(AbstractBC):##{{{
 	def _predictZ0( self , X0 , **kwargs ):##{{{
 		if X0 is None:
 			return None
-		Z0 = self._otcX0Y0.predict(X0)
+		Z0 = self._otcX0Y0.predict( X0 , **kwargs )
 		return Z0
 	##}}}
 	
 	def _predictZ1( self , X1, **kwargs ):##{{{
 		if X1 is None:
 			return None
-		Z1 = self.otc.predict( X1 )
+		okwargs = dict(kwargs)
+		if okwargs.get("reinfer_X1",False):
+			okwargs["reinfer_X0"] = True
+		Z1 = self.otc.predict( X1 , **okwargs )
 		return Z1
 	##}}}
 	

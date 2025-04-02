@@ -25,6 +25,9 @@
 import os
 import sys
 import sysconfig
+import subprocess
+import tempfile
+import uuid
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 import setuptools
@@ -35,7 +38,7 @@ from pathlib import Path
 ## User Eigen path ##
 #####################
 
-eigen_usr_include = ""
+eigen_usr_include = os.environ.get('EIGEN_PATH', '')
 
 i_eigen = -1
 for i,arg in enumerate(sys.argv):
@@ -72,7 +75,8 @@ class get_pybind_include(object):##{{{
 ##}}}
 
 def get_eigen_include( propose_path = "" ):##{{{
-	possible_path = [ propose_path , os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/" , "/usr/local/include/" ]
+	possible_path = [propose_path, os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/",
+					 "/usr/local/include/", "external/eigen"]
 	if os.environ.get("HOME") is not None:
 		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
 	
@@ -125,12 +129,27 @@ class BuildExt(build_ext):##{{{
 	
 	if sys.platform == 'darwin':
 		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
+
+	def initialize_options(self):
+		temp_dir = tempfile.gettempdir()
+		random_suffix = str(uuid.uuid4())  # More robust and unique than using pid or uid
+		self.build_temp = os.path.join(temp_dir, f'sbck_build_temp_{random_suffix}')
+		super().initialize_options()
+
+	def run(self):
+		# Ensure the Eigen submodule is initialized and updated
+		if not os.path.exists("external/eigen"):
+			print("Updating Eigen submodule...")
+			subprocess.run(["git", "submodule", "update", "--init", "--recursive", "--depth", "1"], check=True)
+
+		# Call the original run method to proceed with the build
+		super().run()
 	
 	def build_extensions(self):
 		ct = self.compiler.compiler_type
 		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
 		if ct == 'unix':
+			opts.append( "-O3" )
 			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
 			opts.append(cpp_flag(self.compiler))
 			if has_flag(self.compiler, '-fvisibility=hidden'):
@@ -221,7 +240,7 @@ setup(
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
 	ext_modules      = ext_modules,
-	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
+	install_requires = ["numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0"],
 	cmdclass         = {'build_ext': BuildExt},
 	zip_safe         = False,
 	packages         = list_packages,

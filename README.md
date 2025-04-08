@@ -53,10 +53,8 @@ cd SBCK
 pip3 install .
 ```
 
-If the Eigen library is not found, use:
-```
-pip3 install . eigen="path-to-eigen"
-```
+If the Eigen library is not found, set the environement variable EIGEN_INCLUDE_PATH to the path to Eigen.
+
 
 ## Acknowledgements
 
@@ -65,7 +63,7 @@ Thanks to [[Trevor James Smith]](https://github.com/Zeitsperre) for his help wit
 
 ## License
 
-Copyright(c) 2021 / 2023 Yoann Robin
+Copyright(c) 2021 / 2025 Yoann Robin
 
 This file is part of SBCK.
 

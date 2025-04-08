@@ -20,7 +20,6 @@
 ## Libraries ##
 ###############
 
-import deprecated
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 

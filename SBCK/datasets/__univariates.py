@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -23,8 +23,7 @@
 
 import numpy       as np
 import scipy.stats as sc
-from SBCK.tools.__rv_extend import rv_mixture
-
+from ..tools.__rv_extend import rv_mixture
 
 ###############
 ## Functions ##

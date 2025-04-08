@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2023 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -22,7 +22,7 @@
 ###############
 
 import numpy as np
-from SBCK.tools.__OT import POTemd
+from ..tools.__OT import POTemd
 from .__decorators import _to_SparseHist
 
 

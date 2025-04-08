@@ -1,5 +1,5 @@
 
-## Copyright(c) 2023, 2024 Yoann Robin
+## Copyright(c) 2023, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -23,8 +23,6 @@
 import deprecated
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
-
-import warnings
 
 
 ###########

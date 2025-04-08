@@ -23,31 +23,13 @@
 ###############
 
 import os
-import sys
 import sysconfig
-#from setuptools import setup, Extension
-from setuptools import Extension
-from distutils.core import setup
-from setuptools.command.build_ext import build_ext
 import setuptools
+from setuptools import setup
+from setuptools import Extension
 from pathlib import Path
 
 
-#####################
-## User Eigen path ##
-#####################
-
-eigen_usr_include = ""
-
-i_eigen = -1
-for i,arg in enumerate(sys.argv):
-	if arg[:5] == "eigen":
-		eigen_usr_include = arg[6:]
-		i_eigen = i
-
-if i_eigen > -1:
-	del sys.argv[i_eigen]
-	
 ############################
 ## Python path resolution ##
 ############################
@@ -55,31 +37,35 @@ if i_eigen > -1:
 cpath = Path(__file__).parent
 
 
-################################################################
-## Some class and function to compile with Eigen and pybind11 ##
-################################################################
+####################################################
+## Some class and function to compile with Eigen  ##
+####################################################
 
-class get_pybind_include(object):##{{{
-	"""Helper class to determine the pybind11 include path
-	The purpose of this class is to postpone importing pybind11
-	until it is actually installed, so that the ``get_include()``
-	method can be invoked. """
-	
-	def __init__(self, user=False):
-		self.user = user
-	
-	def __str__(self):
-		import pybind11
-		return pybind11.get_include(self.user)
-##}}}
+class EigenNotFoundError(Exception):
+	def __init__( self , *args , **kwargs ):
+		super().__init__( *args , **kwargs )
 
-def get_eigen_include( propose_path = "" ):##{{{
-	possible_path = [ propose_path , os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/" , "/usr/local/include/" ]
+def get_eigen_include():##{{{
+	possible_path = []
+	
+	## Priority 1: custom user installation
+	if os.environ.get("EIGEN_INCLUDE_PATH") is not None:
+		possible_path.append( os.environ["EIGEN_INCLUDE_PATH"] )
+	
+	## Priority 2: user installation
 	if os.environ.get("HOME") is not None:
 		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
 	
+	## Priority 3: conda installation
+	if os.environ.get("CONDA_PREFIX") is not None:
+		possible_path.append( os.path.join( os.environ["CONDA_PREFIX"] , "include" ) )
+	
+	## Priority >3: others installations
+	for p in [ os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/" , "/usr/local/include/" ]:
+		possible_path.append(p)
+	
+	## Check if eigen in this path
 	for path in possible_path:
-		
 		
 		eigen_include = os.path.join( path , "Eigen" )
 		if os.path.isdir( eigen_include ):
@@ -89,59 +75,7 @@ def get_eigen_include( propose_path = "" ):##{{{
 		if os.path.isdir( eigen_include ):
 			return os.path.join( path , "eigen3" )
 	
-	return ""
-##}}}
-
-def has_flag(compiler, flagname):##{{{
-	"""Return a boolean indicating whether a flag name is supported on
-	the specified compiler.
-	"""
-	import tempfile
-	with tempfile.NamedTemporaryFile('w', suffix='.cpp') as f:
-		f.write('int main (int argc, char **argv) { return 0; }')
-		try:
-			compiler.compile([f.name], extra_postargs=[flagname])
-		except setuptools.distutils.errors.CompileError:
-			return False
-	return True
-##}}}
-
-def cpp_flag(compiler):##{{{
-	"""Return the -std=c++[11/14] compiler flag.
-	The c++14 is prefered over c++11 (when it is available).
-	"""
-	if has_flag(compiler, '-std=c++14'):
-		return '-std=c++14'
-	elif has_flag(compiler, '-std=c++11'):
-		return '-std=c++11'
-	else:
-		raise RuntimeError( 'Unsupported compiler -- at least C++11 support is needed!' )
-##}}}
-
-class BuildExt(build_ext):##{{{
-	"""A custom build extension for adding compiler-specific options."""
-	c_opts = {
-		'msvc': ['/EHsc'],
-		'unix': [],
-	}
-	
-	if sys.platform == 'darwin':
-		c_opts['unix'] += ['-stdlib=libc++', '-mmacosx-version-min=10.7']
-	
-	def build_extensions(self):
-		ct = self.compiler.compiler_type
-		opts = self.c_opts.get(ct, [])
-		opts.append( "-O3" )
-		if ct == 'unix':
-			opts.append('-DVERSION_INFO="%s"' % self.distribution.get_version())
-			opts.append(cpp_flag(self.compiler))
-			if has_flag(self.compiler, '-fvisibility=hidden'):
-				opts.append('-fvisibility=hidden')
-		elif ct == 'msvc':
-			opts.append('/DVERSION_INFO=\\"%s\\"' % self.distribution.get_version())
-		for ext in self.extensions:
-			ext.extra_compile_args = opts
-		build_ext.build_extensions(self)
+	raise EigenNotFoundError("Eigen not found in all possible path, try to install if from conda or set the environement variable 'EIGEN_INCLUDE_PATH' to the path to Eigen")
 ##}}}
 
 
@@ -154,15 +88,13 @@ ext_modules = [
 		"SBCK.tools.__tools_cpp",
 		[ str(cpath / 'SBCK/tools/src/tools.cpp') ],
 		include_dirs=[
-			# Path to pybind11 headers
-			get_eigen_include(eigen_usr_include),
-			get_pybind_include(),
-			get_pybind_include(user=True)
+			get_eigen_include(),
 		],
 		language='c++',
 		depends = [
 			"SBCK/tools/src/SparseHist.hpp"
-			]
+			],
+		extra_compile_args = ["-O3"]
 	),
 ]
 
@@ -216,11 +148,14 @@ setup(
 		"Programming Language :: Python :: 3.8",
 		"Programming Language :: Python :: 3.9",
 		"Programming Language :: Python :: 3.10",
+		"Programming Language :: Python :: 3.11",
+		"Programming Language :: Python :: 3.12",
+		"Programming Language :: Python :: 3.13",
 		"Topic :: Scientific/Engineering :: Mathematics"
 	],
 	ext_modules      = ext_modules,
-	install_requires = [ "numpy" , "scipy" , "matplotlib" , "pybind11>=2.2" , "pot>=0.9.0" , "deprecated" ],
-	cmdclass         = {'build_ext': BuildExt},
+	build_requires   = ["pybind11>=2.2"],
+	install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" , "deprecated" ],
 	zip_safe         = False,
 	packages         = list_packages,
 	package_dir      = package_dir

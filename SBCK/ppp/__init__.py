@@ -40,7 +40,7 @@ from .__Extremes          import LimitTailsRatio
 from .__DiffRef           import PreserveOrder
 from .__DiffRef           import DeltaRef
 from .__DiffRef           import DeltaVars
-from .__MomentsBC         import DCS
+from .__MomentsBC         import UNormalAdjust
 from .__MomentsBC         import MNormalAdjust
 
 ## Deprecated

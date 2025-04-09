@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2024 Yoann Robin
+## Copyright(c) 2024, 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -58,7 +58,7 @@ def as2d(X):##{{{
 	return X.reshape(X.shape[0],-1)
 ##}}}
 
-def sqrtm( M ):##{{{
+def sqrtm( M , method = "svd" ):##{{{
 	"""
 	SBCK.tools.sqrtm
 	================
@@ -68,16 +68,26 @@ def sqrtm( M ):##{{{
 	---------
 	M: array_like
 		A matrix
-	
+	method: str 
+		can be 'svd' (use singular values decomposition, more general) or 'eig' (use eigenvalues)
 	Returns
 	-------
 	S: numpy.ndarray
 		The square root matrix
 	"""
-	D,P = np.linalg.eig(M)
-	S   = np.diag(np.sqrt(D))
 	
-	return P @ S @ P.T
+	match method.lower():
+		case "svd":
+			U,s,V = np.linalg.svd(M)
+		case "eig":
+			s,U = np.linalg.eig(M)
+			V   = U.T
+		case _:
+			raise ValueError("Method must be svd or eig")
+	s = np.diag(np.sqrt(s))
+	S = U @ s @ V
+	
+	return S
 ##}}}
 
 def choleskym( M ):##{{{

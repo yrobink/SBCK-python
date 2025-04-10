@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 / 2024 Yoann Robin
+## Copyright(c) 2022 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,7 +20,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
@@ -196,7 +196,7 @@ class OnlyFiniteAnalog(PrePostProcessing):##{{{
 ## Deprecated names ##
 ######################
 
-@deprecated.deprecated( reason = "PPPRemoveNotFinite is renamed OnlyFinite" , version = "2.0.0" )
+@warnings.deprecated( "PPPRemoveNotFinite is renamed OnlyFinite since the version 2.0.0" )
 class PPPRemoveNotFinite(OnlyFinite):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -206,7 +206,7 @@ class PPPRemoveNotFinite(OnlyFinite):##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "PPPNotFiniteAnalog is renamed OnlyFiniteAnalog" , version = "2.0.0" )
+@warnings.deprecated( "PPPNotFiniteAnalog is renamed OnlyFiniteAnalog since the version 2.0.0" )
 class PPPNotFiniteAnalog(OnlyFiniteAnalog):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

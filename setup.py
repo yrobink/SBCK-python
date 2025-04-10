@@ -155,7 +155,7 @@ setup(
 	],
 	ext_modules      = ext_modules,
 	build_requires   = ["pybind11>=2.2"],
-	install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" , "deprecated" ],
+	install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" ],
 	zip_safe         = False,
 	packages         = list_packages,
 	package_dir      = package_dir

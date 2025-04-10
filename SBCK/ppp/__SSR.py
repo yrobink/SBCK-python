@@ -20,7 +20,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
@@ -139,7 +139,7 @@ class SSR(PrePostProcessing): ##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "PPPSSR is renamed SSR" , version = "2.0.0" )
+@warnings.deprecated( "PPPSSR is renamed SSR since the version 2.0.0" )
 class PPPSSR(SSR):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

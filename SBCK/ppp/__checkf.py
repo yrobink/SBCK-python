@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 / 2024 Yoann Robin
+## Copyright(c) 2022 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,7 +20,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 import numpy as np
 
 
@@ -73,7 +73,7 @@ def atleastonefinite(X):##{{{
 ## Deprecated ##
 ################
 
-@deprecated.deprecated( reason = "skipNotValid is renamed allfinite" , version = "2.0.0" )
+@warnings.deprecated( "skipNotValid is renamed allfinite since the version 2.0.0" )
 def skipNotValid(X):##{{{
 	return allfinite(X)
 ##}}}

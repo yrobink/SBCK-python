@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 / 2024 Yoann Robin
+## Copyright(c) 2022 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,7 +20,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
@@ -239,7 +239,7 @@ class DeltaVars(PrePostProcessing):##{{{
 ## Deprecated ##
 ################
 
-@deprecated.deprecated( reason = "PPPPreserveOrder is renamed PreserveOrder" , version = "2.0.0" )
+@warnings.deprecated( "PPPPreserveOrder is renamed PreserveOrder since the version 2.0.0" )
 class PPPPreserveOrder(PreserveOrder):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -249,7 +249,7 @@ class PPPPreserveOrder(PreserveOrder):##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "PPPDiffRef is renamed DeltaRef" , version = "2.0.0" )
+@warnings.deprecated( "PPPDiffRef is renamed DeltaRef since the version 2.0.0" )
 class PPPDiffRef(DeltaRef):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -259,7 +259,7 @@ class PPPDiffRef(DeltaRef):##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "PPPDiffColumns is renamed DeltaVars" , version = "2.0.0" )
+@warnings.deprecated( "PPPDiffColumns is renamed DeltaVars since the version 2.0.0" )
 class PPPDiffColumns(DeltaVars):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

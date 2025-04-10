@@ -1,5 +1,5 @@
 
-## Copyright(c) 2023, 2025 Yoann Robin
+## Copyright(c) 2023 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,7 +20,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
@@ -153,7 +153,7 @@ class LimitTailsRatio(PrePostProcessing):##{{{
 ## Deprecated ##
 ################
 
-@deprecated.deprecated( reason = "PPPLimitTailsRatio is renamed LimitTailsRatio" , version = "2.0.0" )
+@warnings.deprecated( "PPPLimitTailsRatio is renamed LimitTailsRatio since the version 2.0.0" )
 class PPPLimitTailsRatio(LimitTailsRatio):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

@@ -20,7 +20,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
@@ -51,7 +51,7 @@ class OTCNoise(PrePostProcessing):##{{{
 		return Xt + noise
 ##}}}
 
-@deprecated.deprecated( reason = "PPPOTCNoise is renamed OTCNoise" , version = "2.0.0" )
+@warnings.deprecated( "PPPOTCNoise is renamed OTCNoise since the version 2.0.0" )
 class PPPOTCNoise(OTCNoise):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

@@ -21,7 +21,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 
 from .__AbstractBC import AbstractBC
 from .__decorators import io_fit
@@ -180,7 +180,7 @@ class R2D2(AbstractBC):##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "AR2D2 code is transfered to R2R2" , version = "2.0.0" )
+@warnings.deprecated( "AR2D2 code is transfered to R2R2 since the version 2.0.0" )
 class AR2D2(R2D2):##{{{
 	"""
 	SBCK.AR2D2
@@ -206,7 +206,7 @@ class AR2D2(R2D2):##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "Redundant with R2R2" , version = "2.0.0" )
+@warnings.deprecated( "Redundant with R2R2 since the version 2.0.0" )
 class QMrs(R2D2):##{{{
 	"""
 	SBCK.QMrs

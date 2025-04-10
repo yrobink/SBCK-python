@@ -1,5 +1,5 @@
 
-## Copyright(c) 2023, 2024 Yoann Robin
+## Copyright(c) 2023 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,7 +21,6 @@
 ###############
 
 import warnings
-import deprecated
 
 from .__PrePostProcessing import PrePostProcessing
 from ..tools.__linalg import as2d
@@ -151,7 +150,7 @@ class As2d(PrePostProcessing):##{{{
 ## Deprecated names ##
 ######################
 
-@deprecated.deprecated( reason = "PPPIgnoreWarnings is renamed FilterWarnings" , version = "2.0.0" )
+@warnings.deprecated( "PPPIgnoreWarnings is renamed FilterWarnings since the version 2.0.0" )
 class PPPIgnoreWarnings(FilterWarnings):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -161,7 +160,7 @@ class PPPIgnoreWarnings(FilterWarnings):##{{{
 	
 ##}}}
 
-@deprecated.deprecated( reason = "PPPXarray is renamed Xarray" , version = "2.0.0" )
+@warnings.deprecated( "PPPXarray is renamed Xarray since the version 2.0.0" )
 class PPPXarray(Xarray):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

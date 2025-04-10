@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2024 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,7 +21,7 @@
 ## Libraries ##
 ###############
 
-import deprecated
+import warnings
 
 import numpy as np
 import scipy.stats as sc
@@ -666,7 +666,7 @@ class rv_density(rv_base):##{{{
 	##}}}
 	
 	def _cdf( self , x ):##{{{
-		cdf = np.apply_along_axis( lambda z: self._kernel.integrate_box_1d( -np.Inf , z ) , 1 , x.reshape(-1,1) )
+		cdf = np.apply_along_axis( lambda z: self._kernel.integrate_box_1d( -np.inf , z ) , 1 , x.reshape(-1,1) )
 		cdf[cdf < 0] = 0
 		cdf[cdf > 1] = 1
 		return cdf.squeeze()
@@ -908,19 +908,19 @@ class WrapperStatisticalDistribution:##{{{
 ## Deprecated ##
 ################
 
-@deprecated.deprecated( reason = "rv_histogram is renamed rv_empirical" , version = "2.0.0" )
+@warnings.deprecated( "rv_histogram is renamed rv_empirical since the version 2.0.0" )
 class rv_histogram(rv_empirical):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__(*args,**kwargs)
 ##}}}
 
-@deprecated.deprecated( reason = "rv_ratio_histogram is renamed rv_empirical_ratio" , version = "2.0.0" )
+@warnings.deprecated( "rv_ratio_histogram is renamed rv_empirical_ratio since the version 2.0.0" )
 class rv_ratio_histogram(rv_empirical_ratio):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__(*args,**kwargs)
 ##}}}
 
-@deprecated.deprecated( reason = "mrv_histogram is renamed mrv_base" , version = "2.0.0" )
+@warnings.deprecated( "mrv_histogram is renamed mrv_base since the version 2.0.0" )
 class mrv_histogram(mrv_base):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__(*args,**kwargs)

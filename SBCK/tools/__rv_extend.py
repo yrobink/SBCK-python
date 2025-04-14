@@ -21,14 +21,13 @@
 ## Libraries ##
 ###############
 
-import warnings
-
 import numpy as np
 import scipy.stats as sc
 import scipy.interpolate as sci
 import scipy.optimize as sco
 
 from .__stats import gpdfit
+from ..tools.__sys import deprecated
 
 
 ##############
@@ -908,19 +907,19 @@ class WrapperStatisticalDistribution:##{{{
 ## Deprecated ##
 ################
 
-@warnings.deprecated( "rv_histogram is renamed rv_empirical since the version 2.0.0" )
+@deprecated( "rv_histogram is renamed rv_empirical since the version 2.0.0" )
 class rv_histogram(rv_empirical):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__(*args,**kwargs)
 ##}}}
 
-@warnings.deprecated( "rv_ratio_histogram is renamed rv_empirical_ratio since the version 2.0.0" )
+@deprecated( "rv_ratio_histogram is renamed rv_empirical_ratio since the version 2.0.0" )
 class rv_ratio_histogram(rv_empirical_ratio):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__(*args,**kwargs)
 ##}}}
 
-@warnings.deprecated( "mrv_histogram is renamed mrv_base since the version 2.0.0" )
+@deprecated( "mrv_histogram is renamed mrv_base since the version 2.0.0" )
 class mrv_histogram(mrv_base):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__(*args,**kwargs)

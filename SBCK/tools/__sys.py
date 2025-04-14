@@ -1,5 +1,5 @@
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -17,15 +17,25 @@
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
 
-version_major = 2
-version_minor = 0
-version_patch = 0
-version_extra = "a28"
-version       = "{}.{}.{}{}".format(version_major,version_minor,version_patch,version_extra)
+###############
+## Libraries ##
+###############
 
-name         = "SBCK"
-description  = "Statistical Bias Correction Kit"
-author       = "Yoann Robin"
-author_email = "yoann.robin.k@gmail.com"
-license      = "GNU General Public License v3"
+import warnings
+
+
+###############
+## Functions ##
+###############
+
+def deprecated( message ):
+	def decorator(func):
+		def wrapper( *args , **kwargs ):
+			
+			warnings.warn( message = message , category = DeprecationWarning )
+			return func( *args , **kwargs )
+		
+		return wrapper
+	return decorator
+
 

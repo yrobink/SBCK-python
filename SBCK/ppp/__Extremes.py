@@ -20,9 +20,9 @@
 ## Libraries ##
 ###############
 
-import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
+from ..tools.__sys import deprecated
 
 
 ###########
@@ -153,7 +153,7 @@ class LimitTailsRatio(PrePostProcessing):##{{{
 ## Deprecated ##
 ################
 
-@warnings.deprecated( "PPPLimitTailsRatio is renamed LimitTailsRatio since the version 2.0.0" )
+@deprecated( "PPPLimitTailsRatio is renamed LimitTailsRatio since the version 2.0.0" )
 class PPPLimitTailsRatio(LimitTailsRatio):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

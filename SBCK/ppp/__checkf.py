@@ -20,8 +20,8 @@
 ## Libraries ##
 ###############
 
-import warnings
 import numpy as np
+from ..tools.__sys import deprecated
 
 
 ###############
@@ -73,7 +73,7 @@ def atleastonefinite(X):##{{{
 ## Deprecated ##
 ################
 
-@warnings.deprecated( "skipNotValid is renamed allfinite since the version 2.0.0" )
+@deprecated( "skipNotValid is renamed allfinite since the version 2.0.0" )
 def skipNotValid(X):##{{{
 	return allfinite(X)
 ##}}}

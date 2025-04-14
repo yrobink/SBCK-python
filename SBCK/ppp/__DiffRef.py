@@ -20,9 +20,9 @@
 ## Libraries ##
 ###############
 
-import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
+from ..tools.__sys import deprecated
 
 
 ###########
@@ -239,7 +239,7 @@ class DeltaVars(PrePostProcessing):##{{{
 ## Deprecated ##
 ################
 
-@warnings.deprecated( "PPPPreserveOrder is renamed PreserveOrder since the version 2.0.0" )
+@deprecated( "PPPPreserveOrder is renamed PreserveOrder since the version 2.0.0" )
 class PPPPreserveOrder(PreserveOrder):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -249,7 +249,7 @@ class PPPPreserveOrder(PreserveOrder):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPDiffRef is renamed DeltaRef since the version 2.0.0" )
+@deprecated( "PPPDiffRef is renamed DeltaRef since the version 2.0.0" )
 class PPPDiffRef(DeltaRef):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -259,7 +259,7 @@ class PPPDiffRef(DeltaRef):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPDiffColumns is renamed DeltaVars since the version 2.0.0" )
+@deprecated( "PPPDiffColumns is renamed DeltaVars since the version 2.0.0" )
 class PPPDiffColumns(DeltaVars):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

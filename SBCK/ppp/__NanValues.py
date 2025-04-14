@@ -20,11 +20,11 @@
 ## Libraries ##
 ###############
 
-import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
 import scipy.spatial.distance as ssd
+from ..tools.__sys import deprecated
 
 
 ###########
@@ -196,7 +196,7 @@ class OnlyFiniteAnalog(PrePostProcessing):##{{{
 ## Deprecated names ##
 ######################
 
-@warnings.deprecated( "PPPRemoveNotFinite is renamed OnlyFinite since the version 2.0.0" )
+@deprecated( "PPPRemoveNotFinite is renamed OnlyFinite since the version 2.0.0" )
 class PPPRemoveNotFinite(OnlyFinite):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -206,7 +206,7 @@ class PPPRemoveNotFinite(OnlyFinite):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPNotFiniteAnalog is renamed OnlyFiniteAnalog since the version 2.0.0" )
+@deprecated( "PPPNotFiniteAnalog is renamed OnlyFiniteAnalog since the version 2.0.0" )
 class PPPNotFiniteAnalog(OnlyFiniteAnalog):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

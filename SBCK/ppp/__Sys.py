@@ -20,10 +20,10 @@
 ## Libraries ##
 ###############
 
-import warnings
 
 from .__PrePostProcessing import PrePostProcessing
 from ..tools.__linalg import as2d
+from ..tools.__sys import deprecated
 
 import numpy as np
 
@@ -150,7 +150,7 @@ class As2d(PrePostProcessing):##{{{
 ## Deprecated names ##
 ######################
 
-@warnings.deprecated( "PPPIgnoreWarnings is renamed FilterWarnings since the version 2.0.0" )
+@deprecated( "PPPIgnoreWarnings is renamed FilterWarnings since the version 2.0.0" )
 class PPPIgnoreWarnings(FilterWarnings):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -160,7 +160,7 @@ class PPPIgnoreWarnings(FilterWarnings):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPXarray is renamed Xarray since the version 2.0.0" )
+@deprecated( "PPPXarray is renamed Xarray since the version 2.0.0" )
 class PPPXarray(Xarray):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

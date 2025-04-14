@@ -21,14 +21,13 @@
 ## Libraries ##
 ###############
 
-import warnings
-
 from .__AbstractBC import AbstractBC
 from .__decorators import io_fit
 from .__decorators import io_predict
 from .__CDFt import CDFt
 from .tools.__shuffle import MVQuantilesShuffle
 from .tools.__shuffle import MVRanksShuffle
+from .tools.__sys import deprecated
 
 
 ###########
@@ -180,7 +179,7 @@ class R2D2(AbstractBC):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "AR2D2 code is transfered to R2R2 since the version 2.0.0" )
+@deprecated( "AR2D2 code is transfered to R2R2 since the version 2.0.0" )
 class AR2D2(R2D2):##{{{
 	"""
 	SBCK.AR2D2
@@ -206,7 +205,7 @@ class AR2D2(R2D2):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "Redundant with R2R2 since the version 2.0.0" )
+@deprecated( "Redundant with R2R2 since the version 2.0.0" )
 class QMrs(R2D2):##{{{
 	"""
 	SBCK.QMrs

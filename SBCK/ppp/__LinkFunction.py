@@ -20,9 +20,9 @@
 ## Libraries ##
 ###############
 
-import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
+from ..tools.__sys import deprecated
 
 
 ###########
@@ -402,7 +402,7 @@ class LFLogistic(LinkFunction):##{{{
 ## Deprecated names ##
 ######################
 
-@warnings.deprecated( "PPPLinkFunction is renamed LinkFunction since the version 2.0.0" )
+@deprecated( "PPPLinkFunction is renamed LinkFunction since the version 2.0.0" )
 class PPPLinkFunction(LinkFunction):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -412,7 +412,7 @@ class PPPLinkFunction(LinkFunction):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPAddLink is renamed LFAdd since the version 2.0.0" )
+@deprecated( "PPPAddLink is renamed LFAdd since the version 2.0.0" )
 class PPPAddLink(LFAdd):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -422,7 +422,7 @@ class PPPAddLink(LFAdd):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPMultLink is renamed LFMult since the version 2.0.0" )
+@deprecated( "PPPMultLink is renamed LFMult since the version 2.0.0" )
 class PPPMultLink(LFMult):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -432,7 +432,7 @@ class PPPMultLink(LFMult):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPMaxLink is renamed LFMax since the version 2.0.0" )
+@deprecated( "PPPMaxLink is renamed LFMax since the version 2.0.0" )
 class PPPMaxLink(LFMax):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -442,7 +442,7 @@ class PPPMaxLink(LFMax):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPMinLink is renamed LFMin since the version 2.0.0" )
+@deprecated( "PPPMinLink is renamed LFMin since the version 2.0.0" )
 class PPPMinLink(LFMin):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -452,7 +452,7 @@ class PPPMinLink(LFMin):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPSquareLink is renamed LFSquare since the version 2.0.0" )
+@deprecated( "PPPSquareLink is renamed LFSquare since the version 2.0.0" )
 class PPPSquareLink(LFSquare):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -462,7 +462,7 @@ class PPPSquareLink(LFSquare):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPLogLinLink is renamed LFLoglin since the version 2.0.0" )
+@deprecated( "PPPLogLinLink is renamed LFLoglin since the version 2.0.0" )
 class PPPLogLinLink(LFLoglin):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -472,7 +472,7 @@ class PPPLogLinLink(LFLoglin):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPArctanLink is renamed LFArctan since the version 2.0.0" )
+@deprecated( "PPPArctanLink is renamed LFArctan since the version 2.0.0" )
 class PPPArctanLink(LFArctan):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{
@@ -482,7 +482,7 @@ class PPPArctanLink(LFArctan):##{{{
 	
 ##}}}
 
-@warnings.deprecated( "PPPLogisticLink is renamed LFLogistic since the version 2.0.0" )
+@deprecated( "PPPLogisticLink is renamed LFLogistic since the version 2.0.0" )
 class PPPLogisticLink(LFLogistic):##{{{
 	
 	def __init__( self , *args , **kwargs ):##{{{

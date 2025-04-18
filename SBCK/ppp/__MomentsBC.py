@@ -30,146 +30,114 @@ from ..tools.__linalg import sqrtm
 ## Class ##
 ###########
 
-class UNormalAdjust(PrePostProcessing):##{{{
-	"""
-	SBCK.ppp.UNormalAdjust
-	======================
+class MNPar:##{{{
 	
-	Univariate Normal Adjustement. Data are centered scale, then the mean and
-	standard deviation are corrected at the end.
-	
-	"""
-	def __init__( self , *args , recs_Xt = False , add_Xt1_bias = False , **kwargs ):##{{{
-		PrePostProcessing.__init__( self , *args , **kwargs )
-		self._name    = "UNormalAdjust"
-		self._recs_Xt = recs_Xt
-		self._add_Xt1_bias = add_Xt1_bias
-		
-		self._m  = { "Y0" : 0 , "X0" : 0 , "X1" : 0 }
-		self._C  = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._s  = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._S  = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._is = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._iS = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		
+	def __init__( self , X , univariate = False ):##{{{
+		if X.ndim == 1:
+			X = X.reshape(-1,1)
+		self.ndim = X.shape[1]
+		self.univariate = univariate
+		self._m   = X.mean(0).reshape(1,self.ndim)
+		self._s   = X.std(0).reshape(1,self.ndim)
+		self._C   = np.cov( X , rowvar = False ).reshape(self.ndim,self.ndim)
+		self._S   = sqrtm(self.C)
+		self._ivs = 1. / self.s
+		self._ivS = np.linalg.pinv(self.S)
 	##}}}
 	
-	def transform( self , X ):##{{{
-		
-		k = self._kind
-		
-		self._m[k]  = X.mean( axis = 0 ).reshape(-1,1)
-		self._C[k]  = np.cov(X.T)
-		self._s[k]  = X.std( axis = 0 )
-		self._is[k] = 1. / self._s[k]
-		
-		self._s[k]  = np.diag(self._s[k] )
-		self._is[k] = np.diag(self._is[k])
-		
-		Xt = self._is[k] @ ( X.T - self._m[k] )
-		
-		return Xt.T
+	## Normalization methods ##{{{
+	
+	def _unormalize( self , X ):
+		return ( self.ivs * (X - self.m) )
+
+	def _mnormalize( self , X ):
+		return ( self.ivS @ (X - self.m).T ).T
+
+	def normalize( self , X ):
+		if self.univariate or self.ndim == 1:
+			N = self._unormalize(X.reshape(-1,self.ndim))
+		else:
+			N = self._mnormalize(X.reshape(-1,self.ndim))
+		return N.reshape(-1,self.ndim)
+	
+	def _iunormalize( self , X ):
+		return self.s * X + self.m
+
+	def _imnormalize( self , X ):
+		return ( self.S @ X.T ).T + self.m
+
+	def inormalize( self , N ):
+		if self.univariate or self.ndim == 1:
+			X = self._iunormalize(N.reshape(-1,self.ndim))
+		else:
+			X = self._imnormalize(N.reshape(-1,self.ndim))
+		return X.reshape(-1,self.ndim)
 	##}}}
 	
-	def itransform( self , Xt ):##{{{
-		k = self._kind
-		
-		if self._recs_Xt:
-			mXt  = Xt.mean( axis = 0 ).reshape(-1,1)
-			sXt  = Xt.std(  axis = 0 )
-			isXt = 1. / sXt
-			sXt  = np.diag( sXt)
-			isXt = np.diag(isXt)
-			Xt = ( isXt @ (Xt.T - mXt) ).T
-		
-		S = np.identity(Xt.shape[1])
-		M = np.zeros( (Xt.shape[1],1) )
-		if self._add_Xt1_bias:
-			pass
-		
-		match k:
-			case "Y0":
-				X = self._s[k] @ Xt.T + self._m[k]
-			case "X0":
-				k0 = "Y0"
-				X = self._s[k0] @ Xt.T + self._m[k0]
-			case "X1":
-				D01 = self._s["Y0"] @ self._is["X0"] @ (self._m['X1'] - self._m['X0'])
-				X   = S @ self._s['X1'] @ self._is['X0'] @ self._s['Y0'] @ Xt.T + D01 + self._m['Y0'] + M
-		
-		return X.T
-		##}}}
+	## Properties ##{{{
 	
+	@property
+	def m(self):
+		return self._m
+	
+	@property
+	def s(self):
+		return self._s
+	
+	@property
+	def C(self):
+		return self._C
+	
+	@property
+	def S(self):
+		return self._S
+	
+	@property
+	def ivs(self):
+		return self._ivs
+	
+	@property
+	def ivS(self):
+		return self._ivS
+	
+	##}}}
 	
 ##}}}
 
-class MNormalAdjust(PrePostProcessing):##{{{
-	"""
-	SBCK.ppp.MNormalAdjust
-	======================
+class UMNAdjust(PrePostProcessing):##{{{
 	
-	Multivariate Normal Adjustement. Data are centered scale, then the mean and
-	covariance matrix are corrected at the end.
-	
-	"""
-	
-	def __init__( self , *args , recs_Xt = False , **kwargs ):##{{{
+	def __init__( self , *args , univariate = False , **kwargs ):##{{{
 		PrePostProcessing.__init__( self , *args , **kwargs )
-		self._name    = "MNormalAdjust"
-		self._recs_Xt = recs_Xt
-		
-		self._m  = { "Y0" : 0 , "X0" : 0 , "X1" : 0 }
-		self._C  = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._s  = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._S  = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._is = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		self._iS = { "Y0" : 1 , "X0" : 1 , "X1" : 1 }
-		
+		self._name      = "MNAdjust"
+		self.univariate = univariate
+		self._p         = {}
 	##}}}
 	
 	def transform( self , X ):##{{{
-		
-		k = self._kind
-		
-		self._m[k]  = X.mean( axis = 0 ).reshape(-1,1)
-		self._C[k]  = np.cov(X.T)
-		self._s[k]  = X.std( axis = 0 )
-		self._is[k] = 1. / self._s[k]
-		self._S[k]  = sqrtm(self._C[k])
-		self._iS[k] = np.linalg.pinv(self._S[k])
-		
-		self._s[k]  = np.diag(self._s[k] )
-		self._is[k] = np.diag(self._is[k])
-		
-		Xt = self._iS[k] @ ( X.T - self._m[k] )
-		
-		return Xt.T
+		self._p[self._kind] = MNPar( X , univariate = self.univariate )
+		NX  = self._p[self._kind].normalize(X)
+		return NX
 	##}}}
 	
 	def itransform( self , Xt ):##{{{
-		k = self._kind
 		
-		if self._recs_Xt:
-			mXt  = Xt.mean( axis = 0 ).reshape(-1,1)
-			C  = np.cov(Xt.T)
-			S  = sqrtm(C)
-			iS = np.linalg.pinv(S)
-			Xt = ( iS @ (Xt.T - mXt) ).T
+		pXt = MNPar( Xt , univariate = self.univariate )
+		NXt = pXt.normalize(Xt)
 		
-		match k:
-			case "Y0":
-				X = self._S[k] @ Xt.T + self._m[k]
-			case "X0":
-				k0 = "Y0"
-				X = self._S[k0] @ Xt.T + self._m[k0]
-			case "X1":
-				cF  = self._s["Y0"] @ self._is["X0"]
-				D01 = cF @ (self._m['X1'] - self._m['X0'])
-				X   = self._S['X1'] @ self._iS['X0'] @ self._S['Y0'] @ Xt.T + D01 + self._m['Y0']
+		match self._kind:
+			case 'X0':
+				X = self._p['Y0'].inormalize(Xt)
+			case 'X1':
+				if self.univariate:
+					X  =   self._p['X1'].s * self._p['X0'].ivs * self._p['Y0'].s * NXt
+				else:
+					X  = ( self._p['X1'].S @ self._p['X0'].ivS @ self._p['Y0'].S @ NXt.T ).T
+				X  = X + self._p['Y0'].s * self._p['X0'].ivs * (self._p['X1'].m - self._p['X0'].m)
+				X  = X + self._p['X1'].s * self._p['X0'].ivs * self._p['Y0'].s * pXt.ivs * pXt.m
+				X  = X + self._p['Y0'].m
 		
-		return X.T
-		##}}}
+		return X
+	##}}}
 	
 ##}}}
-
 

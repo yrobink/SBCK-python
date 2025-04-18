@@ -144,9 +144,6 @@ setup(
 		"Operating System :: MacOS :: MacOS X",
 		"Operating System :: POSIX :: Linux",
 		"Programming Language :: Python :: 3",
-		"Programming Language :: Python :: 3.7",
-		"Programming Language :: Python :: 3.8",
-		"Programming Language :: Python :: 3.9",
 		"Programming Language :: Python :: 3.10",
 		"Programming Language :: Python :: 3.11",
 		"Programming Language :: Python :: 3.12",
@@ -156,6 +153,7 @@ setup(
 	ext_modules      = ext_modules,
 	build_requires   = ["pybind11>=2.2"],
 	install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" ],
+	python_requires  = '>=3.10',
 	zip_safe         = False,
 	packages         = list_packages,
 	package_dir      = package_dir

@@ -28,6 +28,7 @@ import setuptools
 from setuptools import setup
 from setuptools import Extension
 from pathlib import Path
+import pybind11
 
 
 ############################
@@ -86,9 +87,11 @@ def get_eigen_include():##{{{
 ext_modules = [
 	Extension(
 		"SBCK.tools.__tools_cpp",
-		[ str(cpath / 'SBCK/tools/src/tools.cpp') ],
+		[ 'SBCK/tools/src/tools.cpp' ],
 		include_dirs=[
 			get_eigen_include(),
+			pybind11.get_include(True),
+			pybind11.get_include(False),
 		],
 		language='c++',
 		depends = [
@@ -139,7 +142,6 @@ setup(
 	platforms        = [ "linux" , "macosx" ],
 	classifiers      = [
 		"Development Status :: 5 - Production/Stable",
-		"License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 		"Natural Language :: English",
 		"Operating System :: MacOS :: MacOS X",
 		"Operating System :: POSIX :: Linux",

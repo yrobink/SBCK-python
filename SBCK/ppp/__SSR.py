@@ -100,7 +100,7 @@ class SSR(PrePostProcessing): ##{{{
 			self._cols = np.array( [i for i in range(X.shape[1])] , dtype = int ).squeeze()
 		cols = self._cols
 		
-		Xn = np.array( [np.nanmin( np.where( X[:,cols] > 0 , X[:,cols] , np.nan ) , axis = 0 )] ).reshape(-1,1)
+		Xn = np.array( [np.nanmin( np.where( X[:,cols] > 0 , X[:,cols] , np.nan ) , axis = 0 )] ).reshape(1,-1)
 		
 		if np.any(np.isnan(Xn)):
 			Xn[np.isnan(Xn)] = 1

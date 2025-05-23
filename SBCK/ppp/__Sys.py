@@ -25,6 +25,7 @@ from .__PrePostProcessing import PrePostProcessing
 from ..tools.__linalg import as2d
 from ..tools.__sys import deprecated
 
+import warnings
 import numpy as np
 
 
@@ -81,70 +82,75 @@ class Xarray(PrePostProcessing):###{{{
 		"""
 		PrePostProcessing.__init__( self , *args , **kwargs )
 		self._name = "Xarray"
+		self._xcls = None
+		self._sX0  = {}
+		self._sX1  = {}
 	
 	def transform( self , X ):
 		
+		self._xcls = type(X)
 		if self._kind == 'X0':
-			self._x0 = X.copy() + np.nan
+			self._sX0["dims"]   = X.dims
+			self._sX0["coords"] = X.coords
+			self._sX0["shape"]  = X.shape
 		if self._kind == 'X1':
-			self._x1 = X.copy() + np.nan
+			self._sX1["dims"]   = X.dims
+			self._sX1["coords"] = X.coords
+			self._sX1["shape"]  = X.shape
 		
 		Xt = X.values
-		if Xt.ndim == 1:
-			Xt = Xt.reshape(-1,1)
 		return Xt
 	
 	def itransform( self , Xt ):
 		
 		if self._kind == "X0":
-			X = self._x0.copy()
-			X[:] = Xt.reshape(X.shape)
+			X = self._xcls( Xt.reshape( self._sX0["shape"] ) , dims = self._sX0["dims"] , coords = self._sX0["coords"] )
 		elif self._kind == "X1":
-			X = self._x1.copy()
-			X[:] = Xt.reshape(X.shape)
+			X = self._xcls( Xt.reshape( self._sX1["shape"] ) , dims = self._sX1["dims"] , coords = self._sX1["coords"] )
 		else:
 			X = Xt
 		
 		return X
 ##}}}
 
-class As2d(PrePostProcessing):##{{{
-	"""
-	SBCK.ppp.As2d
-	=============
-	
-	This PPP method is used to transform input in 2d array. All dimensions
-	except the first are flatten. The predict method keep the shape.
-	"""
-	
-	def __init__( self , *args , **kwargs ):##{{{
-		"""
-		Constructor
-		===========
-		
-		Arguments
-		---------
-		*args:
-			All others arguments are passed to SBCK.ppp.PrePostProcessing
-		*kwargs:
-			All others arguments are passed to SBCK.ppp.PrePostProcessing
-		"""
-		PrePostProcessing.__init__( self , *args , **kwargs )
-		self._name  = "As2d"
-		self._shape = {}
-	##}}}
-	
-	def transform( self , X ):##{{{
-		self._shape[self._kind] = X.shape
-		return as2d(X)
-	##}}}
-	
-	def itransform( self , Xt ):##{{{
-		return Xt.reshape(self._shape[self._kind])
-	##}}}
-	
-##}}}
-
+#
+#class As2d(PrePostProcessing):##{{{
+#	"""
+#	SBCK.ppp.As2d
+#	=============
+#	
+#	This PPP method is used to transform input in 2d array. All dimensions
+#	except the first are flatten. The predict method keep the shape.
+#	"""
+#	
+#	def __init__( self , *args , **kwargs ):##{{{
+#		"""
+#		Constructor
+#		===========
+#		
+#		Arguments
+#		---------
+#		*args:
+#			All others arguments are passed to SBCK.ppp.PrePostProcessing
+#		*kwargs:
+#			All others arguments are passed to SBCK.ppp.PrePostProcessing
+#		"""
+#		PrePostProcessing.__init__( self , *args , **kwargs )
+#		self._name  = "As2d"
+#		self._shape = {}
+#	##}}}
+#	
+#	def transform( self , X ):##{{{
+#		self._shape[self._kind] = X.shape
+#		return as2d(X)
+#	##}}}
+#	
+#	def itransform( self , Xt ):##{{{
+#		return Xt.reshape(self._shape[self._kind])
+#	##}}}
+#	
+###}}}
+#
 
 ######################
 ## Deprecated names ##

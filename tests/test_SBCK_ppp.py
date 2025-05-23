@@ -719,7 +719,7 @@ class Test_MNormal(SBCKTestParameters,unittest.TestCase):##{{{
 		## Parameters of the ppp
 		bc_method        = bc.IdBC
 		bc_method_kwargs = {}
-		pipe             = [bcp.MNormalAdjust]
+		pipe             = [bcp.UMNAdjust]
 		pipe_kwargs      = [{}]
 		
 		## Correction with the ppp

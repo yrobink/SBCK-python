@@ -336,13 +336,13 @@ class ECBC(AbstractBC):##{{{
 		Attributes
 		----------
 		"""
-		super().__init__( "ECBC" , "SNS" )
+		super().__init__( "ECBC" , "NS" )
 		self._bcm = bc_method(**kwargs)
 		self._ss  = SchaakeShuffle()
 	##}}}
 	
 	@io_fit
-	def fit( self , *args ):##{{{
+	def fit( self , Y0 , X0 , X1 ):##{{{
 		"""
 		Fit ECBC
 		
@@ -353,48 +353,30 @@ class ECBC(AbstractBC):##{{{
 		X0	: np.ndarray
 			Biased dataset during calibration period
 		X1	: np.ndarray or None
-			Biased dataset during projection period. Can be None to use as a stationary bias correction method
+			Biased dataset during projection period.
 		"""
-		self._bcm.fit( *args )
-		self._ss.fit(args[0])
+		self._bcm.fit( Y0 , X0 , X1 )
+		self._ss.fit(Y0)
 		
 		return self
 	##}}}
 	
-	@io_predict
-	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
-		"""
-		Perform the bias correction
+	def _predictZ0( self , X0 , **kwargs ):##{{{
 		
-		Parameters
-		----------
-		X1  : np.ndarray
-			Array of value to be corrected in projection period
-		X0  : np.ndarray | None
-			Array of value to be corrected in calibration period
+		if X0 is None:
+			return None
+		Z0 = self._bcm.predict( X0 , **kwargs )
+		Z0 = self._ss.predict(Z0)
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
 		
-		Returns
-		-------
-		Z1 : np.ndarray
-			Return an array of correction in projection period
-		Z0 : np.ndarray | None
-			Return an array of correction in calibration period, or None
-		"""
-		
-		if X0 is None and X1 is not None:
-			Z1 = self._bcm.predict( X1 , **kwargs )
-			Z1 = self._ss.predict(Z1)
-			return Z1
-		elif X1 is None and X1 is not None:
-			Z0 = self._bcm.predict( X0 , **kwargs )
-			Z0 = self._ss.predict(Z0)
-			return Z0
-		else:
-			Z1 = self._bcm.predict( X1 , **kwargs )
-			Z0 = self._bcm.predict( X0 , **kwargs )
-			Z1 = self._ss.predict(Z1)
-			Z0 = self._ss.predict(Z0)
-			return Z1,Z0
+		if X1 is None:
+			return None
+		Z1 = self._bcm.predict( X1 , **kwargs )
+		Z1 = self._ss.predict(Z1)
+		return Z1
 	##}}}
 	
 ##}}}

@@ -52,11 +52,11 @@ class IdBC(AbstractBC):##{{{
 		Attributes
 		----------
 		"""
-		super().__init__( "IdBC" , "SNS" )
+		super().__init__( "IdBC" , "None" )
 	##}}}
 	
 	@io_fit
-	def fit( self , Y0 , X0 , X1 = None ):##{{{
+	def fit( self , *args ):##{{{
 		"""
 		Fit the RBC
 		
@@ -82,7 +82,7 @@ class IdBC(AbstractBC):##{{{
 	##}}}
 	
 	@io_predict
-	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
+	def predict( self , *args , **kwargs ):##{{{
 		"""
 		Perform the bias correction
 		
@@ -105,16 +105,7 @@ class IdBC(AbstractBC):##{{{
 			Return an array of correction in calibration period, or None
 		"""
 		
-		Z0 = X0
-		Z1 = X1
-		
-		if X0 is not None and X1 is not None:
-			return Z1,Z0
-		if X1 is None:
-			return Z0
-		if X0 is None:
-			return Z1
-		
+		return args
 	##}}}
 	
 ##}}}
@@ -143,12 +134,12 @@ class RBC(AbstractBC):##{{{
 		Attributes
 		----------
 		"""
-		super().__init__( "RBC" , "SNS" )
+		super().__init__( "RBC" , "None" )
 		self._Y = None
 	##}}}
 	
 	@io_fit
-	def fit( self , Y0 , X0 , X1 = None ):##{{{
+	def fit( self , Y0 , *args ):##{{{
 		"""
 		Fit the RBC
 		
@@ -207,12 +198,7 @@ class RBC(AbstractBC):##{{{
 		Z0 = self._predictZ0( X0 , **kwargs )
 		Z1 = self._predictZ1( X1 , **kwargs )
 		
-		if X0 is not None and X1 is not None:
-			return Z1,Z0
-		if X1 is None:
-			return Z0
-		if X0 is None:
-			return Z1
+		return self._return_predict_pair( Z1 = Z1 , Z0 = Z0 )
 		
 	##}}}
 	

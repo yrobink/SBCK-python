@@ -78,7 +78,7 @@ class R2D2(AbstractBC):##{{{
 		**bckwargs: ...
 			all others named arguments are passed to bc_method
 		"""
-		super().__init__( "R2D2" , "SNS" )
+		super().__init__( "R2D2" , "NS" )
 		if shuffle == "quantile":
 			self.mvq = MVQuantilesShuffle( col_cond , lag_search , lag_keep )
 		else:
@@ -89,27 +89,8 @@ class R2D2(AbstractBC):##{{{
 		self._reverse  = reverse
 	##}}}
 	
-	def _fit( self , Y0 , X0 , X1 ):##{{{
-		self.mvq.fit(Y0)
-		self._bcm = self.bc_method(**self.bckwargs)
-		if X1 is None:
-			if self._reverse:
-				Z0 = self.mvq.transform(X0)
-				self._bcm.fit( Y0 , Z0 )
-			else:
-				self._bcm.fit( Y0 , X0 )
-		else:
-			if self._reverse:
-				Z0 = self.mvq.transform(X0)
-				Z1 = self.mvq.transform(X1)
-				self._bcm.fit( Y0 , Z0 , Z1 )
-			else:
-				self._bcm.fit( Y0 , X0 , X1 )
-		return self
-	##}}}
-	
 	@io_fit
-	def fit( self , Y0 , X0 , X1 = None ):##{{{
+	def fit( self , Y0 , X0 , X1 ):##{{{
 		"""
 		Fit the AR2D2 model
 		
@@ -120,61 +101,42 @@ class R2D2(AbstractBC):##{{{
 		X0 : np.ndarray
 			Biased dataset during period 0
 		X1	: np.ndarray or None
-			Biased dataset during period 1. If None, the method is considered as
-			stationary
+			Biased dataset during period 1.
 		"""
-		
-		return self._fit( Y0 , X0 , X1 )
-	##}}}
-	
-	def _predict( self , X1 , X0 , **kwargs ):##{{{
-		if X0 is None and X1 is None:
-			return
-		if X0 is None:
-			if self._reverse:
-				Z1 = self.mvq.transform(X1)
-				return self._bcm.predict( Z1 , **kwargs )
-			else:
-				Z1b = self._bcm.predict( X1 , **kwargs )
-				return self.mvq.transform(Z1b)
-		if X1 is None:
-			if self._reverse:
-				Z0 = self.mvq.transform(X0)
-				return self._bcm.predict( Z0 , **kwargs )
-			else:
-				Z0b = self._bcm.predict( X0 , **kwargs )
-				return self.mvq.transform(Z0b)
-		
+		self.mvq.fit(Y0)
+		self._bcm = self.bc_method(**self.bckwargs)
 		if self._reverse:
 			Z0 = self.mvq.transform(X0)
 			Z1 = self.mvq.transform(X1)
-			return self._bcm.predict( Z1 , Z0 , **kwargs )
+			self._bcm.fit( Y0 , Z0 , Z1 )
 		else:
-			Z1b,Z0b = self._bcm.predict( X1 , X0 , **kwargs )
-			return self.mvq.transform(Z1b),self.mvq.transform(Z0b)
+			self._bcm.fit( Y0 , X0 , X1 )
+		
+		return self
 	##}}}
 	
-	@io_predict
-	def predict( self , X1 = None , X0 = None , **kwargs ):##{{{
-		"""
-		Perform the bias correction
-		Return Z1 if X0 is None (and vice-versa), else return a tuple Z1,Z0
-		
-		Parameters
-		----------
-		X1  : np.ndarray
-			Array of value to be corrected in projection period
-		X0  : np.ndarray or None
-			Array of value to be corrected in calibration period
-		
-		Returns
-		-------
-		Z1 : np.ndarray
-			Return an array of correction in projection period
-		Z0 : np.ndarray or None
-			Return an array of correction in calibration period
-		"""
-		return self._predict( X1 , X0 ,**kwargs )
+	def _predictZ0( self , X0 , **kwargs ):##{{{
+		if X0 is None:
+			return None
+		if self._reverse:
+			Z0 = self.mvq.transform(X0)
+			Z0 = self._bcm._predictZ0( Z0 , **kwargs )
+		else:
+			Z0 = self._bcm._predictZ0( X0 , **kwargs )
+			Z0 = self.mvq.transform(Z0)
+		return Z0
+	##}}}
+	
+	def _predictZ1( self , X1 , **kwargs ):##{{{
+		if X1 is None:
+			return None
+		if self._reverse:
+			Z1 = self.mvq.transform(X1)
+			Z1 = self._bcm._predictZ1( Z1 , **kwargs )
+		else:
+			Z1 = self._bcm._predictZ1( X1 , **kwargs )
+			Z1 = self.mvq.transform(Z1)
+		return Z1
 	##}}}
 	
 ##}}}
@@ -192,16 +154,6 @@ class AR2D2(R2D2):##{{{
 	def __init__( self , *args , **kwargs ):
 		super().__init__( *args , **kwargs )
 		self._name = "AR2D2"
-	
-	@io_fit
-	def fit( self , Y0 , X0 , X1 = None ):
-		super()._fit( Y0 = Y0 , X0 = X0 , X1 = X1 )
-		
-		return self
-	
-	@io_predict
-	def predict( self , X1 = None , X0 = None ):
-		return super()._predict( X1 = X1 , X0 = X0 )
 	
 ##}}}
 
@@ -221,13 +173,13 @@ class QMrs(R2D2):##{{{
 	
 	@io_fit
 	def fit( self , Y0 , X0 ):
-		super()._fit( Y0 = Y0 , X0 = X0 )
+		super().fit( Y0 = Y0 , X0 = X0 , X1 = X0 )
 		
 		return self
 	
 	@io_predict
 	def predict( self , X0 ):
-		return super()._predict( X0 = X0 )
+		return super().predict( X1 = X0 )
 	
 ##}}}
 

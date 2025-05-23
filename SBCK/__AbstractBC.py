@@ -71,23 +71,11 @@ class AbstractBC:##{{{
 	
 	@property
 	def is_non_stationary(self):
-		return self._nsk in ["NS","SNS"]
+		return self._nsk  == "NS"
 	
 	@property
 	def is_stationary(self):
-		return self._nsk in ["S","SNS"]
-	
-	@property
-	def is_only_non_stationary(self):
-		return self._nsk == "NS"
-	
-	@property
-	def is_only_stationary(self):
 		return self._nsk == "S"
-	
-	@property
-	def is_stationary_and_non_stationary(self):
-		return self._nsk == "SNS"
 	
 	@property
 	def stationarity_is_not_relevant(self):
@@ -103,13 +91,18 @@ class AbstractBC:##{{{
 	def _predictZ1( self , Z1 , **kwargs ):
 		raise NotImplementedError
 	
+	def _return_predict_pair( self  , Z1 = None , Z0 = None ):
+		if Z0 is not None and Z1 is not None:
+			return Z1,Z0
+		if Z1 is None:
+			return Z0
+		if Z0 is None:
+			return Z1
+
 	@io_predict
 	def predict( self , *args , **kwargs ):
 		
-		if self.is_stationary_and_non_stationary:
-			raise NotImplementedError("The predict method of SBCK.AbstractBC can not be used by SNS methods")
-		
-		if self.is_only_stationary:
+		if self.is_stationary:
 			if len(args) > 1:
 				raise ValueError("Too many positional arguments, only 0 or 1 can be given")
 			X0 = kwargs.get("X0")
@@ -118,7 +111,7 @@ class AbstractBC:##{{{
 			Z0 = self._predictZ0( X0 , **kwargs )
 			return Z0
 		
-		if self.is_only_non_stationary:
+		if self.is_non_stationary:
 			if len(args) > 2:
 				raise ValueError("Too many positional arguments, only 0, 1 or 2 can be given")
 			X1 = kwargs.get("X1")
@@ -129,9 +122,8 @@ class AbstractBC:##{{{
 				X1,X0 = args
 			Z1 = self._predictZ1( X1 , **kwargs )
 			Z0 = self._predictZ0( X0 , **kwargs )
-			if Z0 is None:
-				return Z1
-			return Z1,Z0
+
+			return self._return_predict_pair( Z1 = Z1 , Z0 = Z0 )
 	##}}}
 	
 ##}}}

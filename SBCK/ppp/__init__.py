@@ -22,7 +22,7 @@ from .__checkf            import atleastonefinite
 from .__PrePostProcessing import PrePostProcessing
 from .__Sys               import FilterWarnings
 from .__Sys               import Xarray
-from .__Sys               import As2d
+#from .__Sys               import As2d
 from .__SSR               import SSR
 from .__OTCNoise          import OTCNoise
 from .__LinkFunction      import LinkFunction

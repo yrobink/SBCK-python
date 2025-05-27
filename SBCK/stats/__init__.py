@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 Yoann Robin
+## Copyright(c) 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -17,34 +16,13 @@
 ## You should have received a copy of the GNU General Public License
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
-###############
-## Libraries ##
-###############
 
-from .__minkowski import minkowski
+from .__sparse_distance import chebyshev
+from .__sparse_distance import energy
+from .__sparse_distance import minkowski
+from .__sparse_distance import euclidean
+from .__sparse_distance import manhattan
+from .__sparse_distance import wasserstein
 
 
-##############
-## Function ##
-##############
 
-def euclidean( muX , muY ):
-	"""
-	Description
-	===========
-	Euclidean distance between SparseHist
-
-	Parameters
-	----------
-	muX      : SBCK.SparseHist or np.array
-		Histogram or dataset
-	muY      : SBCK.SparseHist or np.array
-		Histogram or dataset
-
-	Return
-	------
-	cost   : float
-		Euclidean distance between muX and muY
-	"""
-
-	return minkowski( muX , muY , p = 2. )

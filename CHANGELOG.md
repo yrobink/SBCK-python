@@ -16,6 +16,8 @@
 - New SBCK.stats modules:
    - Move all elements of SBCK.metrics to SBCK.stats.__sparse_distance, and add
      typing and some corrections.
+   - Move SparseHist to this module with bin_width_estimator, and add typing
+   - Add new class BaseHist
 
 ### Changed
 - R2D2 and ECBC are only non-stationary methods.

@@ -17,12 +17,15 @@
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
 
+from .__SparseHist import bin_width_estimator
+from .__SparseHist import BaseHist
+from .__SparseHist import SparseHist
+
 from .__sparse_distance import chebyshev
 from .__sparse_distance import energy
 from .__sparse_distance import minkowski
 from .__sparse_distance import euclidean
 from .__sparse_distance import manhattan
 from .__sparse_distance import wasserstein
-
 
 

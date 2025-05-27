@@ -32,9 +32,9 @@ import numpy as np
 import scipy.stats as sc
 
 import SBCK as bc
+import SBCK.stats as bcs
 import SBCK.tools as bct
 import SBCK.datasets as bcd
-import SBCK.metrics as bcm
 
 has_mpl = True
 try:
@@ -92,7 +92,7 @@ class StationaryBCTest(SBCKTestParameters):##{{{
 		super().__init__()
 		self.corr_class  = corr_class
 		self.corr_kwargs = kwargs
-		self.metric      = bcm.wasserstein
+		self.metric      = bcs.wasserstein
 	##}}}
 	
 	def test_bc_calibration(self):##{{{
@@ -299,7 +299,7 @@ class NonStationaryBCTest(SBCKTestParameters):##{{{
 		self.tex_name    = tex_name
 		self.corr_class  = corr_class
 		self.corr_kwargs = kwargs
-		self.metric      = bcm.wasserstein
+		self.metric      = bcs.wasserstein
 	##}}}
 	
 	def test_bc_calibration(self):##{{{

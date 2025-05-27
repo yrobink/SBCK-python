@@ -23,8 +23,8 @@
 import numpy as np
 import scipy.spatial.distance as ssd
 
-from ..tools.__stats import bin_width_estimator
-from ..tools.__SparseHist import SparseHist
+from .__SparseHist import bin_width_estimator
+from .__SparseHist import SparseHist
 from ..tools.__OT import POTemd
 
 
@@ -44,8 +44,7 @@ def _to_SparseHist( func ):##{{{
 			muYY = SparseHist( muY , muX.bin_width )
 			return func( muX , muYY , **kwargs )
 		elif not isinstance(muX,SparseHist) and not isinstance(muY,SparseHist):
-			bw = np.array( [bin_width_estimator([muX,muY])] )
-			bw = bw.reshape(bw.size)
+			bw = bin_width_estimator( muX , muY ).squeeze()
 			muXX = SparseHist( muX , bw )
 			muYY = SparseHist( muY , bw )
 			return func( muXX , muYY , **kwargs )

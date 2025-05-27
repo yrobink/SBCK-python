@@ -29,8 +29,8 @@ from .__AbstractBC import MultiUBC
 from .__QM         import QM
 from .__decorators import io_fit
 
-from .tools.__SparseHist import SparseHist
-from .tools.__stats      import bin_width_estimator
+from .stats.__SparseHist import SparseHist
+from .stats.__SparseHist import bin_width_estimator
 from .tools.__OT         import POTemd
 from .tools.__linalg import sqrtm
 from .tools.__linalg import choleskym
@@ -105,7 +105,7 @@ class OTC(AbstractBC):##{{{
 		"""
 		
 		## Sparse Histogram
-		self.bin_width  = np.array( [self.bin_width ] ).ravel() if self.bin_width  is not None else bin_width_estimator( [Y0,X0] )
+		self.bin_width  = np.array( [self.bin_width ] ).ravel() if self.bin_width  is not None else bin_width_estimator( Y0 , X0 )
 		self.bin_origin = np.array( [self.bin_origin] ).ravel() if self.bin_origin is not None else np.zeros( self.bin_width.size )
 		
 		self.bin_width  = np.array( [self.bin_width] ).ravel()
@@ -253,7 +253,7 @@ class dOTC(AbstractBC):##{{{
 			else:
 				self._cov_factor = np.identity(Y0.shape[1])
 		self._cov_factor = self._cov_factor.reshape(self.ndim,self.ndim)
-		self.bin_width = self.bin_width if self.bin_width is not None else bin_width_estimator( [Y0,X0,X1] )
+		self.bin_width = self.bin_width if self.bin_width is not None else bin_width_estimator( Y0 , X0 , X1 )
 		
 		
 		## Optimal plan

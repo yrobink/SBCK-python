@@ -334,6 +334,57 @@ class Test_rv_mixture(RVExtend,unittest.TestCase):##{{{
 ##}}}
 
 
+#############################
+## SBCK.stats.__SparseHist ##
+#############################
+
+class Test_SparseHist(SBCKTestParameters,unittest.TestCase):##{{{
+	
+	def __init__( self , *args, **kwargs ):##{{{
+		SBCKTestParameters.__init__( self )
+		unittest.TestCase.__init__( self , *args , **kwargs )
+	##}}}
+	
+	def test_mnormal(self):##{{{
+		np.random.seed(42)
+		X = np.random.multivariate_normal( mean = np.zeros(2) , cov = np.identity(2) , size = 1_000_000 )
+		rvX = bcs.SparseHist( X )
+		
+		grid = mplg.GridSpec(3,3)
+		fig  = plt.figure()
+		ax   = fig.add_subplot( grid[1,1] , projection = '3d' )
+		ax.scatter( rvX.c[:,0] , rvX.c[:,1] , rvX.p , c = rvX.p , cmap = plt.cm.hot , linestyle = "" , marker = "." )
+		ax.set_xlabel( r"$x$" )
+		ax.set_ylabel( r"$y$" )
+		ax.set_zlabel( r"$z$" )
+		ax.set_xlim(-5,5)
+		ax.set_ylim(-5,5)
+		
+		mm   = 1. / 25.4
+		pt   = 1. / 72
+		width  = 120*mm
+		w_l    = 1*pt
+		w_r    = 26*pt
+		w_ax   = width - w_l - w_r
+		widths = [w_l,w_ax,w_r]
+		
+		h_ax    = w_ax
+		h_t     = 1*pt
+		h_b     = 1*pt
+		heights = [h_t,h_ax,h_b]
+		height  = sum(heights)
+		
+		grid.set_height_ratios(heights)
+		grid.set_width_ratios(widths)
+		fig.set_figheight(height)
+		fig.set_figwidth(width)
+		
+		plt.subplots_adjust( left = 0 , right = 1 , bottom = 0 , top = 1 , hspace = 0 , wspace = 0 )
+		plt.savefig( os.path.join( self.opath , f"{self.prefix}_mnormal.png" ) , dpi = 600 )
+	##}}}
+	
+##}}}
+
 ##########
 ## main ##
 ##########

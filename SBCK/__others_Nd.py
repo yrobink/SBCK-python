@@ -31,7 +31,7 @@ from .__QM        import QM
 from .__others_1d import QDM
 from .__CDFt      import CDFt
 
-from .metrics.__wasserstein import wasserstein
+from .stats.__sparse_distance import wasserstein
 from .tools.__misc import SlopeStoppingCriteria
 from .tools.__rv_extend import rv_empirical
 from .tools.__shuffle import SchaakeShuffle

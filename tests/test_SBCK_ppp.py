@@ -399,72 +399,6 @@ class Test_LinkFunction(SBCKTestParameters,unittest.TestCase):##{{{
 	
 ##}}}
 
-class Test_XarrayAs2d(SBCKTestParameters,unittest.TestCase):##{{{
-	
-	def __init__( self , *args, **kwargs ):##{{{
-		SBCKTestParameters.__init__( self )
-		unittest.TestCase.__init__( self , *args , **kwargs )
-	##}}}
-	
-	def test_keep_struct(self):##{{{
-		
-		##
-		time     = xr.date_range( "2000-01-01","2005-12-31" ).values
-		cvars    = ["tas","pr"]
-		size     = time.size
-		Y0,X0,X1 = bc.datasets.like_tas_pr(size)
-		
-		## Add xarray structure
-		Y0 = xr.DataArray( Y0 , dims = ["time","cvar"] , coords = [time,cvars] , attrs = { "kind" : "Y0" } )
-		X0 = xr.DataArray( X0 , dims = ["time","cvar"] , coords = [time,cvars] , attrs = { "kind" : "X0" } )
-		X1 = xr.DataArray( X1 , dims = ["time","cvar"] , coords = [time,cvars] , attrs = { "kind" : "X1" } )
-		
-		## Parameters of the ppp
-		bc_method        = bc.IdBC
-		bc_method_kwargs = {}
-		pipe             = [bcp.Xarray]
-		pipe_kwargs      = [{}]
-		
-		## Correction with the ppp
-		cppp  = bcp.PrePostProcessing( bc_method = bc_method , bc_method_kwargs = bc_method_kwargs , pipe = pipe , pipe_kwargs = pipe_kwargs ).fit( Y0 , X0 , X1 )
-		Z1,Z0 = cppp.predict( X1 , X0 )
-		
-		self.assertLess( np.abs(Z0 - X0).max() , 1e-6 )
-		self.assertLess( np.abs(Z1 - X1).max() , 1e-6 )
-		
-	##}}}
-	
-	def test_keep_struct_2d(self):##{{{
-		
-		##
-		time     = xr.date_range( "2000-01-01","2005-12-31" ).values
-		lat      = np.array([30,60])
-		lon      = np.array([-90,90])
-		cvars    = ["tas","pr"]
-		size     = time.size
-		Y0,X0,X1 = bc.datasets.like_tas_pr(lat.size * lon.size * size)
-		
-		## Add xarray structure
-		Y0 = xr.DataArray( Y0.reshape(time.size,lat.size,lon.size,2) , dims = ["time","lat","lon","cvar"] , coords = [time,lat,lon,cvars] , attrs = { "kind" : "Y0" } )
-		X0 = xr.DataArray( X0.reshape(time.size,lat.size,lon.size,2) , dims = ["time","lat","lon","cvar"] , coords = [time,lat,lon,cvars] , attrs = { "kind" : "X0" } )
-		X1 = xr.DataArray( X1.reshape(time.size,lat.size,lon.size,2) , dims = ["time","lat","lon","cvar"] , coords = [time,lat,lon,cvars] , attrs = { "kind" : "X1" } )
-		
-		## Parameters of the ppp
-		bc_method        = bc.IdBC
-		bc_method_kwargs = {}
-		pipe             = [bcp.As2d,bcp.Xarray]
-		pipe_kwargs      = [{},{}]
-		
-		## Correction with the ppp
-		cppp  = bcp.PrePostProcessing( bc_method = bc_method , bc_method_kwargs = bc_method_kwargs , pipe = pipe , pipe_kwargs = pipe_kwargs ).fit( Y0 , X0 , X1 )
-		Z1,Z0 = cppp.predict( X1 , X0 )
-		
-		self.assertLess( np.abs(Z0 - X0).max() , 1e-6 )
-		self.assertLess( np.abs(Z1 - X1).max() , 1e-6 )
-		
-	##}}}
-##}}}
-
 class Test_OnlyFinite(SBCKTestParameters,unittest.TestCase):##{{{
 	
 	def __init__( self , *args, **kwargs ):##{{{
@@ -575,8 +509,8 @@ class Test_Extremes(SBCKTestParameters,unittest.TestCase):##{{{
 		## Parameters of the ppp
 		bc_method    = bc.CDFt
 		bcmkws       = [{ "norm" : "origin"  , "oob" : "Y0CC" },{ "norm" : "d-quant" , "oob" : "None" , "norm_e" : 1-p }]
-		pipes        = [ [], [ bcp.LimitTailsRatio , bcp.As2d ]]
-		pipes_kwargs = [ [], [ { "tails" : "right" , "cols" : 0 } , {} ]]
+		pipes        = [ [], [ bcp.LimitTailsRatio ]]
+		pipes_kwargs = [ [], [ { "tails" : "right" , "cols" : 0 } ]]
 		
 		## Output
 		df = pd.DataFrame( np.nan , columns = pd.MultiIndex.from_product([range(2),range(2)]) , index = ["RXl","RXr","RZl","RZr","Y0x","X0x","X1x","Z0x","Z1x","Y0q","X0q","X1q","Z0q","Z1q"] )

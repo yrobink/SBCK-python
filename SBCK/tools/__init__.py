@@ -22,11 +22,7 @@ from .__linalg    import as2d
 from .__linalg    import sqrtm
 from .__linalg    import choleskym
 
-from .__stats     import bin_width_estimator
 from .__stats     import rvs_spd_matrix
-
-from .__SparseHist import SparseHist
-
 from .__misc      import SlopeStoppingCriteria
 from .__misc      import Shift
 from .__misc      import yearly_window

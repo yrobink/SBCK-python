@@ -35,7 +35,6 @@ import SBCK as bc
 import SBCK.ppp as bcp
 import SBCK.tools as bct
 import SBCK.datasets as bcd
-import SBCK.metrics as bcm
 import SBCK.mm as bcmm
 
 

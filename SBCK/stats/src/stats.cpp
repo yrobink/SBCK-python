@@ -37,7 +37,7 @@ namespace py = pybind11 ;
 // Module //
 //========//
 
-PYBIND11_MODULE( __tools_cpp , m )
+PYBIND11_MODULE( __stats_cpp , m )
 {
 	//===========//
 	// Functions //

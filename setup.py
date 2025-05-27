@@ -86,8 +86,8 @@ def get_eigen_include():##{{{
 
 ext_modules = [
 	Extension(
-		"SBCK.tools.__tools_cpp",
-		[ 'SBCK/tools/src/tools.cpp' ],
+		"SBCK.stats.__stats_cpp",
+		[ 'SBCK/stats/src/stats.cpp' ],
 		include_dirs=[
 			get_eigen_include(),
 			pybind11.get_include(True),
@@ -95,7 +95,7 @@ ext_modules = [
 		],
 		language='c++',
 		depends = [
-			"SBCK/tools/src/SparseHist.hpp"
+			"SBCK/stats/src/SparseHist.hpp"
 			],
 		extra_compile_args = ["-O3"]
 	),

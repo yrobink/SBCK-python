@@ -42,7 +42,7 @@ import numpy        as np
 import scipy.stats  as sc
 import scipy.linalg as scl
 import scipy.spatial.distance as ssd
-from .__rv_extend import mrv_base
+from ..stats.__rv_extend import mrv_base
 
 
 #############

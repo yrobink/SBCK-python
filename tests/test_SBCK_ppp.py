@@ -22,7 +22,9 @@
 ## Imports ##
 #############
 
+import sys
 import os
+import argparse
 import itertools as itt
 import unittest
 
@@ -32,25 +34,33 @@ import pandas as pd
 
 import SBCK as bc
 import SBCK.ppp as bcp
+import SBCK.stats as bcs
 import SBCK.tools as bct
 import SBCK.datasets as bcd
 
-import matplotlib as mpl
-import matplotlib.pyplot   as plt
-import matplotlib.gridspec as mplg
+has_mpl = True
+try:
+	import matplotlib as mpl
+	import matplotlib.pyplot   as plt
+	import matplotlib.gridspec as mplg
+except Exception:
+	has_mpl = False
 
 
 ########################
 ## Set mpl parameters ##
 ########################
 
-mpl.rcdefaults()
-mpl.rcParams['font.size'] = 7
-mpl.rcParams['axes.linewidth']  = 0.5
-mpl.rcParams['lines.linewidth'] = 0.5
-mpl.rcParams['patch.linewidth'] = 0.5
-mpl.rcParams['xtick.major.width'] = 0.5
-mpl.rcParams['ytick.major.width'] = 0.5
+try:
+	mpl.rcdefaults()
+	mpl.rcParams['font.size'] = 7
+	mpl.rcParams['axes.linewidth']  = 0.5
+	mpl.rcParams['lines.linewidth'] = 0.5
+	mpl.rcParams['patch.linewidth'] = 0.5
+	mpl.rcParams['xtick.major.width'] = 0.5
+	mpl.rcParams['ytick.major.width'] = 0.5
+except Exception:
+	has_mpl = False
 
 
 ######################
@@ -59,6 +69,8 @@ mpl.rcParams['ytick.major.width'] = 0.5
 
 class SBCKTestParameters:##{{{
 	
+	PLOTFIG: bool = False
+
 	def __init__( self ):##{{{
 		lpath = os.path.join( *os.path.basename(__file__).split(".")[0].split("_")[1:] )
 		self.opath = os.path.join( os.path.dirname(__file__) , "figures" , lpath )
@@ -144,7 +156,7 @@ class Test_SSR(SBCKTestParameters,unittest.TestCase):##{{{
 		
 		## Parameters of the ppp
 		bc_method        = bc.CDFt
-		bc_method_kwargs = { "rvY" : bct.rv_empirical , "rvX" : bct.rv_empirical , "norm" : "d-quant" , "oob" : "None" }
+		bc_method_kwargs = {}
 		pipe             = [bcp.SSR]
 		pipe_kwargs      = [{'cols' : 0}]
 		
@@ -158,13 +170,13 @@ class Test_SSR(SBCKTestParameters,unittest.TestCase):##{{{
 #		Z1d[Z1d < bY0] = 0
 		
 		## Random variable
-		rvY0  = bct.rv_empirical( X = Y0  )
-		rvX0  = bct.rv_empirical( X = X0  )
-		rvX1  = bct.rv_empirical( X = X1  )
-		rvZ1p = bct.rv_empirical( X = Z1p )
-		rvZ0p = bct.rv_empirical( X = Z0p )
-		rvZ1d = bct.rv_empirical( X = Z1d )
-		rvZ0d = bct.rv_empirical( X = Z0d )
+		rvY0  = bcs.rv_empirical.fit( Y0  )
+		rvX0  = bcs.rv_empirical.fit( X0  )
+		rvX1  = bcs.rv_empirical.fit( X1  )
+		rvZ1p = bcs.rv_empirical.fit( Z1p )
+		rvZ0p = bcs.rv_empirical.fit( Z0p )
+		rvZ1d = bcs.rv_empirical.fit( Z1d )
+		rvZ0d = bcs.rv_empirical.fit( Z0d )
 		rvZ0  = [rvZ0p,rvZ0d]
 		rvZ1  = [rvZ1p,rvZ1d]
 		
@@ -178,49 +190,50 @@ class Test_SSR(SBCKTestParameters,unittest.TestCase):##{{{
 		xlim    = link([xmin,11])
 		
 		##
-		fig = plt.figure( dpi = 120 )
-		grid = mplg.GridSpec( 3 , 3 )
-		
-		ax = fig.add_subplot(grid[1,1])
-		ax.plot( l1x ,  rvY0.cdf(x) , label = r"$Y^0$" , color = "blue"   )
-		ax.plot( l1x ,  rvX0.cdf(x) , label = r"$X^0$" , color = "red"    )
-		ax.plot( l1x ,  rvX1.cdf(x) , label = r"$X^1$" , color = "purple" )
-		ax.plot( l1x , rvZ1p.cdf(x) , label = r"$Z^1$ (PPP)" , color = "darkgreen" , linestyle = "-" )
-		ax.plot( l1x , rvZ1d.cdf(x) , label = r"$Z^1$ (DIR)" , color = "darkgreen" , linestyle = "--" )
-		ax.axvline( link(bY0) , color = "blue"   , linestyle = ":" )
-		ax.axvline( link(bX0) , color = "red"    , linestyle = ":" )
-		ax.axvline( link(bX1) , color = "purple" , linestyle = ":" )
-		ax.set_xticks(lxticks)
-		ax.set_xticklabels(xticks)
-		ax.set_xlim(xlim)
-		ax.legend( loc = "lower right" )
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 210*mm
-		w_l    = 30*pt
-		w_m    = 35*pt
-		w_r    =  5*pt
-		w_ax   = (width - (w_l + w_r)) / 1
-		widths = [w_l,w_ax,w_r]
-		
-		h_ax    = w_ax / (16 / 11)
-		h_t     = 20*pt
-		h_m     = 30*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}_rv_method.png" ) , dpi = 600 )
-		plt.close(fig)
+		if self.PLOTFIG:
+			fig = plt.figure( dpi = 120 )
+			grid = mplg.GridSpec( 3 , 3 )
+			
+			ax = fig.add_subplot(grid[1,1])
+			ax.plot( l1x ,  rvY0.cdf(x) , label = r"$Y^0$" , color = "blue"   )
+			ax.plot( l1x ,  rvX0.cdf(x) , label = r"$X^0$" , color = "red"    )
+			ax.plot( l1x ,  rvX1.cdf(x) , label = r"$X^1$" , color = "purple" )
+			ax.plot( l1x , rvZ1p.cdf(x) , label = r"$Z^1$ (PPP)" , color = "darkgreen" , linestyle = "-" )
+			ax.plot( l1x , rvZ1d.cdf(x) , label = r"$Z^1$ (DIR)" , color = "darkgreen" , linestyle = "--" )
+			ax.axvline( link(bY0) , color = "blue"   , linestyle = ":" )
+			ax.axvline( link(bX0) , color = "red"    , linestyle = ":" )
+			ax.axvline( link(bX1) , color = "purple" , linestyle = ":" )
+			ax.set_xticks(lxticks)
+			ax.set_xticklabels(xticks)
+			ax.set_xlim(xlim)
+			ax.legend( loc = "lower right" )
+			
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
+			
+			width  = 210*mm
+			w_l    = 30*pt
+			w_m    = 35*pt
+			w_r    =  5*pt
+			w_ax   = (width - (w_l + w_r)) / 1
+			widths = [w_l,w_ax,w_r]
+			
+			h_ax    = w_ax / (16 / 11)
+			h_t     = 20*pt
+			h_m     = 30*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_b]
+			height  = sum(heights)
+			
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}_rv_method.png" ) , dpi = 600 )
+			plt.close(fig)
 		
 	##}}}
 	
@@ -255,69 +268,69 @@ class Test_OTCNoise(SBCKTestParameters,unittest.TestCase):##{{{
 		## Direct correction
 		Z1d,Z0d = bc_method( **bc_method_kwargs ).fit( Y0 , X0 , X1 ).predict( X1 , X0 )
 		
-		## xylim
-		xylim = [-5,11]
-		dxy   = 0.1
-		bins  = np.linspace( xylim[0] , xylim[1] , 100 )
-		
-		## Figure
-		titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
-		colors = ["blue","red","purple","green"]
-		fig = plt.figure()
-		grid = mplg.GridSpec(5,5)
-		for ij,K in enumerate([Z0p,Z0d,Z1p,Z1d]):
-			j = ij  % 2
-			i = ij // 2
-			ax  = fig.add_subplot(grid[2*i+1,2*j+1])
-			for iK,K in enumerate([Y0,X0,X1,K]):
-				ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.5 )
-#			ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+		if self.PLOTFIG:
+			## xylim
+			xylim = [-5,11]
+			dxy   = 0.1
+			bins  = np.linspace( xylim[0] , xylim[1] , 100 )
 			
-			if i == 1:
-				ax.set_xlabel(r"$x_0$")
-			else:
-				ax.set_xticks([])
-			if j == 0:
-				ax.set_ylabel(r"$x_1$")
-			else:
-				ax.set_yticks([])
-			ax.spines[['right', 'top']].set_visible(False)
-			ax.set_xlim(xylim)
-			ax.set_ylim(xylim)
-		
-		## Title
-		ax = fig.add_subplot(grid[0,1:4])
-		ax.text( 0 , 0 , "dOTC noise" , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
-		ax.set_xlim(-1,1)
-		ax.set_ylim(-1,1)
-		ax.set_axis_off()
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 180*mm
-		w_l    = 30*pt
-		w_m    =  5*pt
-		w_r    =  5*pt
-		w_ax   = (width - (w_l + w_m + w_r)) / 2
-		widths = [w_l,w_ax,w_m,w_ax,w_r]
-		
-		h_ax    = w_ax
-		h_t     = 17*pt
-		h_m     =  5*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_m,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}_add_noise.png" ) , dpi = 600 )
-		plt.close(fig)
+			## Figure
+			titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
+			colors = ["blue","red","purple","green"]
+			fig = plt.figure()
+			grid = mplg.GridSpec(5,5)
+			for ij,K in enumerate([Z0p,Z0d,Z1p,Z1d]):
+				j = ij  % 2
+				i = ij // 2
+				ax  = fig.add_subplot(grid[2*i+1,2*j+1])
+				for iK,K in enumerate([Y0,X0,X1,K]):
+					ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.5 )
+				
+				if i == 1:
+					ax.set_xlabel(r"$x_0$")
+				else:
+					ax.set_xticks([])
+				if j == 0:
+					ax.set_ylabel(r"$x_1$")
+				else:
+					ax.set_yticks([])
+				ax.spines[['right', 'top']].set_visible(False)
+				ax.set_xlim(xylim)
+				ax.set_ylim(xylim)
+			
+			## Title
+			ax = fig.add_subplot(grid[0,1:4])
+			ax.text( 0 , 0 , "dOTC noise" , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
+			ax.set_xlim(-1,1)
+			ax.set_ylim(-1,1)
+			ax.set_axis_off()
+			
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
+			
+			width  = 180*mm
+			w_l    = 30*pt
+			w_m    =  5*pt
+			w_r    =  5*pt
+			w_ax   = (width - (w_l + w_m + w_r)) / 2
+			widths = [w_l,w_ax,w_m,w_ax,w_r]
+			
+			h_ax    = w_ax
+			h_t     = 17*pt
+			h_m     =  5*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_m,h_ax,h_b]
+			height  = sum(heights)
+			
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}_add_noise.png" ) , dpi = 600 )
+			plt.close(fig)
 		
 	##}}}
 	
@@ -332,6 +345,8 @@ class Test_LinkFunction(SBCKTestParameters,unittest.TestCase):##{{{
 	
 	def test_plot_LF(self):##{{{
 		
+		if not self.PLOTFIG:
+			return
 		##
 		xlim   = (-5,5)
 		ylim   = (-5,5)
@@ -508,7 +523,7 @@ class Test_Extremes(SBCKTestParameters,unittest.TestCase):##{{{
 		
 		## Parameters of the ppp
 		bc_method    = bc.CDFt
-		bcmkws       = [{ "norm" : "origin"  , "oob" : "Y0CC" },{ "norm" : "d-quant" , "oob" : "None" , "norm_e" : 1-p }]
+		bcmkws       = [{ "norm" : "origin"  },{ "norm" : "dynamical" }]
 		pipes        = [ [], [ bcp.LimitTailsRatio ]]
 		pipes_kwargs = [ [], [ { "tails" : "right" , "cols" : 0 } ]]
 		
@@ -524,88 +539,89 @@ class Test_Extremes(SBCKTestParameters,unittest.TestCase):##{{{
 		df.loc["X1q",:] = np.quantile( X1 , p )
 		
 		##
-		rvY0 = bct.rv_empirical( X = Y0 )
-		rvX0 = bct.rv_empirical( X = X0 )
-		rvX1 = bct.rv_empirical( X = X1 )
+		rvY0 = bcs.rv_empirical.fit( Y0 )
+		rvX0 = bcs.rv_empirical.fit( X0 )
+		rvX1 = bcs.rv_empirical.fit( X1 )
 		x    = np.linspace( -5 , 20 , 1000 )
-		names_norm = ["norm_origin","norm_d-quant"]
+		names_norm = ["norm_origin","norm_dynamical"]
 		names_ppp  = ["no-ppp","LimitTailsRatio"]
 		
 		## Loop
-		fig = plt.figure()
-		grid = mplg.GridSpec( 2 * 2 + 1 , 2 * 2 + 1 )
-		for i,j in itt.product(range(2),range(2)):
+		if self.PLOTFIG:
+			fig = plt.figure()
+			grid = mplg.GridSpec( 2 * 2 + 1 , 2 * 2 + 1 )
+			for i,j in itt.product(range(2),range(2)):
+				
+				## Correction
+				bcmkw       = bcmkws[i]
+				pipe        = pipes[j]
+				pipe_kwargs = pipes_kwargs[j]
+				
+				cppp = bcp.PrePostProcessing( bc_method = bc_method , bc_method_kwargs = bcmkw , pipe = pipe , pipe_kwargs = pipe_kwargs , checkf = bcp.atleastonefinite ).fit( Y0 , X0 , X1 )
+				Z1,Z0 = cppp.predict( X1 , X0 )
+				
+				## Add to table
+				_,_,Rl,Rr = self.find_ratio( Z1 , Z0 , p )
+				df.loc["RZl",(i,j)] = Rl
+				df.loc["RZr",(i,j)] = Rr
+				df.loc["Z0x",(i,j)] = Z0.max()
+				df.loc["Z1x",(i,j)] = Z1.max()
+				df.loc["Z0q",(i,j)] = np.quantile( Z0 , p )
+				df.loc["Z1q",(i,j)] = np.quantile( Z1 , p )
+				
+				##
+				rvZ1 = bcs.rv_empirical.fit( Z1 )
+				
+				## Add to figure
+				ax = fig.add_subplot( grid[2*i+1,2*j+1] )
+				ax.plot( x , rvY0.cdf(x) , color = "blue"   )
+				ax.plot( x , rvX0.cdf(x) , color = "red"    )
+				ax.plot( x , rvX1.cdf(x) , color = "purple" )
+				ax.plot( x , rvZ1.cdf(x) , color = "green"  , marker = "x" )
+				ax.set_title( f"{names_norm[i]} / {names_ppp[j]}" )
+				ax.set_ylim(0,1)
+				
+				if j == 0:
+					ax.set_ylabel( "CDF" )
+				else:
+					ax.set_yticks([])
+				if i == 1:
+					ax.set_xlabel( r"$x$" )
+				else:
+					ax.set_xticks([])
+				ax.spines[['right', 'top']].set_visible(False)
 			
-			## Correction
-			bcmkw       = bcmkws[i]
-			pipe        = pipes[j]
-			pipe_kwargs = pipes_kwargs[j]
+			## Tables output
+			df.columns = pd.MultiIndex.from_product( [names_norm,names_ppp] )
 			
-			cppp = bcp.PrePostProcessing( bc_method = bc_method , bc_method_kwargs = bcmkw , pipe = pipe , pipe_kwargs = pipe_kwargs , checkf = bcp.atleastonefinite ).fit( Y0 , X0 , X1 )
-			Z1,Z0 = cppp.predict( X1 , X0 )
+			with open( os.path.join( self.opath , f"{self.prefix}_LimitTailsRatio.txt" ) , "w" ) as f:
+				f.write( df.to_string() )
 			
-			## Add to table
-			_,_,Rl,Rr = self.find_ratio( Z1 , Z0 , p )
-			df.loc["RZl",(i,j)] = Rl
-			df.loc["RZr",(i,j)] = Rr
-			df.loc["Z0x",(i,j)] = Z0.max()
-			df.loc["Z1x",(i,j)] = Z1.max()
-			df.loc["Z0q",(i,j)] = np.quantile( Z0 , p )
-			df.loc["Z1q",(i,j)] = np.quantile( Z1 , p )
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
 			
-			##
-			rvZ1 = bct.rv_empirical( X = Z1 )
+			width  = 180*mm
+			w_l    = 30*pt
+			w_m    =  5*pt
+			w_r    =  5*pt
+			w_ax   = (width - (w_l + w_m + w_r)) / 2
+			widths = [w_l,w_ax,w_m,w_ax,w_r]
 			
-			## Add to figure
-			ax = fig.add_subplot( grid[2*i+1,2*j+1] )
-			ax.plot( x , rvY0.cdf(x) , color = "blue"   )
-			ax.plot( x , rvX0.cdf(x) , color = "red"    )
-			ax.plot( x , rvX1.cdf(x) , color = "purple" )
-			ax.plot( x , rvZ1.cdf(x) , color = "green"  , marker = "x" )
-			ax.set_title( f"{names_norm[i]} / {names_ppp[j]}" )
-			ax.set_ylim(0,1)
+			h_ax    = w_ax / (4/3)
+			h_t     = 17*pt
+			h_m     = 17*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_m,h_ax,h_b]
+			height  = sum(heights)
 			
-			if j == 0:
-				ax.set_ylabel( "CDF" )
-			else:
-				ax.set_yticks([])
-			if i == 1:
-				ax.set_xlabel( r"$x$" )
-			else:
-				ax.set_xticks([])
-			ax.spines[['right', 'top']].set_visible(False)
-		
-		## Tables output
-		df.columns = pd.MultiIndex.from_product( [names_norm,names_ppp] )
-		
-		with open( os.path.join( self.opath , f"{self.prefix}_LimitTailsRatio.txt" ) , "w" ) as f:
-			f.write( df.to_string() )
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 180*mm
-		w_l    = 30*pt
-		w_m    =  5*pt
-		w_r    =  5*pt
-		w_ax   = (width - (w_l + w_m + w_r)) / 2
-		widths = [w_l,w_ax,w_m,w_ax,w_r]
-		
-		h_ax    = w_ax / (4/3)
-		h_t     = 17*pt
-		h_m     = 17*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_m,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}_LimitTailsRatio.png" ) , dpi = 600 )
-		plt.close(fig)
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}_LimitTailsRatio.png" ) , dpi = 600 )
+			plt.close(fig)
 		
 	##}}}
 	
@@ -668,64 +684,65 @@ class Test_MNormal(SBCKTestParameters,unittest.TestCase):##{{{
 		dxy   = 0.1
 		bins  = np.linspace( xylim[0] , xylim[1] , 100 )
 		
-		## Figure
-		titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
-		colors = ["blue","red","purple","green"]
-		fig = plt.figure()
-		grid = mplg.GridSpec(5,5)
-		for ij,K in enumerate([Z0p,Z0d,Z1p,Z1d]):
-			j = ij  % 2
-			i = ij // 2
-			ax  = fig.add_subplot(grid[2*i+1,2*j+1])
-			for iK,K in enumerate([Y0,X0,X1,K]):
-				ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.5 )
-#			ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+		if self.PLOTFIG:
+			## Figure
+			titles = [r"$\mathbf{Y}^0$",r"$\mathbf{X}^0$",r"$\mathbf{Z}^1$",r"$\mathbf{X}^1$"]
+			colors = ["blue","red","purple","green"]
+			fig = plt.figure()
+			grid = mplg.GridSpec(5,5)
+			for ij,K in enumerate([Z0p,Z0d,Z1p,Z1d]):
+				j = ij  % 2
+				i = ij // 2
+				ax  = fig.add_subplot(grid[2*i+1,2*j+1])
+				for iK,K in enumerate([Y0,X0,X1,K]):
+					ax.plot( K[:,0] , K[:,1] , color = colors[iK] , linestyle = "" , marker = "." , markersize = 0.5 )
+	#			ax.text( xylim[1] - 3 * dxy , xylim[1] - 3 * dxy , titles[iK] , ha = "right" , va = "top" , fontdict = { "size" : 12 } , bbox = { 'facecolor' : 'none' , 'edgecolor' : 'black' , "boxstyle" : 'round' } )
+				
+				if i == 1:
+					ax.set_xlabel(r"$x_0$")
+				else:
+					ax.set_xticks([])
+				if j == 0:
+					ax.set_ylabel(r"$x_1$")
+				else:
+					ax.set_yticks([])
+				ax.spines[['right', 'top']].set_visible(False)
+				ax.set_xlim(xylim)
+				ax.set_ylim(xylim)
 			
-			if i == 1:
-				ax.set_xlabel(r"$x_0$")
-			else:
-				ax.set_xticks([])
-			if j == 0:
-				ax.set_ylabel(r"$x_1$")
-			else:
-				ax.set_yticks([])
-			ax.spines[['right', 'top']].set_visible(False)
-			ax.set_xlim(xylim)
-			ax.set_ylim(xylim)
-		
-		## Title
-		ax = fig.add_subplot(grid[0,1:4])
-		ax.text( 0 , 0 , "MNormal" , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
-		ax.set_xlim(-1,1)
-		ax.set_ylim(-1,1)
-		ax.set_axis_off()
-		
-		## Figsize
-		mm = 1. / 25.4
-		pt = 1. / 72
-		
-		width  = 180*mm
-		w_l    = 30*pt
-		w_m    =  5*pt
-		w_r    =  5*pt
-		w_ax   = (width - (w_l + w_m + w_r)) / 2
-		widths = [w_l,w_ax,w_m,w_ax,w_r]
-		
-		h_ax    = w_ax
-		h_t     = 17*pt
-		h_m     =  5*pt
-		h_b     = 30*pt
-		heights = [h_t,h_ax,h_m,h_ax,h_b]
-		height  = sum(heights)
-		
-		grid.set_height_ratios(heights)
-		grid.set_width_ratios(widths)
-		fig.set_figheight(height)
-		fig.set_figwidth(width)
-		plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
-		
-		plt.savefig( os.path.join( self.opath , f"{self.prefix}MNormal.png" ) , dpi = 600 )
-		plt.close(fig)
+			## Title
+			ax = fig.add_subplot(grid[0,1:4])
+			ax.text( 0 , 0 , "MNormal" , ha = "center" , va = "center" , fontdict = { "weight" : "bold" , "size" : 12 } )
+			ax.set_xlim(-1,1)
+			ax.set_ylim(-1,1)
+			ax.set_axis_off()
+			
+			## Figsize
+			mm = 1. / 25.4
+			pt = 1. / 72
+			
+			width  = 180*mm
+			w_l    = 30*pt
+			w_m    =  5*pt
+			w_r    =  5*pt
+			w_ax   = (width - (w_l + w_m + w_r)) / 2
+			widths = [w_l,w_ax,w_m,w_ax,w_r]
+			
+			h_ax    = w_ax
+			h_t     = 17*pt
+			h_m     =  5*pt
+			h_b     = 30*pt
+			heights = [h_t,h_ax,h_m,h_ax,h_b]
+			height  = sum(heights)
+			
+			grid.set_height_ratios(heights)
+			grid.set_width_ratios(widths)
+			fig.set_figheight(height)
+			fig.set_figwidth(width)
+			plt.subplots_adjust( left = 0 , right = 1 , top = 1 , bottom = 0 , wspace = 0 , hspace = 0 )
+			
+			plt.savefig( os.path.join( self.opath , f"{self.prefix}MNormal.png" ) , dpi = 600 )
+			plt.close(fig)
 		
 	##}}}
 	
@@ -736,4 +753,14 @@ class Test_MNormal(SBCKTestParameters,unittest.TestCase):##{{{
 ##########
 
 if __name__ == "__main__":
+	
+	## Custom parser to pass arguments for figures
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--figures', action = "store_true" )
+	parser.add_argument('unittest_args', nargs='*')
+	args = parser.parse_args()
+	sys.argv[1:] = args.unittest_args
+	SBCKTestParameters.PLOTFIG = args.figures and has_mpl
+	
+	## And run
 	unittest.main()

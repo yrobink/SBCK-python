@@ -201,13 +201,13 @@ def like_tas_pr( n_samples ):##{{{
 	X1 = np.random.multivariate_normal( mean = mX1 , cov = covX1 , size = n_samples )
 	Y0 = np.random.multivariate_normal( mean = mY0 , cov = covY0 , size = n_samples )
 	
-	qm = QM( rvY = sc.expon( scale = 1 ) ).fit(None,Y0[:,-1])
+	qm = QM( rvY0 = sc.expon( scale = 1 ) ).fit(None,Y0[:,-1])
 	Y0[:,-1] = qm.predict(Y0[:,-1])
 	
-	qm = QM( rvY = sc.expon( scale = 0.5 ) ).fit(None,X0[:,-1])
+	qm = QM( rvY0 = sc.expon( scale = 0.5 ) ).fit(None,X0[:,-1])
 	X0[:,-1] = qm.predict(X0[:,-1])
 	
-	qm = QM( rvY = sc.expon( scale = 1 ) ).fit(None,X1[:,-1])
+	qm = QM( rvY0 = sc.expon( scale = 1 ) ).fit(None,X1[:,-1])
 	X1[:,-1] = qm.predict(X1[:,-1])
 	
 	X0[X0[:,-1] < np.quantile(X0[:,-1],0.05),-1] = 0

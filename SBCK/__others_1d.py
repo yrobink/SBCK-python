@@ -24,9 +24,16 @@
 import numpy as np
 from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
-from .__QM import Univariate_QM
-from .tools.__rv_extend import rv_empirical
-from .tools.__rv_extend import WrapperStatisticalDistribution
+from .__QM import QM
+
+from .stats.__rv_extend import rv_base
+from .stats.__rv_extend import rv_empirical
+
+from typing import Self
+from typing import Sequence
+from typing import Callable
+from .__AbstractBC import _rv_type
+from .__AbstractBC import _mrv_type
 
 
 ###########
@@ -35,54 +42,70 @@ from .tools.__rv_extend import WrapperStatisticalDistribution
 
 class Univariate_QDM(UnivariateBC):##{{{
 	
-	def __init__( self , delta = "additive" , rvY = np.histogram , rvX = np.histogram ):##{{{
-		super().__init__( "Univariate_QDM" , "NS" )
-		self._delta_method  = np.add
-		self._idelta_method = np.subtract
-		if delta == "multiplicative":
-			self._delta_method  = np.multiply
-			self._idelta_method = np.divide
-		if isinstance(delta,(list,tuple)):
-			self._delta_method  = delta[0]
-			self._idelta_method = delta[1]
+	_rvY0: _rv_type
+	_rvX0: _rv_type
+	_rvX1: _rv_type
+	_planX0Y0: QM | None
+	_planX1Y1: QM | None
+	_delta_method: Callable
+	_idelta_method: Callable
+
+	def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical , delta: str = "additive" ) -> None:##{{{
 		
-		self._qmX0Y0 = None
-		self._qmX1Y1 = None
-		self._qm_kwargs = { "rvY" : rvY , "rvX" : rvX }
+		super().__init__( "dOTC1d" , "NS" )
+		
+		self._rvY0 = rvY0
+		self._rvX0 = rvX0
+		self._rvX1 = rvX1
+		
+		match delta:
+			case "additive":
+				self._delta_method  = np.add
+				self._idelta_method = np.subtract
+			case "multiplicative":
+				self._delta_method  = np.multiply
+				self._idelta_method = np.divide
+			case _:
+				raise ValueError("delta method must be 'additive' or 'multiplicative'")
+
+		self._planX0Y0 = None
+		self._planX1Y1 = None
+		
 	##}}}
 	
-	def fit( self , Y0 , X0 , X1 ):##{{{
-		qmX0Y0 = Univariate_QM(**self._qm_kwargs).fit( Y0 , X0 )
-		qmX1Y0 = Univariate_QM(**self._qm_kwargs).fit( Y0 , X1 )
-		qmX1X0 = Univariate_QM(**self._qm_kwargs).fit( X0 , X1 )
+	def fit( self , Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray ) -> Self:##{{{
 		
-		## Infer Y1
-		D01 = self._idelta_method( X1.reshape(-1,1) , qmX1X0.predict(X1).reshape(-1,1) ).reshape(-1,1)
-		Y1  = self._delta_method( qmX1Y0.predict( X1 ).reshape(-1,1) , D01 ).reshape(X1.shape)
+		## Inference of Y1
+		D0  = QM( rvY0 = self._rvX0 , rvX0 = self._rvY0 ).fit( X0 , Y0 ).predict(Y0)
+		D1  = QM( rvY0 = self._rvX1 , rvX0 = self._rvX0 ).fit( X1 , X0 ).predict(D0)
+		D10 = self._delta_method(D1 , D0)
+		Y1  = self._idelta_method( Y0 , D10 )
 		
-		## store
-		self._Y1 = Y1
-		self._qmX1Y1 = Univariate_QM(**self._qm_kwargs).fit( Y1 , X1 )
-		self._qmX0Y0 = qmX0Y0
+		##
+		self._planX0Y0 = QM( rvY0 = self._rvY0 , rvX0 = self._rvX0 ).fit( Y0 , X0 )
+		self._planX1Y1 = QM(                     rvX0 = self._rvX1 ).fit( Y1 , X1 )
 		
 		return self
 	##}}}
 	
-	def _predictZ0( self , X0 , **kwargs ):##{{{
-		if X0 is None:
-			return None
-		Z0 = self._qmX0Y0.predict( X0 , **kwargs )
-		return Z0
-	##}}}
-	
-	def _predictZ1( self , X1 , **kwargs ):##{{{
+	def _predictZ1( self , X1: np.ndarray | None , reinfer_X1: bool = False , **kwargs ) -> np.ndarray | None:##{{{
 		if X1 is None:
 			return None
-		okwargs = dict(kwargs)
-		if okwargs.get("reinfer_X1",False):
-			okwargs["reinfer_X0"] = True
-		Z1 = self._qmX1Y1.predict( X1 , **okwargs )
+		if reinfer_X1:
+			Z1 = QM( rvY0 = self._planX1Y1._rvY0 ).fit(None,X1).predict(X1)
+		else:
+			Z1 = self._planX1Y1.predict(X1)
 		return Z1
+	##}}}
+	
+	def _predictZ0( self , X0: np.ndarray | None , reinfer_X0: bool = False , **kwargs ) -> np.ndarray | None:##{{{
+		if X0 is None:
+			return None
+		if reinfer_X0:
+			Z0 = QM( rvY0 = self._planX0Y0._rvY0 ).fit(None,X0).predict(X0)
+		else:
+			Z0 = self._planX0Y0.predict(X0)
+		return Z0
 	##}}}
 	
 ##}}}
@@ -105,7 +128,7 @@ class QDM(MultiUBC):##{{{
 	https://doi.org/10.1175/JCLI-D-14- 00754.1, 2015.
 	"""
 	
-	def __init__( self , delta = "additive" , rvY = rv_empirical , rvX = rv_empirical ):##{{{
+	def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical , delta: str = "additive" ):##{{{
 		"""
 		SBCK.QDM.__init__
 		=================
@@ -123,60 +146,47 @@ class QDM(MultiUBC):##{{{
 			Law of models
 		"""
 		
-		## Build args for MultiUBC
-		if not isinstance( delta , (list,tuple) ):
-			if isinstance( rvY , (list,tuple) ):
-				delta = [delta for _ in range(len(rvY))]
-			elif isinstance( rvX , (list,tuple) ):
-				delta = [delta for _ in range(len(rvX))]
-			else:
-				delta = [delta]
-		if not isinstance( rvY , (list,tuple) ):
-			if isinstance( delta , (list,tuple) ):
-				rvY = [rvY for _ in range(len(delta))]
-			elif isinstance( rvX , (list,tuple) ):
-				rvY = [rvY for _ in range(len(rvX))]
-			else:
-				rvY = [rvY]
-		if not isinstance( rvX , (list,tuple) ):
-			if isinstance( delta , (list,tuple) ):
-				rvX = [rvX for _ in range(len(delta))]
-			elif isinstance( rvY , (list,tuple) ):
-				rvX = [rvX for _ in range(len(rvY))]
-			else:
-				rvX = [rvX]
-		if not len(set({len(delta),len(rvX),len(rvY)})) == 1:
-			raise ValueError( "Incoherent arguments between delta, rvY and rvX" )
-		args = [ (dlta,rvy,rvx) for dlta,rvy,rvx in zip(delta,rvY,rvX) ]
-		
 		## And init upper class
-		super().__init__( "QDM" , Univariate_QDM , args = args )
+		args   = tuple()
+		kwargs = { 'delta' : delta , 'rvY0' : rvY0 , 'rvX0' : rvX0 }
+		super().__init__( "QDM" , Univariate_QDM , args = args , kwargs = kwargs )
 	##}}}
 	
 ##}}}
 
-
 class Univariate_QQD(UnivariateBC):##{{{
 	
-	def __init__( self , p_left = 0.01 , p_right = 0.99 ):##{{{
+	_typeY0: type
+	_typeX0: type
+	_typeX1: type
+	_freezeY0: bool
+	_freezeX0: bool
+	_freezeX1: bool
+	rvY0: rv_base | None
+	rvX0: rv_base | None
+	rvX1: rv_base | None
+	rvY1: rv_base | None
+	
+	def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical , p_left: float = 0.01 , p_right: float = 0.99 ) -> None:##{{{
+		
 		super().__init__( "Univariate_QQ" , "NS" )
+		
+		self._typeY0,self._freezeY0,self.rvY0 = self._init(rvY0)
+		self._typeX0,self._freezeX0,self.rvX0 = self._init(rvX0)
+		self._typeX1,self._freezeX1,self.rvX1 = self._init(rvX1)
+		
 		self.p_left  = p_left
 		self.p_right = p_right
 		self._corr_left  = 0
 		self._corr_right = 0
 		
-		self._rvX    = rv_empirical
-		self._rvY    = rv_empirical
-		self.rvY0 = WrapperStatisticalDistribution(self._rvY)
-		self.rvY1 = WrapperStatisticalDistribution(self._rvY)
-		self.rvX0 = WrapperStatisticalDistribution(self._rvX)
 	##}}}
 	
-	def fit( self , Y0 , X0 , X1 ):##{{{
+	def fit( self , Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray ) -> Self:##{{{
 		
-		self.rvY0.fit(Y0)
-		self.rvX0.fit(X0)
-		rvX1 = WrapperStatisticalDistribution(self._rvX).fit(X1)
+		self.rvY0 = self._fit( Y0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		self.rvX0 = self._fit( X0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+		self.rvX1 = self._fit( X1 , self._typeX1 , self._freezeX1 , self.rvX1 )
 		
 		self._corr_left  = self.rvY0.icdf(self.p_left)  - self.rvX0.icdf(self.p_left)
 		self._corr_right = self.rvY0.icdf(self.p_right) - self.rvX0.icdf(self.p_right)
@@ -188,41 +198,40 @@ class Univariate_QQD(UnivariateBC):##{{{
 		## Correction of left tail
 		idxL = cdfX1 < self.p_left
 		if idxL.any():
-			Y1[idxL] = self.rvX0.icdf(rvX1.cdf(X1[idxL])) + self._corr_left
+			Y1[idxL] = self.rvX0.icdf(self.rvX1.cdf(X1[idxL])) + self._corr_left
 		
 		## Correction of right tail
 		idxR = cdfX1 > self.p_right
 		if idxR.any():
-			Y1[idxR] = self.rvX0.icdf(rvX1.cdf(X1[idxR])) + self._corr_right
+			Y1[idxR] = self.rvX0.icdf(self.rvX1.cdf(X1[idxR])) + self._corr_right
 		
 		## And store cdf
-		self.rvY1.fit(Y1)
-		self._Y1 = Y1
+		self.rvY1 = rv_empirical.fit(Y1)
 		
 		return self
 	##}}}
 	
-	def _predictZ0( self , X0 , **kwargs ):##{{{
+	def _predictZ0( self , X0: np.ndarray | None , reinfer_X0: bool = False , **kwargs ) -> np.ndarray | None:##{{{
 		
 		if X0 is None:
 			return None
 		
 		rvX0 = self.rvX0
-		if kwargs.get("reinfer_X0",False):
-			rvX0 = WrapperStatisticalDistribution(self._rvX).fit(X0)
+		if reinfer_X0:
+			rvX0 = self._fit( X0 , self._typeX0 , self._freezeX0 , self.rvX0 )
 		Z0 = self.rvY0.icdf(rvX0.cdf(X0))
 		
 		return Z0
 	##}}}
 	
-	def _predictZ1( self , X1 , **kwargs ):##{{{
+	def _predictZ1( self , X1: np.ndarray | None , reinfer_X1: bool = False  , **kwargs ) -> np.ndarray | None:##{{{
 		
 		if X1 is None:
 			return None
 		
-		rvX1 = self.rvX0 ## Because in QQD rvX1 dont exist!!!
-		if kwargs.get("reinfer_X1",False):
-			rvX1 = WrapperStatisticalDistribution(self._rvX).fit(X1)
+		rvX1 = self.rvX1 ## Because in QQD rvX1 dont exist!!!
+		if reinfer_X1:
+			rvX1 = self._fit( X1 , self._typeX1 , self._freezeX1 , self.rvX1 )
 		Z1 = self.rvY1.icdf(rvX1.cdf(X1))
 		
 		return Z1
@@ -232,7 +241,7 @@ class Univariate_QQD(UnivariateBC):##{{{
 
 class QQD(MultiUBC):##{{{
 	
-	def __init__( self , p_left = 0.01 , p_right = 0.99 ):##{{{
+	def __init__( self ,  rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical , p_left: float = 0.01 , p_right: float = 0.99 ):##{{{
 		"""
 		SBCK.QQD.__init__
 		=================
@@ -255,23 +264,10 @@ class QQD(MultiUBC):##{{{
 			Maximal right quantile
 		"""
 		
-		## Build args for MultiUBC
-		if not isinstance( p_left  , (list,tuple) ):
-			if isinstance( p_right , (list,tuple) ):
-				p_left = [p_left for _ in range(len(p_right))]
-			else:
-				p_left = [p_left]
-		if not isinstance( p_right , (list,tuple) ):
-			if isinstance( p_left , (list,tuple) ):
-				p_right = [p_right for _ in range(len(p_left))]
-			else:
-				p_right = [p_right]
-		if not len(p_left) == len(p_right):
-			raise ValueError( f"Incoherent arguments between p_left and p_right" )
-		args = [ (pL,pR) for pL,pR in zip(p_left,p_right) ]
-		
 		## And init upper class
-		super().__init__( "QQD" , Univariate_QQD , args = args )
+		args   = tuple()
+		kwargs = { 'rvY0' : rvY0 , 'rvX0' : rvX0 , 'rvX1' : rvX1 , 'p_left' : p_left , 'p_right' : p_right }
+		super().__init__( "QQD" , Univariate_QQD , args = args , kwargs = kwargs )
 	##}}}
 	
 ##}}}

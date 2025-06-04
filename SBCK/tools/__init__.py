@@ -37,15 +37,5 @@ from .__shuffle   import SchaakeShuffleRef
 from .__shuffle   import MVQuantilesShuffle
 from .__shuffle   import MVRanksShuffle
 
-from .__rv_extend import rv_base
-from .__rv_extend import rv_empirical
-from .__rv_extend import rv_empirical_ratio
-from .__rv_extend import rv_empirical_gpd
-from .__rv_extend import rv_density
-from .__rv_extend import rv_mixture
-from .__rv_extend import mrv_base
-
-from .__rv_extend import rv_histogram
-from .__rv_extend import rv_ratio_histogram
 
 

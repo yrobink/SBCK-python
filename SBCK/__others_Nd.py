@@ -32,8 +32,8 @@ from .__others_1d import QDM
 from .__CDFt      import CDFt
 
 from .stats.__sparse_distance import wasserstein
+from .stats.__rv_extend import rv_empirical
 from .tools.__misc import SlopeStoppingCriteria
-from .tools.__rv_extend import rv_empirical
 from .tools.__shuffle import SchaakeShuffle
 from .ppp.__PrePostProcessing import PrePostProcessing
 
@@ -214,7 +214,7 @@ class MRec(AbstractBC):##{{{
 	https://doi.org/10.1029/2011WR011524, 2012.
 	"""
 	
-	def __init__( self , rvY = rv_empirical , rvX = rv_empirical ):##{{{
+	def __init__( self , rvY0 = rv_empirical , rvX0 = rv_empirical ):##{{{
 		"""
 		Initialisation of MRec.
 		
@@ -234,8 +234,8 @@ class MRec(AbstractBC):##{{{
 		self._Si_CX0g = None
 		self._re_un_mat = None
 		self.n_features = 0
-		self._rvY = rvY
-		self._rvX = rvX
+		self._rvY0 = rvY0
+		self._rvX0 = rvX0
 	##}}}
 	
 	@io_fit
@@ -255,9 +255,9 @@ class MRec(AbstractBC):##{{{
 		self.n_features = Y0.shape[1]
 		
 		## Transform into Gaussian data
-		self._qmY0 = QM( rvY = sc.norm(0,1) , rvX = self._rvY ).fit( None , Y0 )
-		self._qmX0 = QM( rvY = sc.norm(0,1) , rvX = self._rvX ).fit( None , X0 )
-		self._qmX1 = QM( rvY = sc.norm(0,1) , rvX = self._rvX ).fit( None , X1 )
+		self._qmY0 = QM( rvY0 = sc.norm(0,1) , rvX0 = self._rvY0 ).fit( None , Y0 )
+		self._qmX0 = QM( rvY0 = sc.norm(0,1) , rvX0 = self._rvX0 ).fit( None , X0 )
+		self._qmX1 = QM( rvY0 = sc.norm(0,1) , rvX0 = self._rvX0 ).fit( None , X1 )
 		Y0g = self._qmY0.predict(Y0)
 		X0g = self._qmX0.predict(X0)
 #		X1g = self._qmX1.predict(X1)
@@ -279,7 +279,7 @@ class MRec(AbstractBC):##{{{
 #		X1_recor = np.transpose( self._re_un_mat @ X1g.T )
 		
 		## Final QM
-		self._qmY0 = QM( rvY = self._rvY , rvX = sc.norm ).fit( Y0 , X0_recor )
+		self._qmY0 = QM( rvY0 = self._rvY0 , rvX0 = sc.norm ).fit( Y0 , X0_recor )
 		
 		return self
 	##}}}

@@ -18,13 +18,19 @@
      typing and some corrections.
    - Move SparseHist to this module with bin_width_estimator, and add typing
    - Add new class BaseHist
+   - Add new test file test/SBCK_stats.py
+   - All elements of SBCK.tools.__rv_extend have been moved to SBCK.stats.__rv_extend
+      * Define a new class SBCK.stats.rv_scipy to manage scipy rv
+      * SBCK.tools.WrapperStatisticalDistribution has been removed,
+      * All tests have been updated accordingly
+
 
 ### Changed
 - R2D2 and ECBC are only non-stationary methods.
 - Add normalization in distance SBCK.stats.chebyshev
 
 ### Removed
-- AR2D2 and QMrs are deprecated, use R2D2.
+- AR2D2 and QMrs are removed, use R2D2.
 - Remove SBCK.stats.entropy
 - Remove the module SBCK.metrics (moved to SBCK.stats.__sparse_distance)
 

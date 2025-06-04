@@ -23,6 +23,7 @@
 
 import numpy       as np
 import scipy.stats as sc
+
 from .__AbstractBC import AbstractBC
 from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
@@ -31,10 +32,16 @@ from .__decorators import io_fit
 
 from .stats.__SparseHist import SparseHist
 from .stats.__SparseHist import bin_width_estimator
+from .stats.__rv_extend import rv_base
+from .stats.__rv_extend import rv_empirical
 from .tools.__OT         import POTemd
 from .tools.__linalg import sqrtm
 from .tools.__linalg import choleskym
 
+from typing import Self
+from typing import Sequence
+from .__AbstractBC import _rv_type
+from .__AbstractBC import _mrv_type
 
 ###########
 ## Class ##
@@ -298,54 +305,64 @@ class dOTC(AbstractBC):##{{{
 
 
 class Univariate_dOTC1d(UnivariateBC):##{{{
-	def __init__( self , cov_factor = "std" ):
+	
+	_rvY0: _rv_type
+	_rvX0: _rv_type
+	_rvX1: _rv_type
+	_planX0Y0: QM | None
+	_planX1Y1: QM | None
+
+	def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical ) -> None:##{{{
+		
 		super().__init__( "dOTC1d" , "NS" )
+		
+		self._rvY0 = rvY0
+		self._rvX0 = rvX0
+		self._rvX1 = rvX1
+
 		self._planX0Y0 = None
 		self._planX1Y1 = None
-		self._cov_factor = cov_factor
+		
+	##}}}
 	
-	def fit( self , Y0 , X0 , X1 ):
+	def fit( self , Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray ) -> Self:##{{{
 		
 		## cfactor
-		cfactor = 1.
-		if self._cov_factor == "std":
-			cfactor  = Y0.std() / X0.std()
+		cfactor  = Y0.std() / X0.std()
 		
 		## Inference of Y1
-		planX0X1 = QM().fit( X1 , X0 )
-		planY0X0 = QM().fit( X0 , Y0 )
-		D0       = planY0X0.predict(Y0)
-		D1       = planX0X1.predict(D0)
-		dynamic  = cfactor * (D1 - D0)
-		Y1       = Y0 + dynamic
+		D0  = QM( rvY0 = self._rvX0 , rvX0 = self._rvY0 ).fit( X0 , Y0 ).predict(Y0)
+		D1  = QM( rvY0 = self._rvX1 , rvX0 = self._rvX0 ).fit( X1 , X0 ).predict(D0)
+		D10 = cfactor * (D1 - D0)
+		Y1  = Y0 + D10
 		
 		##
-		self._planX0Y0 = QM().fit( Y0 , X0 )
-		self._planX1Y1 = QM().fit( Y1 , X1 )
+		self._planX0Y0 = QM( rvY0 = self._rvY0 , rvX0 = self._rvX0 ).fit( Y0 , X0 )
+		self._planX1Y1 = QM(                     rvX0 = self._rvX1 ).fit( Y1 , X1 )
 		
 		return self
+	##}}}
 	
-	def _predictZ1( self , X1 , reinfer_X1 = False , **kwargs ):
+	def _predictZ1( self , X1: np.ndarray | None , reinfer_X1: bool = False , **kwargs ) -> np.ndarray | None:##{{{
 		if X1 is None:
 			return None
 		if reinfer_X1:
-			plan = QM( rvY = sc.norm() ).fit(None,X1)
-			plan.ubcm[0].rvY0 = self._planX1Y1.ubcm[0].rvY0
-			Z1 = plan.predict(X1)
+			Z1 = QM( rvY0 = self._planX1Y1._rvY0 ).fit(None,X1).predict(X1)
 		else:
 			Z1 = self._planX1Y1.predict(X1)
 		return Z1
+	##}}}
 	
-	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):
+	def _predictZ0( self , X0: np.ndarray | None , reinfer_X0: bool = False , **kwargs ) -> np.ndarray | None:##{{{
 		if X0 is None:
 			return None
 		if reinfer_X0:
-			plan = QM( rvY = sc.norm() ).fit(None,X0)
-			plan.ubcm[0].rvY0 = self._planX0Y0.ubcm[0].rvY0
-			Z0 = plan.predict(X0)
+			Z0 = QM( rvY0 = self._planX0Y0._rvY0 ).fit(None,X0).predict(X0)
 		else:
 			Z0 = self._planX0Y0.predict(X0)
 		return Z0
+	##}}}
+	
 ##}}}
 
 class dOTC1d(MultiUBC):##{{{
@@ -365,7 +382,9 @@ class dOTC1d(MultiUBC):##{{{
 	corrections with optimal transport, Hydrol. Earth Syst. Sci., 23, 773–786,
 	2019, https://doi.org/10.5194/hess-23-773-2019
 	"""
-	def __init__( self , cov_factor = "std" ):
-		super().__init__( "dOTC1d" , Univariate_dOTC1d , kwargs = { "cov_factor" : cov_factor } )
+	def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical ):
+		args   = tuple()
+		kwargs = { 'rvY0' : rvY0 , 'rvX0' : rvX0 , 'rvX1' : rvX1 }
+		super().__init__( "dOTC1d" , Univariate_dOTC1d , args = args , kwargs = kwargs )
 ##}}}
 

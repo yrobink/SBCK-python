@@ -21,13 +21,27 @@
 ## Libraries ##
 ###############
 
+
 import numpy as np
 import scipy.stats as sc
 import scipy.interpolate as sci
 import scipy.optimize as sco
 
-from .__stats import gpdfit
+from ..tools.__stats import gpdfit
 from ..tools.__sys import deprecated
+
+
+############
+## Typing ##
+############
+
+from typing import Self
+from typing import Callable
+from typing import Tuple
+from typing import Any
+_rv_scipy        = sc._distn_infrastructure.rv_continuous
+_rv_scipy_frozen = sc._distn_infrastructure.rv_continuous_frozen
+_kernel_scipy    = sc._kde.gaussian_kde
 
 
 ##############
@@ -36,7 +50,7 @@ from ..tools.__sys import deprecated
 
 def io_type(func):##{{{
 	"""
-	SBCK.tools.io_type
+	SBCK.stats.io_type
 	==================
 	
 	Decorator of the cdf, icdf and pdf method of rv_base used to cast input
@@ -65,60 +79,72 @@ def io_type(func):##{{{
 
 class rv_base:##{{{
 	"""
-	SBCK.tools.rv_base
+	SBCK.stats.rv_base
 	==================
 	Base class of random variable, used to be derived.
 	"""
 	
-	def __init__(self):##{{{
+	_fcdf:  Callable | None
+	_ficdf: Callable | None
+	_fpdf:  Callable | None
+	
+	def __init__( self , cdf: Callable | None , icdf: Callable | None , pdf: Callable | None , *args , **kwargs ) -> None: ##{{{
+		self._fcdf  =  cdf
+		self._ficdf = icdf
+		self._fpdf  =  pdf
 		pass
 	##}}}
 	
-	def rvs( self , size ):##{{{
+	def rvs( self , size: int ) -> np.ndarray :##{{{
 		return self.icdf( np.random.uniform( size = size ) )
 	##}}}
 	
 	## _cdf, _icdf and _pdf ##{{{
 	
-	def _cdf( self , x ):
-		raise NotImplementedError
+	def _cdf( self , x : np.ndarray | list | float ) -> np.ndarray :
+		return self._fcdf(x)
 	
-	def _icdf( self , p ):
-		raise NotImplementedError
+	def _icdf( self , p : np.ndarray | list | float ) -> np.ndarray :
+		return self._ficdf(p)
 	
-	def _pdf( self , x ):
-		raise NotImplementedError
+	def _pdf( self , x : np.ndarray | list | float ) -> np.ndarray :
+		return self._fpdf(x)
 	
 	##}}}
 	
 	@io_type
-	def cdf( self , x ):##{{{
+	def cdf( self , x : np.ndarray ) -> np.ndarray:##{{{
 		return self._cdf(x)
 	##}}}
 	
 	@io_type
-	def icdf( self , p ):##{{{
+	def icdf( self , p: np.ndarray ) -> np.ndarray:##{{{
 		return self._icdf(p)
 	##}}}
 	
-	def sf( self , x ):##{{{
+	def sf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		return 1 - self.cdf(x)
 	##}}}
 	
-	def isf( self , p ):##{{{
+	def isf( self , p: np.ndarray ) -> np.ndarray:##{{{
 		return self.icdf(1-p)
 	##}}}
 	
-	def ppf( self , p ):##{{{
+	def ppf( self , p: np.ndarray ) -> np.ndarray:##{{{
 		return self.icdf(p)
 	##}}}
 	
 	@io_type
-	def pdf( self , x ):##{{{
+	def pdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		return self._pdf(x)
 	##}}}
 	
-	def _init_icdf_from_cdf( self , xmin , xmax ):##{{{
+	@io_type
+	def logpdf( self , x: np.ndarray ) -> np.ndarray:##{{{
+		return np.log( self._pdf(x) )
+	##}}}
+
+	def _init_icdf_from_cdf( self , xmin: float , xmax: float ) -> Callable:##{{{
 		
 		x    = np.linspace( xmin , xmax , 1000 )
 		p    = self._cdf(x)
@@ -130,19 +156,46 @@ class rv_base:##{{{
 	## Properties ##{{{
 	
 	@property
-	def a(self):
+	def a(self) -> float:
 		return self._icdf(0)
 	
 	@property
-	def b(self):
+	def b(self) -> float:
 		return self._icdf(1)
 	##}}}
 	
 ##}}}
 
+class rv_scipy(rv_base):##{{{
+	
+	_rvSC: _rv_scipy_frozen
+	
+	def __init__( self , rvSC: _rv_scipy_frozen ):##{{{
+		self._rvSC = rvSC
+	##}}}
+	
+	def _cdf( self , x: np.ndarray ):##{{{
+		return self._rvSC.cdf(x)
+	##}}}	
+	
+	def _icdf( self , p: np.ndarray ):##{{{
+		return self._rvSC.ppf(p)
+	##}}}
+	
+	def _pdf( self , x: np.ndarray ):##{{{
+		return self._rvSC.pdf(x)
+	##}}}
+	
+	@staticmethod
+	def fit( X: np.ndarray , type_: _rv_scipy ) -> Self:##{{{
+		return rv_scipy( type_( *type_.fit(X) ) )
+	##}}}
+
+##}}}
+
 class rv_empirical(rv_base):##{{{
 	"""
-	SBCK.tools.rv_empirical
+	SBCK.stats.rv_empirical
 	=======================
 	Empirical histogram class. The differences with scipy.stats.rv_histogram
 	are 1. the fit method and 2. the way to infer the cdf and the icdf. Here:
@@ -151,9 +204,9 @@ class rv_empirical(rv_base):##{{{
 	>>> rvX = rv_empirical( *rv_empirical.fit(X) )
 	"""
 	
-	def __init__( self , cdf = None , icdf = None , pdf = None , *args , X = None , **kwargs ):##{{{
+	def __init__( self , *args: Callable , **kwargs ) -> None:##{{{
 		"""
-		SBCK.tools.rv_empirical.__init__
+		SBCK.stats.rv_empirical.__init__
 		================================
 		
 		Arguments
@@ -164,59 +217,35 @@ class rv_empirical(rv_base):##{{{
 			The inverse of the cdf, infered if X is given
 		pdf: callable | None
 			The probability density function, infered if X is given
-		X: np.ndarray | None
-			Init the rv_empirical with X
 		"""
-		super().__init__()
-		self._fcdf  = None
-		self._ficdf = None
-		self._fpdf  = None
-		if cdf is not None and icdf is not None and pdf is not None:
-			self._fcdf  = cdf
-			self._ficdf = icdf
-			self._fpdf  = pdf
-		elif cdf is not None and icdf is not None and kwargs.get( "no_pdf" , False ):
-			self._fcdf  = cdf
-			self._ficdf = icdf
-		elif X is not None:
-			cdf,icdf,pdf = type(self).fit(X)
-			self._fcdf  = cdf
-			self._ficdf = icdf
-			self._fpdf  = pdf
-		else:
-			raise ValueError( "Bad input arguments" )
+		super().__init__( *args , **kwargs )
 	##}}}
 	
 	@staticmethod
-	def fit( X , *args , **kwargs ):##{{{
+	def fit( X: np.ndarray , *args: Any , bins: int | str = "auto" , bins_min: int = 21 , bins_max: int = 101 , **kwargs: Any ) -> Self:##{{{
 		"""
-		SBCK.tools.rv_empirical.fit
+		SBCK.stats.rv_empirical.fit
 		===========================
 		
 		Fit method
 		
 		Arguments
 		---------
-		X: np.ndarray | None
+		X: np.ndarray
 			Init the rv_empirical with X
-		kwargs:
-			bin_number: int = int(0.1*X.size)
-				Numbers of bin used to infer the pdf, must be between bin_min
-				and bin_max
-			bin_min: int = 21
-				Minimal numbers of bin used to infer the pdf
-			bin_max: int = 101
-				Maximal numbers of bin used to infer the pdf
+		bins: int | str = "auto" int(0.1*X.size)
+			Numbers of bin used to infer the pdf. If 'auto', 0.1 * X.size
+			is used, and values must be between bins_min and bins_max
+		bin_min: int = 21
+			Minimal numbers of bin used to infer the pdf
+		bin_max: int = 101
+			Maximal numbers of bin used to infer the pdf
 		
 		
 		Returns
 		-------
-		cdf: callable
-			The cumulative density function (cdf), infered if X is given
-		icdf: callable
-			The inverse of the cdf, infered if X is given
-		pdf: callable
-			The probability density function, infered if X is given
+		rvX: rv_empirical
+			Random variable initialized
 		"""
 		
 		Xs = np.sort(X.squeeze())
@@ -232,71 +261,50 @@ class rv_empirical(rv_base):##{{{
 		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (0,1) )
 		
 		dq   = 0.05 * (q.max() - q.min())
-		bins = np.linspace( q.min() - dq , q.max() + dq , min( max( kwargs.get("bin_number",int(0.1*X.size)) , kwargs.get("bin_min",21) ) , kwargs.get("bin_max",101) ) )
+		if bins == "auto":
+			bins = int(0.1 * X.size)
+		bins = np.linspace( q.min() - dq , q.max() + dq , min( max( bins , bins_min ) , bins_max ) )
 		h,c  = np.histogram( X , bins , density = True )
 		c    = (c[1:] + c[:-1]) / 2
 		pdf  = sci.interp1d( c , h , bounds_error = False , fill_value = (0,0) ) 
 		
-		return (cdf,icdf,pdf)
+		return rv_empirical( cdf , icdf , pdf )
 	##}}}
-	
-	## _cdf, _icdf and _pdf ##{{{
-	
-	def _cdf( self , x ):
-		return self._fcdf(x)
-	
-	def _icdf( self , p ):
-		return self._ficdf(p)
-	
-	def _pdf( self , x ):
-		return self._fpdf(x)
-	
-	##}}}
-	
 	
 ##}}}
 
 class rv_empirical_ratio(rv_empirical):##{{{
 	"""
-	SBCK.tools.rv_empirical_ratio
+	SBCK.stats.rv_empirical_ratio
 	=============================
-	Extension of SBCK.tools.rv_empirical taking into account of a "ratio" part,
+	Extension of SBCK.stats.rv_empirical taking into account of a "ratio" part,
 	i.e., instead of fitting:
 	P( X < x )
 	We fit separatly the frequency of 0 and:
 	P( X < x | X > 0 )
 	"""
 	
-	def __init__( self , cdf = None , icdf = None , pdf = None , p0 = None , *args , X = None , **kwargs ):##{{{
+	_p0: float
+	
+	def __init__( self , p0: float , *args , **kwargs ) -> None:##{{{
 		"""
-		SBCK.tools.rv_empirical.__init__
+		SBCK.stats.rv_empirical.__init__
 		================================
 		
 		Arguments
 		---------
+		p0: float | None
+			The probability at 0
 		cdf: callable | None
 			The cumulative density function (cdf), infered if X is given
 		icdf: callable | None
 			The inverse of the cdf, infered if X is given
 		pdf: callable | None
 			The probability density function, infered if X is given
-		p0: float | None
-			The probability at 0
-		X: np.ndarray | None
-			Init the rv_empirical_ratio with X
 		"""
 		
 		self._p0  = p0
-		if cdf is not None and icdf is not None and pdf is not None and p0 is not None:
-			super().__init__( cdf , icdf , pdf )
-		elif cdf is not None and icdf is not None and p0 is not None and kwargs.get( "no_pdf" , False ):
-			super().__init__( cdf , icdf , pdf , no_pdf = True )
-		elif X is not None:
-			cdf,icdf,pdf,p0 = type(self).fit(X)
-			super().__init__( cdf , icdf , pdf )
-			self._p0   = p0
-		else:
-			raise ValueError( "Bad input arguments" )
+		super().__init__( *args , **kwargs )
 	##}}}
 	
 	## Properties ##{{{
@@ -308,35 +316,30 @@ class rv_empirical_ratio(rv_empirical):##{{{
 	##}}}
 	
 	@staticmethod
-	def fit( X , *args , **kwargs ):##{{{
+	def fit( X: np.ndarray , *args: Any , **kwargs: Any ) -> Self:##{{{
 		"""
-		SBCK.tools.rv_empirical_ratio.fit
+		SBCK.stats.rv_empirical_ratio.fit
 		=================================
 		
 		Fit method
 		
 		Arguments
 		---------
-		X: np.ndarray | None
+		X: np.ndarray
 			Init the rv_empirical_ratio with X
 		
 		Returns
 		-------
-		cdf: callable
-			The cumulative density function (cdf), infered if X is given
-		icdf: callable
-			The inverse of the cdf, infered if X is given
-		pdf: callable
-			The probability density function, infered if X is given
-		p0: float
-			The probability at 0
+		rvX: rv_empirical_ratio
+			Random variable initialized
 		"""
 		Xp = X[X>0]
 		p0 = 1 - np.sum( X>0 ) / X.size
-		return rv_empirical.fit( Xp , *args , **kwargs) + (p0,)
+		rvXp = rv_empirical.fit(Xp)
+		return rv_empirical_ratio( p0 , rvXp._fcdf , rvXp._ficdf , rvXp._fpdf )
 	##}}}
 	
-	def _cdf( self , x ):##{{{
+	def _cdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		p = np.zeros_like(x) + np.nan
 		idxp = x > 0
 		idxn = x < 0
@@ -347,7 +350,7 @@ class rv_empirical_ratio(rv_empirical):##{{{
 		return p
 	##}}}
 	
-	def _icdf( self , p ):##{{{
+	def _icdf( self , p: np.ndarray ) -> np.ndarray:##{{{
 		
 		x    = np.zeros_like(p) + np.nan
 		idxp = p > self.p0
@@ -357,7 +360,7 @@ class rv_empirical_ratio(rv_empirical):##{{{
 		return x
 	##}}}
 	
-	def _pdf( self , x ):##{{{
+	def _pdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		
 		pdf = np.zeros_like(x) + np.nan
 		xp  = x[x>0].min() / 2
@@ -377,68 +380,48 @@ class rv_empirical_ratio(rv_empirical):##{{{
 
 class rv_empirical_gpd(rv_empirical):##{{{
 	"""
-	SBCK.tools.rv_empirical_gpd
+	SBCK.stats.rv_empirical_gpd
 	===========================
 	Empirical histogram class where tails are given by the fit of Generalized
 	Pareto Distribution.
 	
 	"""
 	
-	def __init__( self , *args , X = None , p = 0.1 , **kwargs ):##{{{
+	_locl: float
+	_locr: float
+	_gpdl: rv_scipy
+	_gpdr: rv_scipy
+	_pl: float
+	_pr: float
+	
+	def __init__( self , locl: float, locr: float, gpdl: rv_scipy, gpdr: rv_scipy, pl: float, pr: float, *args: Callable , **kwargs) -> None: ##{{{
 		"""
-		SBCK.tools.rv_empirical_gpd.__init__
+		SBCK.stats.rv_empirical_gpd.__init__
 		====================================
 		
 		Arguments
 		---------
-		args (if given):
-			cdf: callable
-				The cumulative density function (cdf), infered if X is given
-			icdf: callable
-				The inverse of the cdf, infered if X is given
-			pdf: callable
-				The probability density function, infered if X is given
-			locl: float
-				Location parameter of the left GPD
-			locr: float
-				Location parameter of the right GPD
-			gpdl: scipy.stats.genpareto
-				Law of the left tail
-			gpdr: scipy.stats.genpareto
-				Law of the right tail
-			pl: float
-				Probability of the left tail
-			pr: float
-				Probability of the right tail
-		X: np.ndarray | None
-			Init the rv_empirical_gpd with X
-		p: float | tuple | list
-			Probability of the tailS, i.e.
-			 - if p is a float, left and right tails have a weight of p/2.
-			 - if p is a tuple | list, then pl,pr = p
-			Not used if pl + pr = p are given in args.
+		locl: float
+			Location parameter of the left GPD
+		locr: float
+			Location parameter of the right GPD
+		gpdl: scipy.stats.genpareto
+			Law of the left tail
+		gpdr: scipy.stats.genpareto
+			Law of the right tail
+		pl: float
+			Probability of the left tail
+		pr: float
+			Probability of the right tail
+		cdf: callable
+			The cumulative density function (cdf), infered if X is given
+		icdf: callable
+			The inverse of the cdf, infered if X is given
+		pdf: callable
+			The probability density function, infered if X is given
 		"""
 		
-		if X is not None:
-			cdf,icdf,pdf,locl,locr,gpdl,gpdr,pl,pr = rv_empirical_gpd.fit( X , p )
-		else:
-			if len(args) == 7: ## p is not given
-				cdf,icdf,pdf,locl,locr,gpdl,gpdr = args
-				if isinstance(p,float):
-					pl = p / 2
-					pr = 1 - p / 2
-				else:
-					pl,pr = p
-			elif len(args) == 8: ## p given as a single value
-				cdf,icdf,pdf,locl,locr,gpdl,gpdr,p = args
-				pl = p / 2
-				pr = 1 - p / 2
-			elif len(args) == 9: ## pl and pr are given
-				cdf,icdf,pdf,locl,locr,gpdl,gpdr,pl,pr = args
-			else:
-				raise ValueError("Incoherent arguments")
-		
-		super().__init__( cdf , icdf , pdf )
+		super().__init__( *args , **kwargs )
 		self._locl = locl
 		self._locr = locr
 		self._gpdl = gpdl
@@ -448,32 +431,23 @@ class rv_empirical_gpd(rv_empirical):##{{{
 	##}}}
 	
 	@staticmethod
-	def fit( X , p = 0.1 ):##{{{
+	def fit( X: np.ndarray , *args: Any , pl: float = 0.05 , pr: float = 1 - 0.05 , **kwargs: Any ) -> Self:##{{{
 		"""
-		SBCK.tools.rv_empirical_gpd.fit
+		SBCK.stats.rv_empirical_gpd.fit
 		===============================
 		
 		Arguments
 		---------
 		X: np.ndarray | None
 			Init the rv_empirical_gpd with X
-		p: float | tuple | list
-			Probability of the tailS, i.e.
-			 - if p is a float, left and right tails have a weight of p/2.
-			 - if p is a tuple | list, then pl,pr = p
-			Not used if pl + pr = p are given in args.
+		pl: float = 0.05
+			Probability of the left tail
+		pr: float = 1 - 0.05
+			Probability of the right tail
 		"""
 		
-		## Find pl and pr
-		if isinstance( p , float ):
-			pl = p / 2
-			pr = 1 - p / 2
-		else:
-			pl,pr = p
-		
 		## Location parameter
-		locl = np.quantile( X , pl )
-		locr = np.quantile( X , pr )
+		locl,locr = np.quantile( X , [pl,pr] )
 		
 		## Cut X in the three part
 		idxl = X < locl
@@ -484,20 +458,20 @@ class rv_empirical_gpd(rv_empirical):##{{{
 		Xm   = X[idxm]
 		
 		## Empirical part
-		cdf,icdf,pdf = rv_empirical.fit(Xm)
+		rvXm = rv_empirical.fit(Xm)
 		
 		## GPD left fit
 		scl,shl = gpdfit(-Xl)
-		gpdl    = sc.genpareto( loc = 0 , scale = scl , c = shl )
+		gpdl    = rv_scipy( sc.genpareto( loc = 0 , scale = scl , c = shl ) )
 		
 		## GPD right fit
 		scr,shr = gpdfit(Xr)
-		gpdr    = sc.genpareto( loc = 0 , scale = scr , c = shr )
+		gpdr    = rv_scipy( sc.genpareto( loc = 0 , scale = scr , c = shr ) )
 		
-		return cdf,icdf,pdf,locl,locr,gpdl,gpdr,pl,pr
+		return rv_empirical_gpd( locl , locr , gpdl , gpdr , pl , pr , rvXm._fcdf , rvXm._ficdf , rvXm._fpdf )
 	##}}}
 	
-	def _pdf( self , x ):##{{{
+	def _pdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		
 		pdf = np.zeros_like(x)
 		
@@ -518,7 +492,7 @@ class rv_empirical_gpd(rv_empirical):##{{{
 		return pdf
 	##}}}
 	
-	def _cdf( self , x ):##{{{
+	def _cdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		
 		p = np.zeros_like(x) + np.nan
 		
@@ -539,7 +513,7 @@ class rv_empirical_gpd(rv_empirical):##{{{
 		return p
 	##}}}
 	
-	def _icdf( self , p ):##{{{
+	def _icdf( self , p: np.ndarray ) -> np.ndarray:##{{{
 		
 		x = np.zeros_like(p) + np.nan
 		
@@ -563,35 +537,35 @@ class rv_empirical_gpd(rv_empirical):##{{{
 	## Attributes ##{{{
 	
 	@property
-	def pl(self):
+	def pl(self) -> float:
 		return self._pl
 	
 	@property
-	def pr(self):
+	def pr(self) -> float:
 		return self._pr
 	
 	@property
-	def locl(self):
+	def locl(self) -> float:
 		return self._locl
 	
 	@property
-	def locr(self):
+	def locr(self) -> float:
 		return self._locr
 	
 	@property
-	def scalel(self):
+	def scalel(self) -> float:
 		return float(self._gpdl.kwds["scale"])
 	
 	@property
-	def scaler(self):
+	def scaler(self) -> float:
 		return float(self._gpdr.kwds["scale"])
 	
 	@property
-	def shapel(self):
+	def shapel(self) -> float:
 		return float(self._gpdl.kwds["c"])
 	
 	@property
-	def shaper(self):
+	def shaper(self) -> float:
 		return float(self._gpdr.kwds["c"])
 	
 	##}}}
@@ -600,16 +574,18 @@ class rv_empirical_gpd(rv_empirical):##{{{
 
 class rv_density(rv_base):##{{{
 	"""
-	SBCK.tools.rv_density
+	SBCK.stats.rv_density
 	=====================
 	Empirical density class. Use a gaussian kernel. 'bw_method' argument
 	can be given as kwargs to scipy.stats.gaussian_kde
 	
 	"""
 	
-	def __init__( self , *args , **kwargs ):##{{{
+	_kernel: _kernel_scipy
+
+	def __init__( self , kernel: _kernel_scipy , *args , **kwargs ) -> None:##{{{
 		"""
-		SBCK.tools.rv_density.__init__
+		SBCK.stats.rv_density.__init__
 		==============================
 		
 		Arguments
@@ -627,21 +603,15 @@ class rv_density(rv_base):##{{{
 			bw_method:
 				bandwidth method, see scipy.stats.gaussian_kde
 		"""
-		super().__init__()
-		self._kernel = None
-		if kwargs.get("X") is not None:
-			X = kwargs.get("X")
-			self._kernel = sc.gaussian_kde( X.squeeze() , bw_method = kwargs.get("bw_method") )
-			self._icdf = self._init_icdf_from_cdf( X.min() , X.max() )
-		elif len(args) > 0:
-			self._kernel = args[0]
-			self._icdf = self._init_icdf_from_cdf( args[1] , args[2] )
+		self._kernel = kernel
+		icdf = self._init_icdf_from_cdf( self._kernel.dataset.min() , self._kernel.dataset.max() )
+		super().__init__( None , icdf , None , **kwargs )
 		
 	##}}}
 	
-	def fit( X , bw_method = None ):##{{{
+	def fit( X: np.ndarray , *args: Any , bw_method: str | float | Callable | None = None , **kwargs: Any ) -> Self:##{{{
 		"""
-		SBCK.tools.rv_density.fit
+		SBCK.stats.rv_density.fit
 		=========================
 		
 		Arguments
@@ -660,18 +630,17 @@ class rv_density(rv_base):##{{{
 		xmax: float
 			right bound of the support
 		"""
-		kernel = sc.gaussian_kde( X , bw_method = bw_method )
-		return (kernel,X.min(),X.max())
+		return rv_density( sc.gaussian_kde( X , bw_method = bw_method ) )
 	##}}}
 	
-	def _cdf( self , x ):##{{{
+	def _cdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		cdf = np.apply_along_axis( lambda z: self._kernel.integrate_box_1d( -np.inf , z ) , 1 , x.reshape(-1,1) )
 		cdf[cdf < 0] = 0
 		cdf[cdf > 1] = 1
 		return cdf.squeeze()
 	##}}}
 	
-	def _pdf( self , x ):##{{{
+	def _pdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		return self._kernel.pdf(x)
 	##}}}
 	
@@ -679,68 +648,75 @@ class rv_density(rv_base):##{{{
 
 class rv_mixture(rv_base):##{{{
 	"""
-	SBCK.tools.rv_mixture
+	SBCK.stats.rv_mixture
 	=====================
-	Mixture of distributions. A fit method is implemented, but not really work.
+	Mixture of distributions. The fit method raise a NotImplementedError
 	
 	"""
 	
-	def __init__( self , *args , **kwargs ):##{{{
+	_dist: list[rv_base] = []
+	_weights: np.ndarray
+	
+	def __init__( self , *args: rv_base | _rv_scipy_frozen  , weights: list | np.ndarray | None = None , **kwargs ):##{{{
 		"""
-		SBCK.tools.rv_mixture.__init__
+		SBCK.stats.rv_mixture.__init__
 		==============================
 		
 		Arguments
 		---------
 		args:
-			A list of scipy.stats.* distribution (initialized), and a vector of
-			weights.
+			A list of rv_base based or frozen scipy distribution
+		weights:
+			The weight, default is uniform
 		"""
-		super().__init__()
 		
-		self._dist    = []
-		self._weights = None
+		
+		## Init laws
 		for d in args:
-			if isinstance( d , (list,tuple,np.ndarray) ):
-				self._weights = np.array(d).ravel()
-			else:
+			if isinstance( d, rv_base ):
 				self._dist.append(d)
-		
-		if self._weights is None:
-			if "weights" in kwargs:
-				self._weights = kwargs["weights"]
+			elif isinstance( d , _rv_scipy_frozen ):
+				self._dist.append( rv_scipy(d) )
 			else:
-				self._weights = np.ones(len(self._dist))
-		self._weights  = np.array([self._weights]).ravel()
+				raise ValueError(f"Unknow type of {d}")
+		ndist = len(self._dist)
+		self._weights = None
+		
+		if weights is None:
+			self._weights = np.ones(ndist)
+		else:
+			self._weights = np.array([weights]).ravel()
 		self._weights /= self._weights.sum()
 		
 		## Build the icdf
 		xmin =  np.inf
 		xmax = -np.inf
-		for dist in self._dist:
-			xmin = min( xmin , dist.ppf(  1e-3) )
-			xmax = max( xmax , dist.ppf(1-1e-3) )
-		self._icdf = self._init_icdf_from_cdf(xmin,xmax)
+		for d in self._dist:
+			xmin = min( xmin , d.icdf(  1e-3) )
+			xmax = max( xmax , d.icdf(1-1e-3) )
+		icdf = self._init_icdf_from_cdf(xmin,xmax)
+		
+		super().__init__( None , icdf , None )
 	##}}}
 	
-	def _pdf( self , x ):##{{{
+	def _pdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		pdf = np.zeros_like(x)
-		for i in range(len(self._dist)):
-			pdf += self._dist[i].pdf(x) * self._weights[i]
+		for d,w in zip(self._dist,self._weights):
+			pdf += w * d.pdf(x)
 		return pdf
 	##}}}
 	
-	def _cdf( self , x ):##{{{
+	def _cdf( self , x: np.ndarray ) -> np.ndarray:##{{{
 		cdf = np.zeros_like(x)
-		for i in range(len(self._dist)):
-			cdf += self._dist[i].cdf(x) * self._weights[i]
+		for d,w in zip(self._dist,self._weights):
+			cdf += w * d.cdf(x)
 		return cdf
 	##}}}
 	
 	@staticmethod
-	def fit( X , *args ):##{{{
+	def fit( X: np.ndarray , *args: rv_base | _rv_scipy , **kwargs: Any ) -> Self:##{{{
 		"""
-		SBCK.tools.rv_mixture.fit
+		SBCK.stats.rv_mixture.fit
 		=========================
 		
 		Use a MLE method, but not really work
@@ -757,65 +733,66 @@ class rv_mixture(rv_base):##{{{
 		- A list of scipy.stats.* distribution, initialized
 		- A vector of weights
 		"""
-		
-		## Step 1, find the numbers of parameters
-		nhpars = []
-		x0     = []
-		for law in args:
-			ehpar = list(law.fit(X))
-			x0 = x0 + ehpar
-			nhpars.append( len(ehpar) )
-		thpar = sum(nhpars)
-		
-		## Define the likelihood
-		def mle( x , X , nhpars , *args ):
-			
-			## Extract hyper-parameters and weights
-			thpar = sum(nhpars)
-			hpars = x[:thpar]
-			ws    = np.exp(x[thpar:])
-			ws    = ws / ws.sum()
-			
-			## Split hpar in hpar for each law
-			i0,i1  = 0,0
-			lhpars = []
-			for n in nhpars:
-				i1 = i0 + n
-				lhpars.append(hpars[i0:i1])
-				i0 = i1
-			
-			## And compute likelihood
-			ll = 0
-			for law,hpar,w in zip(args,lhpars,ws):
-				ll += w * law.logpdf( X , *hpar.tolist() ).sum()
-			
-			return -ll
-		
-		## Define the init point
-		x0 = np.array( [x0 + np.zeros(len(args)).tolist()] ).ravel()
-		
-		## Optimization
-		res = sco.minimize( mle , x0 , args = (X,nhpars) + args , method = "Nelder-Mead" )
-		x   = res.x
-		
-		## Split output parameters
-		hpars = x[:thpar]
-		ws    = np.exp(x[thpar:])
-		ws    = ws / ws.sum()
-		i0,i1  = 0,0
-		lhpars = []
-		for n in nhpars:
-			i1 = i0 + n
-			lhpars.append(hpars[i0:i1])
-			i0 = i1
-		
-		##
-		oargs = []
-		for law,hpar in zip(args,lhpars):
-			oargs.append( law( *hpar.tolist() ) )
-		oargs.append(ws)
-		
-		return tuple(oargs)
+		raise NotImplementedError
+#
+#		## Step 1, find the numbers of parameters
+#		nhpars = []
+#		x0     = []
+#		for law in args:
+#			ehpar = list(law.fit(X))
+#			x0 = x0 + ehpar
+#			nhpars.append( len(ehpar) )
+#		thpar = sum(nhpars)
+#		
+#		## Define the likelihood
+#		def mle( x , X , nhpars , *args ):
+#			
+#			## Extract hyper-parameters and weights
+#			thpar = sum(nhpars)
+#			hpars = x[:thpar]
+#			ws    = np.exp(x[thpar:])
+#			ws    = ws / ws.sum()
+#			
+#			## Split hpar in hpar for each law
+#			i0,i1  = 0,0
+#			lhpars = []
+#			for n in nhpars:
+#				i1 = i0 + n
+#				lhpars.append(hpars[i0:i1])
+#				i0 = i1
+#			
+#			## And compute likelihood
+#			ll = 0
+#			for law,hpar,w in zip(args,lhpars,ws):
+#				ll += w * law.logpdf( X , *hpar.tolist() ).sum()
+#			
+#			return -ll
+#		
+#		## Define the init point
+#		x0 = np.array( [x0 + np.zeros(len(args)).tolist()] ).ravel()
+#		
+#		## Optimization
+#		res = sco.minimize( mle , x0 , args = (X,nhpars) + args , method = "Nelder-Mead" )
+#		x   = res.x
+#		
+#		## Split output parameters
+#		hpars = x[:thpar]
+#		ws    = np.exp(x[thpar:])
+#		ws    = ws / ws.sum()
+#		i0,i1  = 0,0
+#		lhpars = []
+#		for n in nhpars:
+#			i1 = i0 + n
+#			lhpars.append(hpars[i0:i1])
+#			i0 = i1
+#		
+#		##
+#		oargs = []
+#		for law,hpar in zip(args,lhpars):
+#			oargs.append( law( *hpar.tolist() ) )
+#		oargs.append(ws)
+#		
+#		return tuple(oargs)
 	##}}}
 	
 ##}}}
@@ -827,44 +804,69 @@ class rv_mixture(rv_base):##{{{
 
 class mrv_base:##{{{
 	"""
-	SBCK.tools.mrv_base
-	==================
+	SBCK.stats.mrv_base
+	===================
 	Class used to transform univariate rv in multivariate rv. Each margins is
 	fitted separately.
 	"""
 	
-	def __init__( self , *args ):
-		self.ndim  = len(args)
-		self._claw = args
-		self._law  = []
+	_dist: list[rv_base]
 	
-	def fit( self , X ):
+	def __init__( self , *args: rv_base | _rv_scipy_frozen ):##{{{
+		self._dist = []
+		for d in args:
+			if isinstance( d, rv_base ):
+				self._dist.append(d)
+			elif isinstance( d , _rv_scipy_frozen ):
+				self._dist.append( rv_scipy(d) )
+			else:
+				raise ValueError(f"Unknow type of {d}")
+	##}}}
+	
+	@staticmethod
+	def fit( X: np.ndarray , *args: rv_base | _rv_scipy ) -> Self:##{{{
+		
+		## Dimensions of X
 		if X.ndim == 1:
 			X = X.reshape(-1,1)
-		if self.ndim == 0:
-			self.ndim  = X.shape[1]
-			self._claw = [rv_empirical for _ in range(self.ndim)]
-		elif not self.ndim == X.shape[1]:
-			raise ValueError( "Dimensions of X not compatible with arguments" )
-		for i in range(self.ndim):
-			claw = self._claw[i]
-			self._law.append( claw( *claw.fit( X[:,i] ) ) )
+		ndim = X.shape[1]
 		
-		return self
+		## distributions
+		dist = args
+		if len(args) == 0:
+			dist = [ rv_empirical for _ in range(ndim) ]
+		if len(args) == 1 and ndim > 1:
+			dist = [ args[0] for _ in range(ndim) ]
+		if not len(dist) == ndim:
+			raise ValueError("Incoherent size between X and law parameters")
+		## Now fit
+		fdist = []
+		for i,d in enumerate(dist):
+			if issubclass( d , rv_base ):
+				fdist.append( d.fit(X[:,i]) )
+			elif isinstance( d , _rv_scipy ):
+				fdist.append( rv_scipy.fit( X[:,i] , d ) )
+			else:
+				raise ValueError(f"Unknow distribution {d}")
+		
+		return mrv_base( *fdist )
+	##}}}
+	
+	## Statistical methods ##{{{
 	
 	def rvs( self , size = 1 ):
-		return np.array( [ self._law[i].rvs(size=size) for i in range(self.ndim) ] ).T.copy()
+		return np.array( [ d.rvs(size=size) for d in self._dist ] ).T.copy()
 	
 	def cdf( self , x ):
 		x = x.reshape(-1,self.ndim)
-		return np.array( [ self._law[i].cdf(x[:,i]) for i in range(self.ndim) ] ).T.copy()
+		return np.array( [ d.cdf(x[:,i]) for i,d in enumerate(self._dist) ] ).T.copy()
 	
 	def sf( self , x ):
 		return 1 - self.cdf(x)
 	
 	def icdf( self , p ):
 		p = p.reshape(-1,self.ndim)
-		return np.array( [ self._law[i].ppf(p[:,i]) for i in range(self.ndim) ] ).T.copy()
+		return np.array( [ d.icdf(p[:,i]) for i,d in enumerate(self._dist) ] ).T.copy()
 	
 	def isf( self , p ):
 		return self.icdf(1-p)
@@ -872,57 +874,15 @@ class mrv_base:##{{{
 	def ppf( self , p ):
 		return self.icdf(p)
 	
-##}}}
-
-
-############################
-## Wrapper of QM and CDFt ##
-############################
-
-class WrapperStatisticalDistribution:##{{{
+	##}}}
 	
-	def __init__( self , law = rv_empirical ):
-		self.law = law
+	## Properties ##{{{
 	
-	def is_frozen( self ):
-		return isinstance(self.law,sc._distn_infrastructure.rv_frozen)
+	@property
+	def ndim(self) -> int:
+		return len(self._dist)
+	##}}}
 	
-	def is_parametric( self ):
-		raise NotImplementedError
-	
-	def cdf( self , x ):
-		return self.law.cdf(x)
-	
-	def icdf( self , p ):
-		return self.law.ppf(p)
-	
-	def fit( self , X ):
-		if not self.is_frozen():
-			self.law = self.law( *self.law.fit( X.squeeze() ) )
-		return self
-##}}}
-
-
-################
-## Deprecated ##
-################
-
-@deprecated( "rv_histogram is renamed rv_empirical since the version 2.0.0" )
-class rv_histogram(rv_empirical):##{{{
-	def __init__( self , *args , **kwargs ):
-		super().__init__(*args,**kwargs)
-##}}}
-
-@deprecated( "rv_ratio_histogram is renamed rv_empirical_ratio since the version 2.0.0" )
-class rv_ratio_histogram(rv_empirical_ratio):##{{{
-	def __init__( self , *args , **kwargs ):
-		super().__init__(*args,**kwargs)
-##}}}
-
-@deprecated( "mrv_histogram is renamed mrv_base since the version 2.0.0" )
-class mrv_histogram(mrv_base):##{{{
-	def __init__( self , *args , **kwargs ):
-		super().__init__(*args,**kwargs)
 ##}}}
 
 

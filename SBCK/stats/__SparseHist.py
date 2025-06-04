@@ -243,6 +243,7 @@ class SparseHist:##{{{
 	def bin_width(self):
 		return self._sparse_hist.bin_width
 	
+	@property
 	def bin_origin(self):
 		return self._sparse_hist.bin_origin
 

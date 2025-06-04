@@ -28,4 +28,12 @@ from .__sparse_distance import euclidean
 from .__sparse_distance import manhattan
 from .__sparse_distance import wasserstein
 
+from .__rv_extend import rv_base
+from .__rv_extend import rv_scipy
+from .__rv_extend import rv_empirical
+from .__rv_extend import rv_empirical_ratio
+from .__rv_extend import rv_empirical_gpd
+from .__rv_extend import rv_density
+from .__rv_extend import rv_mixture
+from .__rv_extend import mrv_base
 

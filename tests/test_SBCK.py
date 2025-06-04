@@ -66,7 +66,7 @@ except Exception:
 
 class SBCKTestParameters:##{{{
 	
-	PLOTFIG = False
+	PLOTFIG: bool = False
 	
 	def __init__( self ):##{{{
 		lpath = os.path.join( *os.path.basename(__file__).split(".")[0].split("_")[1:] )
@@ -211,29 +211,29 @@ class Test_QM(StationaryBCTest,unittest.TestCase):##{{{
 		norm  = sc.norm
 		expon = sc.expon
 		
-		## And define calibration and projection dataset such that the law of each columns are reversed
+		## And define calibration and reference dataset such that the law of each columns are reversed
 		size = 10000
 		Y0   = np.stack( [expon.rvs( scale = 2 , size = size ),norm.rvs( loc = 0 , scale = 1 , size = size )] ).T
 		X0   = np.stack( [norm.rvs( loc = 0 , scale = 1 , size = size ),expon.rvs( scale = 1 , size = size )] ).T
 		
 		## Generally, the law of Y0 and X0 is unknow, so we use the empirical histogram distribution
-		qm0  = bc.QM( rvY = [bct.rv_empirical,bct.rv_empirical] , rvX = [bct.rv_empirical,bct.rv_empirical] ).fit( Y0 , X0 )
+		qm0  = bc.QM( rvY0 = bcs.rv_empirical , rvX0 = bcs.rv_empirical ).fit( Y0 , X0 )
 		Z0_h = qm0.predict(X0)
 		
 		## Actually, this is the default behavior
 		qm1= bc.QM().fit( Y0 , X0 )
-		assert np.abs(Z0_h - qm1.predict(X0)).max() < 1e-12
+		self.assertAlmostEqual( np.abs(Z0_h - qm1.predict(X0)).max() , 0. )
 		
 		## In some case we know the kind of law of Y0 (or X0)
-		qm2   = bc.QM( rvY = [expon,norm] ).fit( Y0 , X0 )
+		qm2   = bc.QM( rvY0 = [expon,norm] ).fit( Y0 , X0 )
 		Z0_Y0 = qm2.predict(X0)
 		
 		## Or, even better, we know the law of the 2nd component of Y0 (or X0)
-		qm3   = bc.QM( rvY = [expon,norm(loc=0,scale=1)] ).fit( Y0 , X0 )
+		qm3   = bc.QM( rvY0 = [expon,norm(loc=0,scale=1)] ).fit( Y0 , X0 )
 		Z0_Y2 = qm3.predict(X0)
 		
 		## Obviously, we can mix all this strategy to build a custom Quantile Mapping
-		qm4   = bc.QM( rvY = [bct.rv_empirical,norm(loc=0,scale=1)] , rvX = [norm,bct.rv_empirical] ).fit( Y0 , X0 )
+		qm4   = bc.QM( rvY0 = [bcs.rv_empirical,norm(loc=0,scale=1)] , rvX0 = [norm,bcs.rv_empirical] ).fit( Y0 , X0 )
 		Z0_Yh = qm4.predict(X0)
 		
 		##
@@ -412,7 +412,7 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 	def test_norm_oob(self):##{{{
 		
 		## Parameters
-		norms       = ["None","mean","meanstd","quant","minmax"]
+		norms       = ["None","origin","dynamical"]
 		oobs        = ["None","CC1","CC5","Y0","Y0CC"]
 		nnorms      = len(norms)
 		noobs       = len(oobs)
@@ -429,9 +429,9 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 			##
 			bins = np.linspace( -5 , 11 , 500 )
 			x    = np.linspace( -5 , 11 , 1000 )
-			rvY0 = bct.rv_density( X = Y0[:,col] )
-			rvX0 = bct.rv_density( X = X0[:,col] )
-			rvX1 = bct.rv_density( X = X1[:,col] )
+			rvY0 = bcs.rv_density.fit( Y0[:,col] )
+			rvX0 = bcs.rv_density.fit( X0[:,col] )
+			rvX1 = bcs.rv_density.fit( X1[:,col] )
 			
 			## Fig parameters
 			colors = ["blue","red","purple","green"]
@@ -449,7 +449,7 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 				corr_kwargs["oob"]  = oob
 				corr = self.corr_class(**corr_kwargs).fit( Y0 , X0 , X1 )
 				Z1 = corr.predict(X1)
-				rvZ1 = bct.rv_density( X = Z1[:,col] )
+				rvZ1 = bcs.rv_density.fit( Z1[:,col] )
 				
 				if self.PLOTFIG:
 					## Figure
@@ -533,7 +533,7 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 	def test_dnorm_oob(self):##{{{
 		
 		## Parameters
-		norms       = [ f"d-{m}" for m in ["None","mean","meanstd","quant","minmax"] ]
+		norms       = ["None","origin","dynamical"]
 		oobs        = ["None","CC1","CC5","Y0","Y0CC"]
 		nnorms      = len(norms)
 		noobs       = len(oobs)
@@ -550,9 +550,9 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 			##
 			bins = np.linspace( -5 , 11 , 500 )
 			x    = np.linspace( -5 , 11 , 1000 )
-			rvY0 = bct.rv_density( X = Y0[:,col] )
-			rvX0 = bct.rv_density( X = X0[:,col] )
-			rvX1 = bct.rv_density( X = X1[:,col] )
+			rvY0 = bcs.rv_density.fit( Y0[:,col] )
+			rvX0 = bcs.rv_density.fit( X0[:,col] )
+			rvX1 = bcs.rv_density.fit( X1[:,col] )
 			
 			if self.PLOTFIG:
 				## Fig parameters
@@ -572,7 +572,7 @@ class Test_CDFt(NonStationaryBCTest,unittest.TestCase):##{{{
 				Z1 = corr.predict(X1)
 				
 				if self.PLOTFIG:
-					rvZ1 = bct.rv_density( X = Z1[:,col] )
+					rvZ1 = bcs.rv_density.fit( Z1[:,col] )
 					
 					## Figure
 					ax = fig.add_subplot( grid[1+2*ioob+1,1+2*inorm+1] )

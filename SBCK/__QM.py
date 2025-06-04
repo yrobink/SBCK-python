@@ -22,11 +22,17 @@
 ###############
 
 import numpy as np
+import scipy.stats as sc
 
 from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
-from .tools.__rv_extend import WrapperStatisticalDistribution
-from .tools.__rv_extend import rv_empirical
+from .stats.__rv_extend import rv_base
+from .stats.__rv_extend import rv_empirical
+
+from typing import Self
+from typing import Sequence
+from .__AbstractBC import _rv_type
+from .__AbstractBC import _mrv_type
 
 
 ###########
@@ -35,26 +41,36 @@ from .tools.__rv_extend import rv_empirical
 
 class Univariate_QM(UnivariateBC):##{{{
 	
-	def __init__( self , rvY = rv_empirical , rvX = rv_empirical ):
-		super().__init__( "Univariate_QM" , "S" )
-		self._rvY = rvY
-		self._rvX = rvX
-		self.rvY0 = WrapperStatisticalDistribution(self._rvY)
-		self.rvX0 = WrapperStatisticalDistribution(self._rvX)
+	_typeX0: type
+	_typeY0: type
+	_freezeX0: bool
+	_freezeY0: bool
+	rvY0: rv_base | None
+	rvX0: rv_base | None
 	
-	def fit( self , Y0 , X0 ):
-		self.rvX0.fit(X0)
-		self.rvY0.fit(Y0)
+	def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical ) -> None:##{{{
+		super().__init__( "Univariate_QM" , "S" )
+		self._typeY0,self._freezeY0,self.rvY0 = self._init(rvY0)
+		self._typeX0,self._freezeX0,self.rvX0 = self._init(rvX0)
+	##}}}
+	
+	def fit( self , Y0: np.ndarray | None , X0: np.ndarray | None ) -> Self:##{{{
+		
+		self.rvY0 = self._fit( Y0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		self.rvX0 = self._fit( X0 , self._typeX0 , self._freezeX0 , self.rvX0 )
 		
 		return self
+		
+		
+	##}}}
 	
-	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):
+	def _predictZ0( self , X0: np.ndarray | None , reinfer_X0: bool = False , **kwargs ) -> np.ndarray:##{{{
+		
 		if X0 is None:
 			return None
 		cdfX0 = self.rvX0.cdf
 		if reinfer_X0:
-			rvX0 = WrapperStatisticalDistribution(self._rvX)
-			rvX0.fit(X0)
+			rvX0 = self._fit( X0 , self._typeX0 , self._freezeX0 , self.rvX0 )
 			cdfX0 = rvX0.cdf
 		eps  = np.sqrt(np.finfo(X0.dtype).resolution)
 		cdf  = cdfX0(X0)
@@ -62,7 +78,10 @@ class Univariate_QM(UnivariateBC):##{{{
 		cdfn = min(           cdf[cdf > 0].min() / 10   ,     eps )
 		cdf = np.where( cdf < 1 , cdf , cdfx )
 		cdf = np.where( cdf > 0 , cdf , cdfn )
+		
 		return self.rvY0.icdf(cdf)
+	##}}}
+	
 ##}}}
 
 class QM(MultiUBC):##{{{
@@ -91,7 +110,7 @@ class QM(MultiUBC):##{{{
 	X0   = np.stack( [norm.rvs( loc = 0 , scale = 1 , size = size ),expon.rvs( scale = 1 , size = size )] ).T
 	
 	## Generally, the law of Y0 and X0 is unknow, so we use the empirical histogram distribution
-	qm   = bc.QM( rvY = [bct.rv_empirical,bct.rv_empirical] , rvX = [bct.rv_empirical,bct.rv_empirical] ).fit( Y0 , X0 )
+	qm   = bc.QM( rvY0 = [bct.rv_empirical,bct.rv_empirical] , rvX0 = [bct.rv_empirical,bct.rv_empirical] ).fit( Y0 , X0 )
 	Z0_h = qm.predict(X0)
 	
 	## Actually, this is the default behavior
@@ -99,15 +118,15 @@ class QM(MultiUBC):##{{{
 	assert np.abs(Z0_h - qm.predict(X0)).max() < 1e-12
 	
 	## In some case we know the kind of law of Y0 (or X0)
-	qm    = bc.QM( rvY = [expon,norm] ).fit( Y0 , X0 )
+	qm    = bc.QM( rvY0 = [expon,norm] ).fit( Y0 , X0 )
 	Z0_Y0 = qm.predict(X0)
 	
 	## Or, even better, we know the law of the 2nd component of Y0 (or X0)
-	qm    = bc.QM( rvY = [expon,norm(loc=0,scale=1)] ).fit( Y0 , X0 )
+	qm    = bc.QM( rvY0 = [expon,norm(loc=0,scale=1)] ).fit( Y0 , X0 )
 	Z0_Y2 = qm.predict(X0)
 	
 	## Obviously, we can mix all this strategy to build a custom Quantile Mapping
-	qm    = bc.QM( rvY = [bct.rv_empirical,norm(loc=0,scale=1)] , rvX = [norm,bct.rv_empirical] ).fit( Y0 , X0 )
+	qm    = bc.QM( rvY0 = [bct.rv_empirical,norm(loc=0,scale=1)] , rvX0 = [norm,bct.rv_empirical] ).fit( Y0 , X0 )
 	Z0_Yh = qm.predict(X0)
 	```
 	
@@ -126,38 +145,25 @@ class QM(MultiUBC):##{{{
 	https://doi.org/10.1016/j.gloplacha.2006.11.030, 2007.
 	"""
 	
-	def __init__( self , rvY = rv_empirical , rvX = rv_empirical ):##{{{
+	def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , **kwargs ) -> None:##{{{
 		"""
 		SBCK.QM.__init__
 		================
 		
 		Arguments
 		---------
-		rvY: SBCK.tools.<law> | scipy.stats.<law>
+		rvY0: type | rv_base | Sequence[type | rv_base]
 			Law of references
-		rvX: SBCK.tools.<law> | scipy.stats.<law>
+		rvX0: type | rv_base | Sequence[type | rv_base]
 			Law of models
 		"""
 		
-		## Build args for MultiUBC
-		if not isinstance( rvY , (list,tuple) ):
-			if isinstance( rvX , (list,tuple) ):
-				rvY = [rvY for _ in range(len(rvX))]
-			else:
-				rvY = [rvY]
-		if not isinstance( rvX , (list,tuple) ):
-			if isinstance( rvY , (list,tuple) ):
-				rvX = [rvX for _ in range(len(rvY))]
-			else:
-				rvX = [rvX]
-		if not len(rvX) == len(rvY):
-			raise ValueError( "Incoherent arguments between rvY and rvX" )
-		args = [ (rvy,rvx) for rvy,rvx in zip(rvY,rvX) ]
 		
-		## And init upper class
-		super().__init__( "QM" , Univariate_QM , args = args )
+		## Init upper class
+		args   = tuple()
+		kwargs = { **{ 'rvY0' : rvY0 , 'rvX0' : rvX0 } , **kwargs }
+		super().__init__( "QM" , Univariate_QM , args = args , kwargs = kwargs )
 	##}}}
 	
 ##}}}
-
 

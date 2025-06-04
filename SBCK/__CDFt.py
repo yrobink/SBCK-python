@@ -40,12 +40,19 @@
 import itertools as itt
 
 import numpy       as np
+import scipy.stats as sc
 import scipy.interpolate as sci
 
 from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
-from .tools.__rv_extend import WrapperStatisticalDistribution
-from .tools.__rv_extend import rv_empirical
+
+from .stats.__rv_extend import rv_base
+from .stats.__rv_extend import rv_empirical
+
+from typing import Self
+from typing import Sequence
+from .__AbstractBC import _rv_type
+from .__AbstractBC import _mrv_type
 
 
 ###########
@@ -54,70 +61,47 @@ from .tools.__rv_extend import rv_empirical
 
 class Univariate_CDFt(UnivariateBC):##{{{
 	
-	class OoB:##{{{
-		
-		def __init__( self , method , **kwargs ):##{{{
-			self.method = str(method)
-			self.pmin   = float(kwargs.get( "oob_pmin" ,     1e-6 ))
-			self.pmax   = float(kwargs.get( "oob_pmax" , 1 - 1e-6 ))
-			self.NCC    =   int(kwargs.get( "oob_NCC"  ,        1 ))
-			if self.method[:2] == "CC":
-				if len(self.method) > 2:
-					self.NCC    = int(self.method[2:])
-					self.method = "CC"
-			if self.method not in ["None","CC","Y0","Y0CC"]:
-				raise ValueError( f"Unknow Out Of Bounds method: '{method}'" )
-		##}}}
-		
-	##}}}
+	_typeY0: type
+	_typeX0: type
+	_typeX1: type
+	_freezeY0: bool
+	_freezeX0: bool
+	_freezeX1: bool
+	rvY0: rv_base | None
+	rvX0: rv_base | None
+	rvX1: rv_base | None
+	rvY1: rv_base | None
+	norm: str
+	oob: str
+	_oob_pmin: float
+	_oob_pmax: float
+	_oob_NCC: int
 	
-	class Norm:##{{{
-		
-		def __init__( self , method , **kwargs ):##{{{
-			self.method    = str(method)
-			self.dynamical = self.method[:2] == "d-"
-			self.e         = kwargs.get("norm_e")
-			
-			if self.dynamical:
-				self.method = self.method[2:]
-			
-			if self.method not in ["None","mean","meanstd","quant","minmax","origin"]:
-				raise ValueError( f"Unknow normalization method: '{method}'" )
-			
-		##}}}
-		
-	##}}}
-	
-	def __init__( self , rvY = rv_empirical , rvX = rv_empirical , norm = "origin" , oob = "Y0" , **kwargs ):##{{{
+	def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical , norm: str = "dynamical" , oob: str = "Y0" , **kwargs ) -> None:##{{{
 		
 		super().__init__( "Univariate_CDFt" , "NS" )
 		
-		self._rvY = rvY
-		self._rvX = rvX
-		self.rvY0 = None
-		self.rvY1 = None
-		self.rvX0 = None
-		self.rvX1 = None
+		self._typeY0,self._freezeY0,self.rvY0 = self._init(rvY0)
+		self._typeX0,self._freezeX0,self.rvX0 = self._init(rvX0)
+		self._typeX1,self._freezeX1,self.rvX1 = self._init(rvX1)
 		
-		self.oob    = self.OoB(   oob , **kwargs )
-		self.norm   = self.Norm( norm , **kwargs )
-		self._tools = {}
+		self.oob       = oob
+		self._oob_pmin = kwargs.get("oob_pmin",1e-2)
+		self._oob_pmax = kwargs.get("oob_pmax",1-1e-2)
+		self._oob_NCC  = kwargs.get("oob_NCC",5)
+		if self.oob.startswith('CC') and len(self.oob) > 2 and self.oob[2:].isdigit():
+			self._oob_NCC = int(self.oob[2:])
+			self.oob      = 'CC'
+		if self.oob.lower() not in ["none","y0","y0cc","cc"]:
+			raise ValueError("Oob must be 'None', 'Y0', 'Y0CC' or 'CC'")
 		
+		self.norm   = norm
+		if self.norm.lower() not in ["none","origin","dynamical"]:
+			raise ValueError(f"Normalization must be 'None', 'origin' or 'dynamical' (= {self.norm})")
+
 	##}}}
 	
-	## Normalization methods ##{{{
-	
-	def _norm_default( self ):##{{{
-		self._tools["Y0s"] = self._tools["Y0"]
-		self._tools["X0s"] = self._tools["X0"]
-		self._tools["X1s"] = self._tools["X1"]
-	##}}}
-	
-	def _norm_origin(self):##{{{
-		
-		Y0 = self._tools["Y0"]
-		X0 = self._tools["X0"]
-		X1 = self._tools["X1"]
+	def _normalization( self , Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray ) -> tuple[np.ndarray,np.ndarray,np.ndarray]:##{{{
 		
 		mY0 = Y0.mean()
 		mX0 = X0.mean()
@@ -125,149 +109,34 @@ class Univariate_CDFt(UnivariateBC):##{{{
 		sY0 = Y0.std()
 		sX0 = X0.std()
 		sX1 = X1.std()
+		NY0 = Y0
 		
-		X0s = (X0 - mX0) * sY0 / sX0 + mY0
-		X1s = (X1 - mX1) * sY0 / sX0 + mX1 + mY0 - mX0
-		
-		self._tools["Y0s"] = Y0
-		self._tools["X0s"] = X0s
-		self._tools["X1s"] = X1s
-	
-	##}}}
-	
-	def _norm_mean( self ):##{{{
-		
-		Y0 = self._tools["Y0"]
-		X0 = self._tools["X0"]
-		X1 = self._tools["X1"]
-		
-		mY0 = Y0.mean()
-		mX0 = X0.mean()
-		mX1 = X1.mean()
-		
-		normX0Y0 = lambda x: ( x - mX0 ) + mY0
-		normX1X0 = lambda x: ( x - mX1 ) + mX0
-		normX0X1 = lambda x: ( x - mX0 ) + mX1
-		
-		X0s = normX0Y0(X0)
-		if not self.norm.dynamical:
-			X1s = normX0Y0(X1)
-		else:
-			X1s = normX0X1(normX0Y0(normX1X0(X1)))
-		
-		self._tools["Y0s"] = Y0
-		self._tools["X0s"] = X0s
-		self._tools["X1s"] = X1s
-	##}}}
-	
-	def _norm_meanstd( self ):##{{{
-		
-		Y0 = self._tools["Y0"]
-		X0 = self._tools["X0"]
-		X1 = self._tools["X1"]
-		
-		mY0 = Y0.mean()
-		mX0 = X0.mean()
-		mX1 = X1.mean()
-		sY0 = Y0.std()
-		sX0 = X0.std()
-		sX1 = X1.std()
-		
-		normX0Y0 = lambda x: ( x - mX0 ) / sX0 * sY0 + mY0
-		normX1X0 = lambda x: ( x - mX1 ) / sX1 * sX0 + mX0
-		normX0X1 = lambda x: ( x - mX0 ) / sX0 * sX1 + mX1
-		
-		X0s = normX0Y0(X0)
-		if not self.norm.dynamical:
-			X1s = normX0Y0(X1)
-		else:
-			X1s = normX0X1(normX0Y0(normX1X0(X1)))
-		
-		self._tools["Y0s"] = Y0
-		self._tools["X0s"] = X0s
-		self._tools["X1s"] = X1s
-	##}}}
-	
-	def _norm_quant( self ):##{{{
-		
-		Y0 = self._tools["Y0"]
-		X0 = self._tools["X0"]
-		X1 = self._tools["X1"]
-		
-		e = self.norm.e
-		if not isinstance(e,float):
-			e = 5 * max( 1 / Y0.size , 1 / X0.size , 1 / X1.size )
-		
-		lX0 = np.quantile( X0 , e )
-		lY0 = np.quantile( Y0 , e )
-		lX1 = np.quantile( X1 , e )
-		
-		uX0 = np.quantile( X0 , 1 - e )
-		uY0 = np.quantile( Y0 , 1 - e )
-		uX1 = np.quantile( X1 , 1 - e )
-		
-		normX0Y0 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uY0 - lY0 ) + lY0
-		normX1X0 = lambda x: ( x - lX1 ) / ( uX1 - lX1 ) * ( uX0 - lX0 ) + lX0
-		normX0X1 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uX1 - lX1 ) + lX1
-		
-		X0s = normX0Y0(X0)
-		if not self.norm.dynamical:
-			X1s = normX0Y0(X1)
-		else:
-			X1s = normX0X1(normX0Y0(normX1X0(X1)))
-		
-		self._tools["Y0s"] = Y0
-		self._tools["X0s"] = X0s
-		self._tools["X1s"] = X1s
-	##}}}
-	
-	def _norm_minmax( self ):##{{{
-		
-		Y0 = self._tools["Y0"]
-		X0 = self._tools["X0"]
-		X1 = self._tools["X1"]
-		
-		lX0 = np.min(X0)
-		lY0 = np.min(Y0)
-		lX1 = np.min(X1)
-		uX0 = np.max(X0)
-		uY0 = np.max(Y0)
-		uX1 = np.max(X1)
-		
-		normX0Y0 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uY0 - lY0 ) + lY0
-		normX1X0 = lambda x: ( x - lX1 ) / ( uX1 - lX1 ) * ( uX0 - lX0 ) + lX0
-		normX0X1 = lambda x: ( x - lX0 ) / ( uX0 - lX0 ) * ( uX1 - lX1 ) + lX1
-		
-		X0s = normX0Y0(X0)
-		if not self.norm.dynamical:
-			X1s = normX0Y0(X1)
-		else:
-			X1s = normX0X1(normX0Y0(normX1X0(X1)))
-		
-		self._tools["Y0s"] = Y0
-		self._tools["X0s"] = X0s
-		self._tools["X1s"] = X1s
-	##}}}
-	
+		match self.norm.lower():
+			case 'none':
+				NX0 = X0
+				NX1 = X1
+			case 'origin':
+				NX0 = (X0 - mX0) * sY0 / sX0 + mY0
+				NX1 = (X1 - mX1) * sY0 / sX0 + mY0 + (mX1 - mX0)
+			case 'dynamical':
+				NX0 = (X0 - mX0) * sY0 / sX0 + mY0
+				NX1 = (X1 - mX1) * sY0 / sX0 + mY0 + (mX1 - mX0) * sY0 / sX0
+		return NY0,NX0,NX1
 	##}}}
 	
 	## Out of Bounds method ##{{{
 	
-	def _find_support(self):##{{{
-		
-		rvY0s = self._tools["rvY0s"]
-		rvX0s = self._tools["rvX0s"]
-		rvX1s = self._tools["rvX1s"]
+	def _find_support( self , rvY0: rv_base , rvX0: rv_base , rvX1: rv_base ) -> tuple[np.ndarray,np.ndarray]:##{{{
 		
 		## First estimation of the support
-		qmin = min([rv.icdf(0) for rv in [rvY0s,rvX0s,rvX1s]])
-		qmax = max([rv.icdf(1) for rv in [rvY0s,rvX0s,rvX1s]])
+		qmin = min([rv.icdf(0) for rv in [rvY0,rvX0,rvX1]])
+		qmax = max([rv.icdf(1) for rv in [rvY0,rvX0,rvX1]])
 		dq   = 0.05 * (qmax - qmin)
 		nq   = 1000
 		q    = np.linspace( qmin - dq , qmax + dq , nq )
 		
 		## Find the associated probabilities
-		cdf = lambda q: rvY0s.cdf( rvX0s.icdf( rvX1s.cdf( q ) ) )
+		cdf = lambda q: rvY0.cdf( rvX0.icdf( rvX1.cdf( q ) ) )
 		p   = cdf(q)
 		
 		## Cut the support
@@ -279,93 +148,101 @@ class Univariate_CDFt(UnivariateBC):##{{{
 		return q,p
 	##}}}
 	
-	def _oob_default(self):##{{{
-		rvY0s = self._tools["rvY0s"]
-		rvX0s = self._tools["rvX0s"]
-		rvX1s = self._tools["rvX1s"]
-		cdf  = lambda q: rvY0s.cdf(  rvX0s.icdf( rvX1s.cdf(  q ) ) )
-		icdf = lambda p: rvX1s.icdf( rvX0s.cdf(  rvY0s.icdf( p ) ) )
-		self.rvY1 = WrapperStatisticalDistribution( rv_empirical( cdf = cdf , icdf = icdf , no_pdf = True ) )
+	def _oob_none( self , NY0: np.ndarray , NX0: np.ndarray , NX1: np.ndarray ) -> rv_base:##{{{
+		
+		rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+		rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+		c_icdf = lambda p: rvNX1.icdf( rvNX0.cdf(  rvNY0.icdf( p ) ) )
+		
+		p = np.linspace( 0 , 1 , 1000 )
+		q = c_icdf(p)
+		
+		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (p[0],p[-1]) )
+		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
+		
+		return rv_empirical( cdf , icdf , None )
 	##}}}
 	
-	def _oob_Y0(self):##{{{
+	def _oob_Y0( self , NY0: np.ndarray , NX0: np.ndarray , NX1: np.ndarray ) -> rv_base:##{{{
 		
-		rvY0s = self._tools["rvY0s"]
-		rvX0s = self._tools["rvX0s"]
-		rvX1s = self._tools["rvX1s"]
+		rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+		rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
 		
-		q,p = self._find_support()
+		q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )
 		
 		## Correct the left tail
-		if p[0] > self.oob.pmin:
-			qmin = q[0] - (rvY0s.icdf(p[0]) - rvY0s.icdf(0))
+		if p[0] > self._oob_pmin:
+			qmin = q[0] - (rvNY0.icdf(p[0]) - rvNY0.icdf(0))
 			qL   = np.linspace( qmin , q[0] , 1000 )
-			pL   = rvY0s.cdf( np.linspace( rvY0s.icdf(0) , rvY0s.icdf(p[0]) , 1000 ) )
+			pL   = rvNY0.cdf( np.linspace( rvNY0.icdf(0) , rvNY0.icdf(p[0]) , 1000 ) )
 			p    = np.hstack( (pL,p) )
 			q    = np.hstack( (qL,q) )
 		
 		## Correct the right tail
-		if p[-1] < self.oob.pmax:
-			qmax = q[-1] + (rvY0s.icdf(1) - rvY0s.icdf(p[-1]))
+		if p[-1] < self._oob_pmax:
+			qmax = q[-1] + (rvNY0.icdf(1) - rvNY0.icdf(p[-1]))
 			qR   = np.linspace( q[-1] , qmax , 1000 )
-			pR   = rvY0s.cdf( np.linspace( rvY0s.icdf(p[-1]) , rvY0s.icdf(1) , 1000 ) )
+			pR   = rvNY0.cdf( np.linspace( rvNY0.icdf(p[-1]) , rvNY0.icdf(1) , 1000 ) )
 			p    = np.hstack( (p,pR) )
 			q    = np.hstack( (q,qR) )
 		
 		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (p[0],p[-1]) )
 		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
-		self.rvY1 = WrapperStatisticalDistribution( rv_empirical( cdf = cdf , icdf = icdf , no_pdf = True ) )
+		
+		return rv_empirical( cdf , icdf , None )
 	##}}}
 	
-	def _oob_Y0CC(self):##{{{
+	def _oob_Y0CC( self , NY0: np.ndarray , NX0: np.ndarray , NX1: np.ndarray ) -> rv_base:##{{{
 		
-		rvY0s = self._tools["rvY0s"]
-		rvX0s = self._tools["rvX0s"]
-		rvX1s = self._tools["rvX1s"]
+		rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+		rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
 		
-		q,p = self._find_support()
+		q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )
 		
 		## Correct the left tail
-		if p[0] > self.oob.pmin:
-			r    = (rvX1s.icdf(p[0]) - rvX1s.icdf(0)) / (rvX0s.icdf(p[0]) - rvX0s.icdf(0))
-			if r == 0: r = 1
-			qmin = q[0] - (rvY0s.icdf(p[0]) - rvY0s.icdf(0)) * r
+		if p[0] > self._oob_pmin:
+			r    = (rvNX1.icdf(p[0]) - rvNX1.icdf(0)) / (rvNX0.icdf(p[0]) - rvNX0.icdf(0))
+			if r == 0:
+				r = 1
+			qmin = q[0] - (rvNY0.icdf(p[0]) - rvNY0.icdf(0)) * r
 			qL   = np.linspace( qmin , q[0] , 1000 )
-			pL   = rvY0s.cdf( np.linspace( rvY0s.icdf(0) , rvY0s.icdf(p[0]) , 1000 ) )
+			pL   = rvNY0.cdf( np.linspace( rvNY0.icdf(0) , rvNY0.icdf(p[0]) , 1000 ) )
 			p    = np.hstack( (pL,p) )
 			q    = np.hstack( (qL,q) )
 		
 		## Correct the right tail
-		if p[-1] < self.oob.pmax:
-			r    = (rvX1s.icdf(1) - rvX1s.icdf(p[-1])) / (rvX0s.icdf(1) - rvX0s.icdf(p[-1]))
-			if r == 0: r = 1
-			qmax = q[-1] + (rvY0s.icdf(1) - rvY0s.icdf(p[-1])) * r
+		if p[-1] < self._oob_pmax:
+			r    = (rvNX1.icdf(1) - rvNX1.icdf(p[-1])) / (rvNX0.icdf(1) - rvNX0.icdf(p[-1]))
+			if r == 0:
+				r = 1
+			qmax = q[-1] + (rvNY0.icdf(1) - rvNY0.icdf(p[-1])) * r
 			qR   = np.linspace( q[-1] , qmax , 1000 )
-			pR   = rvY0s.cdf( np.linspace( rvY0s.icdf(p[-1]) , rvY0s.icdf(1) , 1000 ) )
+			pR   = rvNY0.cdf( np.linspace( rvNY0.icdf(p[-1]) , rvNY0.icdf(1) , 1000 ) )
 			p    = np.hstack( (p,pR) )
 			q    = np.hstack( (q,qR) )
 		
 		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (p[0],p[-1]) )
 		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
-		self.rvY1 = WrapperStatisticalDistribution( rv_empirical( cdf = cdf , icdf = icdf , no_pdf = True ) )
+		
+		return rv_empirical( cdf , icdf , None )
 	##}}}
 	
-	def _oob_CC(self):##{{{
+	def _oob_CC( self , NY0: np.ndarray , NX0: np.ndarray , NX1: np.ndarray ) -> rv_base:##{{{
 		
-		Y0s   = self._tools["Y0s"]
-		X0s   = self._tools["X0s"]
-		X1s   = self._tools["X1s"]
-		rvY0s = self._tools["rvY0s"]
-		rvX0s = self._tools["rvX0s"]
-		rvX1s = self._tools["rvX1s"]
-		NCC   = self.oob.NCC
+		rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+		rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+		NCC    = self._oob_NCC
 		
-		q,p = self._find_support()
+		q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )
 		
 		cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (-np.inf,np.inf) )
 		icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (-np.inf,np.inf) )
 		
-		Z1   = icdf( rvX1s.cdf(X1s) )
+		Z1   = icdf( rvNX1.cdf(NX1) )
 		idxF = np.argsort(Z1.squeeze())
 		idxF = idxF[np.isfinite(Z1.squeeze()[idxF])]
 		idxL = idxF[:NCC]
@@ -375,107 +252,71 @@ class Univariate_CDFt(UnivariateBC):##{{{
 		iL = ~np.isfinite(Z1) & (Z1 < 0)
 		if np.any(iL):
 			## Find D
-			D = np.sum( Z1[idxL] - X1s[idxL] ) / NCC
+			D = np.sum( Z1[idxL] - NX1[idxL] ) / NCC
 			
 			## Apply factor
-			Z1[iL] = X1s[iL] + D
+			Z1[iL] = NX1[iL] + D
 		
 		## Right tail
 		iR = ~np.isfinite(Z1) & (Z1 > 0)
 		if np.any(iR):
 			## Find D
-			D = np.sum( Z1[idxR] - X1s[idxR] ) / NCC
+			D = np.sum( Z1[idxR] - NX1[idxR] ) / NCC
 			
 			## Apply factor
-			Z1[iR] = X1s[iR] + D
+			Z1[iR] = NX1[iR] + D
 		
-		self.rvY1 = WrapperStatisticalDistribution().fit(Z1)
+		return rv_empirical.fit(Z1)
 	##}}}
 	
 	##}}}
 	
 	## Fit / predict functions ##{{{
-	
-	def fit( self , Y0 , X0 , X1 ):##{{{
+
+	def fit( self , Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray ) -> Self:##{{{
 		
-		## Init shared variable
-		self._tools["Y0"]   = Y0
-		self._tools["X0"]   = X0
-		self._tools["X1"]   = X1
-		self._tools["Y0s"]  = Y0
-		self._tools["X0s"]  = X0
-		self._tools["X1s"]  = X1
-		self._tools["rvY0"]  = WrapperStatisticalDistribution(self._rvY)
-		self._tools["rvX0"]  = WrapperStatisticalDistribution(self._rvX)
-		self._tools["rvX1"]  = WrapperStatisticalDistribution(self._rvX)
-		self._tools["rvY0s"] = WrapperStatisticalDistribution(self._rvY)
-		self._tools["rvX0s"] = WrapperStatisticalDistribution(self._rvX)
-		self._tools["rvX1s"] = WrapperStatisticalDistribution(self._rvX)
+		## Fit
+		self.rvY0 = self._fit( Y0 , self._typeY0 , self._freezeY0 , self.rvY0 )
+		self.rvX0 = self._fit( X0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+		self.rvX1 = self._fit( X1 , self._typeX1 , self._freezeX1 , self.rvX1 )
 		
 		## Normalization step
-		match self.norm.method:
-			case "mean":
-				self._norm_mean()
-			case "meanstd":
-				self._norm_meanstd()
-			case "quant":
-				self._norm_quant()
-			case "minmax":
-				self._norm_minmax()
-			case "origin":
-				self._norm_origin()
-			case _:
-				self._norm_default()
-		
-		## Define CDF
-		for K,s in itt.product(["Y0","X0","X1"],["","s"]):
-			YX   = self._tools[f"{K}{s}"]
-			rvYX = self._tools[f"rv{K}{s}"]
-			rvYX.fit(YX)
-			self._tools[f"rv{K}{s}"]  = rvYX
-		self.rvY0  = self._tools["rvY0"]
-		self.rvX0  = self._tools["rvX0"]
-		self.rvX1  = self._tools["rvX1"]
+		NY0,NX0,NX1 = self._normalization( Y0 , X0 , X1 )
 		
 		## Find rvY1 with Out of Bounds conditions
-		match self.oob.method:
+		match self.oob:
 			case "Y0":
-				self._oob_Y0()
+				self.rvY1 = self._oob_Y0( NY0 , NX0 , NX1 )
 			case "Y0CC":
-				self._oob_Y0CC()
+				self.rvY1 = self._oob_Y0CC( NY0 , NX0 , NX1 )
 			case "CC":
-				self._oob_CC()
+				self.rvY1 = self._oob_CC( NY0 , NX0 , NX1 )
 			case _:
-				self._oob_default()
-		
-		##
-		del self._tools
-		
+				self.rvY1 = self._oob_none( NY0 , NX0 , NX1 )
+
 		return self
 	##}}}
 	
-	def _predictZ0( self , X0 , reinfer_X0 = False , **kwargs ):##{{{
+	def _predictZ0( self , X0: np.ndarray | None , reinfer_X0: bool = False , **kwargs ) -> np.ndarray | None:##{{{
 		if X0 is None:
 			return None
 		
 		cdfX0 = self.rvX0.cdf
 		if reinfer_X0:
-			rvX0 = WrapperStatisticalDistribution(self._rvX)
-			rvX0.fit(X0)
+			rvX0 = self._fit( X0 , self._typeX0 , self._freezeX0 , self.rvX0 )
 			cdfX0 = rvX0.cdf
 		Z0 = self.rvY0.icdf( cdfX0(X0) )
 		
 		return Z0
 	##}}}
 	
-	def _predictZ1( self , X1 , reinfer_X1 = False , **kwargs ):##{{{
+	def _predictZ1( self , X1: np.ndarray | None  , reinfer_X1: bool = False , **kwargs ) -> np.ndarray | None:##{{{
 		if X1 is None:
 			return None
 		
 		cdfX1 = self.rvX1.cdf
 		if reinfer_X1:
-			rvX1 = WrapperStatisticalDistribution(self._rvX)
-			rvX1.fit(X1)
+			rvX1 = self._fit( X1 , self._typeX1 , self._freezeX1 , self.rvX1 )
 			cdfX1 = rvX1.cdf
 		Z1 = self.rvY1.icdf( cdfX1(X1) )
 		
@@ -532,17 +373,19 @@ class CDFt(MultiUBC):##{{{
 	https://cran.r-project.org/web/packages/CDFt/index.htmm
 	"""
 	
-	def __init__( self , rvY = rv_empirical , rvX = rv_empirical , norm = "origin" , oob = "Y0" , **kwargs ):##{{{
+	def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical , norm: str | Sequence[str] = "dynamical" , oob: str | Sequence[str] = "Y0" , **kwargs ):##{{{
 		"""
 		SBCK.CDFt.__init__
 		==================
 		
 		Arguments
 		---------
-		rvY: SBCK.tools.<law> | scipy.stats.<law>
+		rvY0: type | rv_base | Sequence[type | rv_base]
 			Law of references
-		rvX: SBCK.tools.<law> | scipy.stats.<law>
-			Law of models
+		rvX0: type | rv_base | Sequence[type | rv_base]
+			Law of models in calibration period
+		rvX1: type | rv_base | Sequence[type | rv_base]
+			Law of models in projection period
 		norm: str
 			Normalisation method
 		oob: str
@@ -558,40 +401,9 @@ class CDFt(MultiUBC):##{{{
 			Maximal value of 'valid' quantile in oob.
 		
 		"""
-		## Build args for MultiUBC
-		if not isinstance( rvY , (list,tuple) ):
-			if isinstance( rvX , (list,tuple) ):
-				rvY = [rvY for _ in range(len(rvX))]
-			else:
-				rvY = [rvY]
-		if not isinstance( rvX , (list,tuple) ):
-			if isinstance( rvY , (list,tuple) ):
-				rvX = [rvX for _ in range(len(rvY))]
-			else:
-				rvX = [rvX]
-		if not len(rvX) == len(rvY):
-			raise ValueError( "Incoherent arguments between rvY and rvX" )
-		args = [ (rvy,rvx) for rvy,rvx in zip(rvY,rvX) ]
-		
-		## Build kwargs for MultiUBC
-		ncorr   = len(args)
-		ikwargs = kwargs
-		ikwargs["norm"] = norm
-		ikwargs["oob"]  = oob
-		kwargs = [{} for _ in range(ncorr)]
-		for key in ikwargs:
-			kwarg = ikwargs[key]
-			if isinstance( kwarg , (list,tuple) ):
-				if len(kwarg) == ncorr:
-					for i in range(ncorr):
-						kwargs[i][key] = kwarg[i]
-				else:
-					raise ValueError( f"Invalid format for kwargs '{key}'" )
-			else:
-				for i in range(ncorr):
-					kwargs[i][key] = kwarg
-		
 		## And init upper class
+		args   = tuple()
+		kwargs = { **{ 'rvY0' : rvY0 , 'rvX0' : rvX0 , 'rvX1' : rvX1 , 'norm' : norm , 'oob' : oob } , **kwargs }
 		super().__init__( "CDFt" , Univariate_CDFt , args = args , kwargs = kwargs )
 	##}}}
 	

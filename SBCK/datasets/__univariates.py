@@ -23,7 +23,7 @@
 
 import numpy       as np
 import scipy.stats as sc
-from ..tools.__rv_extend import rv_mixture
+from ..stats.__rv_extend import rv_mixture
 
 ###############
 ## Functions ##

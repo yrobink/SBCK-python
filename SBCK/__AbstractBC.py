@@ -22,9 +22,21 @@
 #############
 
 import numpy as np
+import scipy.stats as sc
+
+from .stats.__rv_extend import rv_base
+from .stats.__rv_extend import rv_scipy
 
 from .__decorators import io_fit
 from .__decorators import io_predict
+
+from typing import Self
+from typing import Sequence
+from typing import Any
+_rv_scipy        = sc._distn_infrastructure.rv_continuous
+_rv_scipy_frozen = sc._distn_infrastructure.rv_continuous_frozen
+_rv_type  = type | rv_base | _rv_scipy | _rv_scipy_frozen
+_mrv_type = _rv_type | Sequence[_rv_type]
 
 
 #############
@@ -39,7 +51,7 @@ class AbstractBC:##{{{
 	to check if a variable is an instance of a bias correction methods.
 	"""
 	
-	def __init__( self , name , non_stationarity_kind , *args , **kwargs ):##{{{
+	def __init__( self , name: str , non_stationarity_kind: str , *args: Any , **kwargs: Any ) -> None:##{{{
 		self._name = name
 		self._nsk  = non_stationarity_kind
 		self._ndim = 0
@@ -51,10 +63,10 @@ class AbstractBC:##{{{
 	
 	## sys ##{{{
 	
-	def __str__(self):
+	def __str__(self) -> str:
 		return f"SBCK.{self.name}"
 	
-	def __repr__(self):
+	def __repr__(self) -> str:
 		return self.__str__()
 	
 	##}}}
@@ -62,36 +74,36 @@ class AbstractBC:##{{{
 	## Properties ##{{{
 	
 	@property
-	def ndim(self):
+	def ndim(self) -> int:
 		return self._ndim
 	
 	@property
-	def name(self):
+	def name(self) -> str:
 		return self._name
 	
 	@property
-	def is_non_stationary(self):
+	def is_non_stationary(self) -> bool:
 		return self._nsk  == "NS"
 	
 	@property
-	def is_stationary(self):
+	def is_stationary(self) -> bool:
 		return self._nsk == "S"
 	
 	@property
-	def stationarity_is_not_relevant(self):
+	def stationarity_is_not_relevant(self) -> bool:
 		return self._nsk == "None"
 	
 	##}}}
 	
 	## Predict methods ##{{{
 	
-	def _predictZ0( self , Z0 , **kwargs ):
+	def _predictZ0( self , Z0: np.ndarray | None , **kwargs ) -> np.ndarray | None:
 		raise NotImplementedError
 	
-	def _predictZ1( self , Z1 , **kwargs ):
+	def _predictZ1( self , Z1: np.ndarray | None , **kwargs ) -> np.ndarray | None:
 		raise NotImplementedError
 	
-	def _return_predict_pair( self  , Z1 = None , Z0 = None ):
+	def _return_predict_pair( self  , Z1: np.ndarray | None = None , Z0: np.ndarray | None = None ) -> tuple[np.ndarray,np.ndarray] | np.ndarray | None:
 		if Z0 is not None and Z1 is not None:
 			return Z1,Z0
 		if Z1 is None:
@@ -100,7 +112,7 @@ class AbstractBC:##{{{
 			return Z1
 
 	@io_predict
-	def predict( self , *args , **kwargs ):
+	def predict( self , *args: np.ndarray | None , **kwargs: Any ) -> tuple[np.ndarray,np.ndarray] | np.ndarray | None:
 		
 		if self.is_stationary:
 			if len(args) > 1:
@@ -136,10 +148,40 @@ class UnivariateBC(AbstractBC):##{{{
 	to check if a variable is an instance of a univariate bias correction methods.
 	"""
 	
-	def __init__( self , name , non_stationarity_kind , *args , **kwargs ):##{{{
+	def __init__( self , name: str , non_stationarity_kind: str , *args: Any , **kwargs: Any ) -> None:##{{{
 		super().__init__( name , non_stationarity_kind )
 		self._ndim = 1
 		
+	##}}}
+	
+	def _init( self , rv: _rv_type ) -> tuple[type,bool,rv_base | None]:##{{{
+		type_   = None
+		freeze_ = None
+		rv_     = None
+		if isinstance( rv , (type,_rv_scipy) ):
+			type_   = rv
+			freeze_ = False
+			rv_     = None
+		else:
+			freeze_ = True
+			if isinstance( rv , _rv_scipy_frozen ):
+				type_   = rv_scipy
+				rv_     = rv_scipy(rv)
+			else:
+				type_   = type(rv)
+				rv_     = rv
+
+		return type_,freeze_,rv_
+	##}}}
+	
+	def _fit( self , X: np.ndarray | None , type_: type , freeze: bool , rv: rv_base | None ) -> rv_base:##{{{
+		if X is None or freeze:
+			return rv
+		
+		if isinstance( type_ , _rv_scipy ):
+			return rv_scipy.fit( X , type_ )
+		else:
+			return type_.fit( X )
 	##}}}
 	
 ##}}}
@@ -153,8 +195,66 @@ class MultiUBC(AbstractBC):##{{{
 	mapping) to perform in a multivariate context, but margins per margins.
 	"""
 	
+	@staticmethod
+	def _build_margs_from_args( *args: Any , **kwargs: Any ) -> tuple[tuple[Any,...],dict[Any,...]]:##{{{
+		
+		## Find size
+		lsizes = set()
+		for arg in args:
+			if isinstance( arg , (list,tuple) ):
+				lsizes.add(len(arg))
+			else:
+				lsizes.add(1)
+		for key in kwargs:
+			if isinstance( kwargs[key] , (list,tuple) ):
+				lsizes.add(len(kwargs[key]))
+			else:
+				lsizes.add(1)
+		lsizes = sorted(lsizes)
+		if len(lsizes) > 2 or (len(lsizes) == 2 and 1 not in lsizes):
+			raise ValueError("Inconsistent arguments (multiple size)")
+		if len(lsizes) == 2:
+			lsizes.remove(1)
+		size = lsizes[0]
+		
+		zargs = []
+		for arg in args:
+			if size == 1:
+				if isinstance( arg , (list,tuple) ):
+					zargs.append(arg)
+				else:
+					zargs.append([arg])
+			else:
+				if isinstance( arg , (list,tuple) ):
+					zargs.append(arg)
+				else:
+					zargs.append([arg for _ in range(size)])
+		margs = tuple([t for t in zip(*zargs)]) 
+		
+		zkwargs = {}
+		for key in kwargs:
+			elmnt = kwargs[key]
+			if size == 1:
+				if isinstance( elmnt , (list,tuple) ):
+					zkwargs[key] = elmnt
+				else:
+					zkwargs[key] = [elmnt]
+			else:
+				if isinstance( elmnt , (list,tuple) ):
+					zkwargs[key] = elmnt
+				else:
+					zkwargs[key] = [elmnt for _ in range(size)]
+		mkwargs = [ { key : zkwargs[key][i] for key in kwargs } for i in range(size) ]
+		
+		if len(margs) == 0:
+			margs = [ tuple() for _ in range(size) ]
+		if len(mkwargs) == 0:
+			mkwargs = [ {} for _ in range(size) ]
+
+		return margs,mkwargs
+	##}}}
 	
-	def __init__( self , name , ubcm , args = None , kwargs = None ):##{{{
+	def __init__( self , name: str , ubcm: AbstractBC , args: tuple[Any,...] | None = None , kwargs: dict[Any,...] | None = None ) -> None:##{{{
 		"""
 		SBCK.MultiUBC.__init__
 		======================
@@ -172,14 +272,18 @@ class MultiUBC(AbstractBC):##{{{
 			List of kwargs for at each dimensions given at 'ubcm'. If kwargs is
 			not a list or a tuple, it is duplicated for each dimensions.
 		"""
+		
+		margs,mkwargs = self._build_margs_from_args( *args , **kwargs )
+		
 		super().__init__( name , ubcm()._nsk )
+		
 		self.ubcm_class  = ubcm
 		self.ubcm        = []
-		self.ubcm_args   = args
-		self.ubcm_kwargs = kwargs
+		self.ubcm_args   = margs
+		self.ubcm_kwargs = mkwargs
 	##}}}
 	
-	def _check_ubcm_args_kwargs( self , *args ):##{{{
+	def _check_ubcm_args_kwargs( self , *args: Any ) -> None:##{{{
 		
 		## Check args
 		if self.ubcm_args is None:
@@ -213,7 +317,7 @@ class MultiUBC(AbstractBC):##{{{
 	##}}}
 	
 	@io_fit
-	def fit( self , *args , **kwargs ):##{{{
+	def fit( self , *args: np.ndarray | None , **kwargs: Any ) -> Self:##{{{
 		"""
 		Fit the bias correction method
 		
@@ -237,7 +341,7 @@ class MultiUBC(AbstractBC):##{{{
 		return self
 	##}}}
 	
-	def _predictZ0( self , X0 , **kwargs ):##{{{
+	def _predictZ0( self , X0: np.ndarray | None , **kwargs: Any ) -> np.ndarray | None:##{{{
 		X0 = X0.reshape(-1,self.ndim)
 		Z0 = np.zeros_like(X0)
 		## Loop of fit
@@ -246,7 +350,7 @@ class MultiUBC(AbstractBC):##{{{
 		return Z0
 	##}}}
 	
-	def _predictZ1( self , X1 , **kwargs ):##{{{
+	def _predictZ1( self , X1: np.ndarray | None , **kwargs: Any ) -> np.ndarray | None:##{{{
 		X1 = X1.reshape(-1,self.ndim)
 		Z1 = np.zeros_like(X1)
 		## Loop of fit
@@ -256,7 +360,7 @@ class MultiUBC(AbstractBC):##{{{
 	##}}}
 	
 	@io_predict
-	def predict( self , *args , **kwargs ):##{{{
+	def predict( self , *args: np.ndarray | None , **kwargs: Any ) -> tuple[np.ndarray | None,...]:##{{{
 		"""
 		Predict the correction
 		

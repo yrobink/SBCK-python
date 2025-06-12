@@ -24,49 +24,54 @@ import numpy as np
 from ..misc.__sys import deprecated
 
 
+############
+## Typing ##
+############
+
+from typing import Sequence
+from typing import Any
+
+_Array = np.ndarray
+_Cols = Sequence[int] | int | None
+
+
 ###############
 ## Functions ##
 ###############
 
-def allfinite(X):##{{{
-	"""
-	SBCK.ppp.allfinite
-	==================
-	
-	Parameters
-	----------
-	X:
-		Input numpy array
-	
-	Returns
-	-------
-	bool:
-		Return true if all values of X are finite (numpy.finite), else return
-		False.
-	
-	"""
-	return np.all(np.isfinite(X))
-	##}}}
+def allfinite( X: _Array ) -> bool:##{{{
+    """
+    Parameters
+    ----------
+    X: np.ndarray
+        Input numpy array
+    
+    Returns
+    -------
+    bool:
+        Return true if all values of X are finite (numpy.finite), else return
+        False.
+    
+    """
+    return np.all(np.isfinite(X))
+    ##}}}
 
-def atleastonefinite(X):##{{{
-	"""
-	SBCK.ppp.atleastonefinite
-	=========================
-	
-	Parameters
-	----------
-	X:
-		Input numpy array
-	
-	Returns
-	-------
-	bool:
-		Return true if any values of X are finite (numpy.finite), else return
-		False.
-	
-	"""
-	return np.any(np.isfinite(X))
-	##}}}
+def atleastonefinite( X: _Array ) -> bool:##{{{
+    """
+    Parameters
+    ----------
+    X: np.ndarray
+        Input numpy array
+    
+    Returns
+    -------
+    bool:
+        Return true if any values of X are finite (numpy.finite), else return
+        False.
+    
+    """
+    return np.any(np.isfinite(X))
+    ##}}}
 
 
 ################
@@ -74,8 +79,8 @@ def atleastonefinite(X):##{{{
 ################
 
 @deprecated( "skipNotValid is renamed allfinite since the version 2.0.0" )
-def skipNotValid(X):##{{{
-	return allfinite(X)
+def skipNotValid( X: _Array ) -> bool:##{{{
+    return allfinite(X)
 ##}}}
 
 

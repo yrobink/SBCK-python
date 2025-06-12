@@ -20,7 +20,6 @@
 
 from .__linalg    import as2d
 from .__linalg    import sqrtm
-from .__linalg    import choleskym
 
 from .__sys import deprecated
 

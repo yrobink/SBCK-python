@@ -24,18 +24,36 @@
 import warnings
 
 
+############
+## Typing ##
+############
+
+from typing import Any
+from typing import Callable
+
 ###############
 ## Functions ##
 ###############
 
-def deprecated( message ):
-	def decorator(func):
-		def wrapper( *args , **kwargs ):
-			
-			warnings.warn( message = message , category = DeprecationWarning )
-			return func( *args , **kwargs )
-		
-		return wrapper
-	return decorator
+def deprecated( message: str ) -> Callable:##{{{
+    """Decorator to raise a warning message with the warnings package.
 
+    Parameters
+    ----------
+    message: str
+        Message to pass to warnings
+
+    Returns
+    decorator: Callable
+        The decorator
+
+    """
+    def decorator(func: Callable) -> Callable:
+        def wrapper( *args: Any , **kwargs: Any ) -> Any:
+            
+            warnings.warn( message = message , category = DeprecationWarning )
+            return func( *args , **kwargs )
+        return wrapper
+    return decorator
+##}}}
 

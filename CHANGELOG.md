@@ -28,16 +28,20 @@
 - New SBCK.misc modules:
    - Add linalg extension
    - Add sys extension
+- typing all the package
 
 ### Changed
 - R2D2 is only a non-stationary method.
 - Add normalization in distance SBCK.stats.chebyshev
+- Indentation used is 4 spaces instead of tabulation
+- All documentations updated
 
 ### Removed
 - AR2D2 and QMrs are removed, use R2D2.
 - Remove SBCK.ECBC
 - Remove SBCK.stats.entropy
 - Remove the module SBCK.metrics (moved to SBCK.stats.__sparse_distance)
+- Remove the cholesky function, call directly np.linalg.cholesky
 
 ### Fixed
 

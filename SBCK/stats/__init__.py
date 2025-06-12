@@ -28,6 +28,7 @@ from .__sparse_distance import euclidean
 from .__sparse_distance import manhattan
 from .__sparse_distance import wasserstein
 
+from .__rv_extend import rvs_spd_matrix
 from .__rv_extend import rv_base
 from .__rv_extend import rv_scipy
 from .__rv_extend import rv_empirical

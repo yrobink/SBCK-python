@@ -28,276 +28,256 @@ from ..__QM import QM
 from ..stats.__rv_extend import rvs_spd_matrix
 
 
+############
+## Typing ##
+############
+
+_Array = np.ndarray
+
+
 ###############
 ## Functions ##
 ###############
 
-def gaussian_exp_2d(n_samples):##{{{
-	"""
-	SBCK.datasets.gaussian_exp_2d
-	=============================
-	
-	Build a bivariate test dataset.
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period, exp x norm
-		- X0 biased dataset in calibration period, norm x exp
-		- X1 biased dataset in projection period, (norm + 5) x exp
-	"""
-	X0 = np.hstack( ( np.random.normal( size = (n_samples,1) )           , np.random.exponential( size = (n_samples,1)  ) ) )
-	Y0 = np.hstack( ( np.random.exponential( size = (n_samples,1)  )     , np.random.normal( size = (n_samples,1) ) ) )
-	X1 = np.hstack( ( np.random.normal( size = (n_samples,1) , loc = 5 ) , np.random.exponential( size = (n_samples,1)  ) ) )
-	
-	return Y0,X0,X1
+def gaussian_exp_2d( n_samples: int ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a bivariate test dataset.
+    
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in X0, X1 and Y0
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period, exp x norm
+        - X0 biased dataset in calibration period, norm x exp
+        - X1 biased dataset in projection period, (norm + 5) x exp
+    """
+    X0 = np.hstack( ( np.random.normal( size = (n_samples,1) )           , np.random.exponential( size = (n_samples,1)  ) ) )
+    Y0 = np.hstack( ( np.random.exponential( size = (n_samples,1)  )     , np.random.normal( size = (n_samples,1) ) ) )
+    X1 = np.hstack( ( np.random.normal( size = (n_samples,1) , loc = 5 ) , np.random.exponential( size = (n_samples,1)  ) ) )
+    
+    return Y0,X0,X1
 ##}}}
 
-def gaussian_L_2d( n_samples ):##{{{
-	"""
-	SBCK.datasets.gaussian_L_2d
-	===========================
-	
-	Build a bivariate test dataset.
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period, form in "L"
-		- X0 biased dataset in calibration period, gaussian
-		- X1 biased dataset in projection period, gaussian
-	"""
-	## Construction of X0 (biased period 0), X1 (biased period 1) and Y0 (reference period 0)
-	size0  = int(n_samples/2)
-	size1  = n_samples - int(n_samples/4)
-	
-	## Just a gaussian for X0
-	X0 = np.random.multivariate_normal( mean = [0.,0.] , cov = np.identity(2) , size = n_samples )
-	
-	## A lightly complex gaussian for X1
-	X1 = np.random.multivariate_normal( mean = [1.,2.] , cov = [ [2.,0] , [0,0.5] ] , size = n_samples )
-	
-	## A very complex law for Y0
-	Y0 = np.zeros( (n_samples,2) )
-	Y0[:size0,:]      = np.random.multivariate_normal( mean = [7.,7.]   , cov = [[2,0],[0,0.5]]   , size = size0 )
-	Y0[size0:size1,:] = np.random.multivariate_normal( mean = [5.,9.]   , cov = [[0.5,0],[0,2]]   , size = size1 - size0 )
-	Y0[size1:]        = np.random.multivariate_normal( mean = [5.,12.5] , cov = [[0.2,0],[0,0.2]] , size = n_samples - size1 )
-	meanY0 = np.mean( Y0 , axis = 0 )
-	meanX0 = np.mean( X0 , axis = 0 )
-	Y0 = np.apply_along_axis( lambda x : x - meanY0 + meanX0 , 1 , Y0 )
-	
-	return Y0,X0,X1
+def gaussian_L_2d( n_samples: int ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a bivariate test dataset.
+    
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in X0, X1 and Y0
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period, form in "L"
+        - X0 biased dataset in calibration period, gaussian
+        - X1 biased dataset in projection period, gaussian
+    """
+    ## Construction of X0 (biased period 0), X1 (biased period 1) and Y0 (reference period 0)
+    size0  = int(n_samples/2)
+    size1  = n_samples - int(n_samples/4)
+    
+    ## Just a gaussian for X0
+    X0 = np.random.multivariate_normal( mean = [0.,0.] , cov = np.identity(2) , size = n_samples )
+    
+    ## A lightly complex gaussian for X1
+    X1 = np.random.multivariate_normal( mean = [1.,2.] , cov = [ [2.,0] , [0,0.5] ] , size = n_samples )
+    
+    ## A very complex law for Y0
+    Y0 = np.zeros( (n_samples,2) )
+    Y0[:size0,:]      = np.random.multivariate_normal( mean = [7.,7.]   , cov = [[2,0],[0,0.5]]   , size = size0 )
+    Y0[size0:size1,:] = np.random.multivariate_normal( mean = [5.,9.]   , cov = [[0.5,0],[0,2]]   , size = size1 - size0 )
+    Y0[size1:]        = np.random.multivariate_normal( mean = [5.,12.5] , cov = [[0.2,0],[0,0.2]] , size = n_samples - size1 )
+    meanY0 = np.mean( Y0 , axis = 0 )
+    meanX0 = np.mean( X0 , axis = 0 )
+    Y0 = np.apply_along_axis( lambda x : x - meanY0 + meanX0 , 1 , Y0 )
+    
+    return Y0,X0,X1
 ##}}}
 
-def bimodal_reverse_2d( n_samples ):##{{{
-	"""
-	SBCK.datasets.bimodal_reverse_2d
-	================================
-	
-	Build a test dataset such that:
-	- X0 is a bimodal bivariate normal distribution, with different covariance matrix for each mode. Modes are close
-	- X1 is a bimodal bivariate normal distribution, with different covariance matrix for each mode. Modes are differents
-	- Y0 is a bimodal bivariate normal distribution, two modes are the same, but are orthogonal to X0 and X1
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period
-		- X0 biased dataset in calibration period
-		- X1 biased dataset in projection period
-	"""
-	drawn = int(n_samples/2)
-	drawn = [drawn,n_samples-drawn]
-	lmY0   = [ np.array([5,-3]) , np.array( [-3,3] ) ]
-	lcovY0 = [ 0.9 * np.identity(2) , np.identity(2) ]
-	lmX0   = [ np.zeros(2) , np.array( [2,2] ) ]
-	lcovX0 = [ np.identity(2) , 0.5 * np.identity(2) ]
-	lmX1   = [ np.zeros(2) - 1. , np.array( [5,5] ) ]
-	lcovX1 = [ np.identity(2)  * 2 , 0.1 * np.identity(2) ]
-	Y0     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmY0,lcovY0,drawn) ] )
-	X0     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmX0,lcovX0,drawn) ] )
-	X1     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmX1,lcovX1,drawn) ] )
-	return Y0,X0,X1
+def bimodal_reverse_2d( n_samples: int ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a test dataset such that:
+    - X0 is a bimodal bivariate normal distribution, with different covariance matrix for each mode. Modes are close
+    - X1 is a bimodal bivariate normal distribution, with different covariance matrix for each mode. Modes are differents
+    - Y0 is a bimodal bivariate normal distribution, two modes are the same, but are orthogonal to X0 and X1
+    
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in X0, X1 and Y0
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period
+        - X0 biased dataset in calibration period
+        - X1 biased dataset in projection period
+    """
+    drawn = int(n_samples/2)
+    drawn = [drawn,n_samples-drawn]
+    lmY0   = [ np.array([5,-3]) , np.array( [-3,3] ) ]
+    lcovY0 = [ 0.9 * np.identity(2) , np.identity(2) ]
+    lmX0   = [ np.zeros(2) , np.array( [2,2] ) ]
+    lcovX0 = [ np.identity(2) , 0.5 * np.identity(2) ]
+    lmX1   = [ np.zeros(2) - 1. , np.array( [5,5] ) ]
+    lcovX1 = [ np.identity(2)  * 2 , 0.1 * np.identity(2) ]
+    Y0     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmY0,lcovY0,drawn) ] )
+    X0     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmX0,lcovX0,drawn) ] )
+    X1     = np.vstack( [ np.random.multivariate_normal( mean = m , cov = cov , size = draw ) for m,cov,draw in zip(lmX1,lcovX1,drawn) ] )
+    return Y0,X0,X1
 ##}}}
 
-def gaussian_dd( n_samples , n_features = 2 ):##{{{
-	"""
-	SBCK.datasets.gaussian_dd
-	=========================
-	
-	Build a test dataset such that X0, X1 and Y0 are multivariate normal distribution.
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	n_features : integer
-		dimension, default is 2
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period
-		- X0 biased dataset in calibration period
-		- X1 biased dataset in projection period
-	"""
+def gaussian_dd( n_samples: int , ndim: int = 2 ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a test dataset such that X0, X1 and Y0 are multivariate normal
+    distribution.
+    
+    Parameters
+    ----------
+    n_samples: int
+        Number of samples in X0, X1 and Y0
+    ndim: int
+        dimension, default is 2
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period
+        - X0 biased dataset in calibration period
+        - X1 biased dataset in projection period
+    """
 
-	X0 = np.random.multivariate_normal( mean = np.zeros(n_features)     , cov = rvs_spd_matrix(n_features) , size = n_samples )
-	X1 = np.random.multivariate_normal( mean = np.zeros(n_features) + 5 , cov = rvs_spd_matrix(n_features) , size = n_samples )
-	Y0 = np.random.multivariate_normal( mean = np.zeros(n_features) - 2 , cov = rvs_spd_matrix(n_features) , size = n_samples )
-	return Y0,X0,X1
+    X0 = np.random.multivariate_normal( mean = np.zeros(n_features)     , cov = rvs_spd_matrix(n_features) , size = n_samples )
+    X1 = np.random.multivariate_normal( mean = np.zeros(n_features) + 5 , cov = rvs_spd_matrix(n_features) , size = n_samples )
+    Y0 = np.random.multivariate_normal( mean = np.zeros(n_features) - 2 , cov = rvs_spd_matrix(n_features) , size = n_samples )
+    return Y0,X0,X1
 ##}}}
 
-def like_tas_pr( n_samples ):##{{{
-	"""
-	SBCK.datasets.like_tas_pr
-	=========================
-	
-	Build a test dataset such that X0, X1 and Y0 are similar to temperature/
-	precipitation.
-	
-	The method is the following:
-	- Data from a multivariate normal law (dim = 2) are drawn
-	- The quantile mapping is used to map the last column into the exponential law
-	- Values lower than a fixed quantile are replaced by 0
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period
-		- X0 biased dataset in calibration period
-		- X1 biased dataset in projection period
-	"""
-	n_dim = 2
-	
-	mX0   = np.array([5 for _ in range(n_dim-1)] + [0])
-	mX1   = np.array([8 for _ in range(n_dim-1)] + [0])
-	mY0   = np.zeros(n_dim)
-	covX0 = rvs_spd_matrix(n_dim)
-	covX1 = rvs_spd_matrix(n_dim)
-	covY0 = rvs_spd_matrix(n_dim)
-	
-	X0 = np.random.multivariate_normal( mean = mX0 , cov = covX0 , size = n_samples )
-	X1 = np.random.multivariate_normal( mean = mX1 , cov = covX1 , size = n_samples )
-	Y0 = np.random.multivariate_normal( mean = mY0 , cov = covY0 , size = n_samples )
-	
-	qm = QM( rvY0 = sc.expon( scale = 1 ) ).fit(None,Y0[:,-1])
-	Y0[:,-1] = qm.predict(Y0[:,-1])
-	
-	qm = QM( rvY0 = sc.expon( scale = 0.5 ) ).fit(None,X0[:,-1])
-	X0[:,-1] = qm.predict(X0[:,-1])
-	
-	qm = QM( rvY0 = sc.expon( scale = 1 ) ).fit(None,X1[:,-1])
-	X1[:,-1] = qm.predict(X1[:,-1])
-	
-	X0[X0[:,-1] < np.quantile(X0[:,-1],0.05),-1] = 0
-	X1[X0[:,-1] < np.quantile(X1[:,-1],0.10),-1] = 0
-	Y0[Y0[:,-1] < np.quantile(Y0[:,-1],0.35),-1] = 0
-	
-	return Y0,X0,X1
+def like_tas_pr( n_samples: int ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a test dataset such that X0, X1 and Y0 are similar to the couple
+    temperature / precipitation.
+    
+    The method is the following:
+    - Data from a multivariate normal law (dim = 2) are drawn
+    - The quantile mapping is used to map the last column into the exponential law
+    - Values lower than a fixed quantile are replaced by 0
+    
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in X0, X1 and Y0
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period
+        - X0 biased dataset in calibration period
+        - X1 biased dataset in projection period
+    """
+    n_dim = 2
+    
+    mX0   = np.array([5 for _ in range(n_dim-1)] + [0])
+    mX1   = np.array([8 for _ in range(n_dim-1)] + [0])
+    mY0   = np.zeros(n_dim)
+    covX0 = rvs_spd_matrix(n_dim)
+    covX1 = rvs_spd_matrix(n_dim)
+    covY0 = rvs_spd_matrix(n_dim)
+    
+    X0 = np.random.multivariate_normal( mean = mX0 , cov = covX0 , size = n_samples )
+    X1 = np.random.multivariate_normal( mean = mX1 , cov = covX1 , size = n_samples )
+    Y0 = np.random.multivariate_normal( mean = mY0 , cov = covY0 , size = n_samples )
+    
+    qm = QM( rvY0 = sc.expon( scale = 1 ) ).fit(None,Y0[:,-1])
+    Y0[:,-1] = qm.predict(Y0[:,-1])
+    
+    qm = QM( rvY0 = sc.expon( scale = 0.5 ) ).fit(None,X0[:,-1])
+    X0[:,-1] = qm.predict(X0[:,-1])
+    
+    qm = QM( rvY0 = sc.expon( scale = 1 ) ).fit(None,X1[:,-1])
+    X1[:,-1] = qm.predict(X1[:,-1])
+    
+    X0[X0[:,-1] < np.quantile(X0[:,-1],0.05),-1] = 0
+    X1[X0[:,-1] < np.quantile(X1[:,-1],0.10),-1] = 0
+    Y0[Y0[:,-1] < np.quantile(Y0[:,-1],0.35),-1] = 0
+    
+    return Y0,X0,X1
 ##}}}
 
-def gaussian_scale_problem( n_samples ):##{{{
-	"""
-	SBCK.datasets.gaussian_scale_problem
-	====================================
-	
-	Build a test dataset where the change in the evolution of the scale is hard
-	to correct.
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period
-		- X0 biased dataset in calibration period
-		- X1 biased dataset in projection period
-	"""
-	Y0 = np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) )
-	X0 = np.random.normal( loc = 0 , scale = 1.  , size = (n_samples,2) ) + np.array([0,5])
-	X1 = np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) ) + np.array([5,5])
-	
-	return Y0,X0,X1
+def gaussian_scale_problem( n_samples: int ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a test dataset where the change in the evolution of the scale is
+    hard to correct.
+    
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in X0, X1 and Y0
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period
+        - X0 biased dataset in calibration period
+        - X1 biased dataset in projection period
+    """
+    Y0 = np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) )
+    X0 = np.random.normal( loc = 0 , scale = 1.  , size = (n_samples,2) ) + np.array([0,5])
+    X1 = np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) ) + np.array([5,5])
+    
+    return Y0,X0,X1
 ##}}}
 
-def weird_dep_structure( n_samples ):##{{{
-	"""
-	SBCK.datasets.weird_dep_structure
-	=================================
-	
-	Build a test dataset such that X0, X1 and Y0 have a very complex dependence
-	structure.
-	
-	Parameters
-	----------
-	n_samples : integer
-		Number of samples in X0, X1 and Y0
-	
-	Returns
-	-------
-	Y0,X0,X1 : tuple
-		- Y0 reference dataset in calibration period
-		- X0 biased dataset in calibration period
-		- X1 biased dataset in projection period
-	"""
-	
-	Y0 = np.zeros( (n_samples,2) )
-	X0 = np.zeros( (n_samples,2) )
-	X1 = np.zeros( (n_samples,2) )
-	
-	##
-	dsize0 = int(n_samples/2)
-	dsize1 = n_samples - dsize0
-	Y0[:dsize0,0] = np.linspace(-1,1,dsize0)
-	Y0[:dsize0,1] = np.linspace(-1,1,dsize0)
-	Y0[dsize0:,0] = np.linspace(-1,1,dsize1)
-	Y0[dsize0:,1] = np.linspace(-1,1,dsize1)[::-1]
-	Y0 += np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) )
-	
-	##
-	X0[:,0] = np.cos( np.linspace( 0 , 2*np.pi , n_samples ) )
-	X0[:,1] = np.sin( np.linspace( 0 , 2*np.pi , n_samples ) )
-	X0 += np.random.exponential( scale = 0.1 , size = (n_samples,2) )
-	
-	##
-	X1[:,0] = np.linspace( 0 , 2 , n_samples )
-	X1[:,1] = np.sin(np.linspace(0,4*np.pi,n_samples))
-	X1 += np.random.normal( loc = 0 , scale = 0.05 , size = (n_samples,2) )
-	
-	## Center scale
-	Y0 = (Y0 - Y0.mean(0)) / Y0.std(0)
-	X0 = (X0 - X0.mean(0)) / X0.std(0)
-	X1 = (X1 - X1.mean(0)) / X1.std(0)
-	
-	## Add change in mean std
-	Y0 = Y0 * np.array([1.5,0.5]) + np.array([-1,-0.5])
-	X1 = X1 * np.array([1.5,1]) + np.array([2,1])
-	
-	return Y0,X0,X1
+def weird_dep_structure( n_samples: int ) -> tuple[_Array,_Array,_Array]:##{{{
+    """Build a test dataset such that X0, X1 and Y0 have a very complex
+    dependence structure.
+    
+    Parameters
+    ----------
+    n_samples : integer
+        Number of samples in X0, X1 and Y0
+    
+    Returns
+    -------
+    Y0,X0,X1 : tuple
+        - Y0 reference dataset in calibration period
+        - X0 biased dataset in calibration period
+        - X1 biased dataset in projection period
+    """
+    
+    Y0 = np.zeros( (n_samples,2) )
+    X0 = np.zeros( (n_samples,2) )
+    X1 = np.zeros( (n_samples,2) )
+    
+    ##
+    dsize0 = int(n_samples/2)
+    dsize1 = n_samples - dsize0
+    Y0[:dsize0,0] = np.linspace(-1,1,dsize0)
+    Y0[:dsize0,1] = np.linspace(-1,1,dsize0)
+    Y0[dsize0:,0] = np.linspace(-1,1,dsize1)
+    Y0[dsize0:,1] = np.linspace(-1,1,dsize1)[::-1]
+    Y0 += np.random.normal( loc = 0 , scale = 0.1 , size = (n_samples,2) )
+    
+    ##
+    X0[:,0] = np.cos( np.linspace( 0 , 2*np.pi , n_samples ) )
+    X0[:,1] = np.sin( np.linspace( 0 , 2*np.pi , n_samples ) )
+    X0 += np.random.exponential( scale = 0.1 , size = (n_samples,2) )
+    
+    ##
+    X1[:,0] = np.linspace( 0 , 2 , n_samples )
+    X1[:,1] = np.sin(np.linspace(0,4*np.pi,n_samples))
+    X1 += np.random.normal( loc = 0 , scale = 0.05 , size = (n_samples,2) )
+    
+    ## Center scale
+    Y0 = (Y0 - Y0.mean(0)) / Y0.std(0)
+    X0 = (X0 - X0.mean(0)) / X0.std(0)
+    X1 = (X1 - X1.mean(0)) / X1.std(0)
+    
+    ## Add change in mean std
+    Y0 = Y0 * np.array([1.5,0.5]) + np.array([-1,-0.5])
+    X1 = X1 * np.array([1.5,1]) + np.array([2,1])
+    
+    return Y0,X0,X1
 ##}}}
 
 

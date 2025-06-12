@@ -21,306 +21,335 @@
 ## Libraries ##
 ###############
 
+import warnings
 import numpy as np
 import scipy.spatial.distance as ssd
-#from .__tools_cpp import network_simplex
 import ot
+from .__SparseHist import SparseHist
+
+
+############
+## Typing ##
+############
+
+_Array = np.ndarray
+from typing import Any
+from typing import Callable
+
 
 #############
 ## Classes ##
 #############
 
 class OTHist:##{{{
-	def __init__( self , c , p ):
-		self.p = p
-		self.c = c
+
+    p: _Array
+    c: _Array
+
+    def __init__( self , c: _Array , p: _Array ):
+        self.p = p
+        self.c = c
 ##}}}
 
 class POTemd:##{{{
-	"""
-	SBCK.tools.POTemd
-	=================
-	
-	Earth Mover Distance (emd) solver from the POT package.
-	see https://pythonot.github.io
-	
-	"""
-	
-	def __init__( self , power = 2 , numItermax = 100_000_000):##{{{
-		"""
-		Initialisation of solver
-		
-		Parameters
-		----------
-		power : float
-			Power of the plan (default = 2)
-		"""
-		self.C = None
-		self.P = None
-		self.power = power
-		self.state = True
-		self.numItermax = numItermax
-		
-	##}}}
-	
-	def fit( self , mu0 , mu1 , C = None ):##{{{
-		"""
-		Fit optimal plan from two measures mu0 and mu1. The measures must have the arguments "c" (center of bins) and "p" (probability of bins)
-		
-		Parameters
-		----------
-		mu0 : (SBCK.SparseHist)
-			Source histogram
-		mu1 : (SBCK.SparseHist)
-			Target histogram
-		"""
-		self.C = C
-		if C is None:
-			self.C = ssd.cdist( mu0.c , mu1.c )
-		self.C = self.C**self.power
-		
-		try:
-			_,out = ot.emd2( mu0.p , mu1.p , self.C , return_matrix = True , numItermax = self.numItermax )
-			self.P = out['G']
-			self.state = True
-		except Exception as e:
-			print(e)
-			self.state = False
-	##}}}
-	
-	def plan(self):##{{{
-		"""
-		Return plan estimated
-		
-		Return
-		------
-		P : np.array
-			Plan
-		"""
-		return self.P
-	##}}}
-	
+    """
+    Earth Mover Distance (emd) solver from the POT package.
+    see https://pythonot.github.io
+    
+    """
+    
+    C: _Array
+    P: _Array
+    power: float
+    state: bool
+    numItermax: int
+
+    def __init__( self , power: float = 2 , numItermax: int = 100_000_000):##{{{
+        """
+        Initialisation of solver
+        
+        Parameters
+        ----------
+        power : float
+            Power of the plan (default = 2)
+        """
+        self.power = power
+        self.state = True
+        self.numItermax = numItermax
+        
+    ##}}}
+    
+    def fit( self , mu0: SparseHist | OTHist , mu1: SparseHist | OTHist , C: _Array | None = None ) -> None:##{{{
+        """Fit optimal plan from two measures mu0 and mu1.
+        
+        Parameters
+        ----------
+        mu0: SBCK.stats.SparseHist | SBCK.stats.OTHist
+            Source histogram
+        mu1: SBCK.stats.SparseHist | SBCK.stats.OTHist
+            Target histogram
+        C: numpy.ndarray | None
+            Cost matrix or None 
+        """
+        self.C = C
+        if C is None:
+            self.C = ssd.cdist( mu0.c , mu1.c )
+        self.C = self.C**self.power
+        
+        try:
+            _,out = ot.emd2( mu0.p , mu1.p , self.C , return_matrix = True , numItermax = self.numItermax )
+            self.P = out['G']
+            self.state = True
+        except Exception as e:
+            warnings.warn(e)
+            self.state = False
+    ##}}}
+    
+    def proj0(self) -> _Array:##{{{
+        """Projection on first margin
+        
+        Returns
+        -------
+        p0 : numpy.array
+            Vector of probability of the first margin (from plan)
+        """
+        return self.P.mean( axis = 1 )
+    ##}}}
+
+    def proj1(self) -> _Array:##{{{
+        """Projection on second margin
+        
+        Returns
+        -------
+        p1 : numpy.array
+            Vector of probability of the second margin (from plan)
+        """
+        return self.P.mean( axis = 0 )
+    ##}}}
+    
+    def plan(self) -> _Array:##{{{
+        """Return plan estimated
+        
+        Return
+        ------
+        P : numpy.ndarray
+            Plan
+        """
+        return self.P
+    ##}}}
+    
 ##}}}
 
 
 class OTSinkhorn:##{{{
-	"""
-	SBCK.tools.OTSinkhorn
-	=====================
-	
-	Sinkhorn method to solve optimal transport problem
-	
-	References
-	==========
-	Sinkhorn Distances: Lightspeed Computation of Optimal Transportation Distances. arXiv, https://arxiv.org/abs/1306.0895
-	
-	"""
-	
-	def __init__( self , power = 2 , eps = 0.1 , tol = 1e-6 ):##{{{
-		"""
-		Initialisation of solver
-		
-		Parameters
-		----------
-		power : float
-			Power of the plan (default = 2)
-		eps   : float
-			Regularization parameter
-		tol   : float
-			Numerical tolerance
-		"""
-		self.power = power
-		self.eps = eps
-		self.tol = tol
-		self.u = None
-		self.v = None
-		self.C = None
-		self.K = None
-		self.P = None
-	##}}}
-	
-	def fit( self , mu0 , mu1 , C = None ):##{{{
-		"""
-		Fit optimal plan from two measures mu0 and mu1. The measures must have the arguments "c" (center of bins) and "p" (probability of bins)
-		
-		Parameters
-		----------
-		mu0 : (SBCK.SparseHist)
-			Source histogram
-		mu1 : (SBCK.SparseHist)
-			Target histogram
-		"""
-		self.u = np.ones_like( mu0.p )
-		self.v = np.ones_like( mu1.p )
-		self.C = ssd.cdist( mu0.c , mu1.c )**self.power if C is None else C
-		self.K = np.exp( - self.C / self.eps )
-		
-		err = 1. + self.tol
-		
-		while err > self.tol:
-			## Iteration
-			self.u = mu0.p / ( self.K @ self.v )
-			self.v = mu1.p / ( self.K.T @ self.u )
-			
-			## Margins
-			hpX = self.proj0()
-			hpY = self.proj1()
-			
-			## Update error
-			err = max( np.linalg.norm( mu0.p - hpX ) , np.linalg.norm( mu1.p - hpY ) )
-		
-		self.P = np.diag(self.u) @ self.K @ np.diag(self.v)
-	##}}}
-	
-	def proj0( self ):##{{{
-		"""
-		Projection on first margin
-		
-		Returns
-		-------
-		hp0 : np.array
-			Vector of probability of the first margin (from plan)
-		"""
-		return self.u * ( self.K @ self.v   )
-	##}}}
-	
-	def proj1( self ):##{{{
-		"""
-		Projection on second margin
-		
-		Returns
-		-------
-		hp1 : np.array
-			Vector of probability of the second margin (from plan)
-		"""
-		return self.v * ( self.K.T @ self.u )
-	##}}}
-	
-	def plan( self ):##{{{
-		"""
-		Return plan estimated
-		
-		Return
-		------
-		P : np.array
-			Plan
-		"""
-		return np.diag(self.u) @ self.K @ np.diag(self.v)
-	##}}}
-	
+    """Sinkhorn method to solve optimal transport problem
+    
+    References
+    ==========
+    Sinkhorn Distances: Lightspeed Computation of Optimal Transportation Distances. arXiv, https://arxiv.org/abs/1306.0895
+    
+    """
+    power: float
+    eps: float
+    tol: float
+    u: _Array
+    v: _Array
+    C: _Array
+    K: _Array
+    P: _Array
+    
+    def __init__( self , power: float = 2 , eps: float = 0.1 , tol: float = 1e-6 ) -> None:##{{{
+        """
+        Initialisation of solver
+        
+        Parameters
+        ----------
+        power : float
+            Power of the plan (default = 2)
+        eps   : float
+            Regularization parameter
+        tol   : float
+            Numerical tolerance
+        """
+        self.power = power
+        self.eps = eps
+        self.tol = tol
+    ##}}}
+    
+    def fit( self , mu0: SparseHist | OTHist , mu1: SparseHist | OTHist , C: _Array | None = None ) -> None:##{{{
+        """Fit optimal plan from two measures mu0 and mu1.
+        
+        Parameters
+        ----------
+        mu0: SBCK.stats.SparseHist | SBCK.stats.OTHist
+            Source histogram
+        mu1: SBCK.stats.SparseHist | SBCK.stats.OTHist
+            Target histogram
+        C: numpy.ndarray | None
+            Cost matrix or None 
+        """
+        self.u = np.ones_like( mu0.p )
+        self.v = np.ones_like( mu1.p )
+        self.C = ssd.cdist( mu0.c , mu1.c )**self.power if C is None else C
+        self.K = np.exp( - self.C / self.eps )
+        
+        err = 1. + self.tol
+        
+        while err > self.tol:
+            ## Iteration
+            self.u = mu0.p / ( self.K @ self.v )
+            self.v = mu1.p / ( self.K.T @ self.u )
+            
+            ## Margins
+            hpX = self.proj0()
+            hpY = self.proj1()
+            
+            ## Update error
+            err = max( np.linalg.norm( mu0.p - hpX ) , np.linalg.norm( mu1.p - hpY ) )
+        
+        self.P = np.diag(self.u) @ self.K @ np.diag(self.v)
+    ##}}}
+    
+    def proj0( self ) -> _Array:##{{{
+        """Projection on first margin
+        
+        Returns
+        -------
+        p0 : numpy.array
+            Vector of probability of the first margin (from plan)
+        """
+        return self.u * ( self.K @ self.v   )
+    ##}}}
+    
+    def proj1( self ) -> _Array:##{{{
+        """Projection on second margin
+        
+        Returns
+        -------
+        p1 : numpy.array
+            Vector of probability of the second margin (from plan)
+        """
+        return self.v * ( self.K.T @ self.u )
+    ##}}}
+    
+    def plan( self ) -> _Array:##{{{
+        """Return plan estimated
+        
+        Return
+        ------
+        P : numpy.array
+            Plan
+        """
+        return np.diag(self.u) @ self.K @ np.diag(self.v)
+    ##}}}
+    
 ##}}}
 
 class OTSinkhornLogDual:##{{{
-	"""
-	SBCK.tools.OTSinkhornLogDual
-	============================
-	
-	Sinkhorn method to solve optimal transport problem, on dual problem with min max acceleration, more robust.
-	
-	"""
-	
-	def __init__( self , power = 2 , eps = 0.1 , tol = 1e-6 ):##{{{
-		"""
-		Initialisation of solver
-		
-		Parameters
-		----------
-		power : float
-			Power of the plan (default = 2)
-		eps : float
-			Regularization parameter
-		tol : float
-			Numerical tolerance
-		"""
-		self.power = power
-		self.eps = eps
-		self.tol = tol
-		self.f = None
-		self.g = None
-		self.C = None
-		
-		self.P   = None
-		self.hp0 = None
-		self.hp1 = None
-	##}}}
-	
-	def fit( self , mu0 , mu1 ):##{{{
-		"""
-		Fit optimal plan from two measures mu0 and mu1. The measures must have the arguments "c" (center of bins) and "p" (probability of bins)
-		
-		Parameters
-		----------
-		mu0 : (SBCK.SparseHist)
-			Source histogram
-		mu1 : (SBCK.SparseHist)
-			Target histogram
-		"""
-		self.f = np.zeros_like( mu0.p )
-		self.g = np.zeros_like( mu1.p )
-		self.C = ssd.cdist( mu0.c , mu1.c )**self.power
-		
-		
-		err = 1. + self.tol
-		nit = 0
-		while err > self.tol and nit < 1000:
-			## Iteration of f
-			mg     = self.g.reshape( (1,-1) ) - self.C
-			maxg   = np.max( mg , axis = 1 ).reshape(-1,1)
-			self.f = - maxg.ravel() - self.eps * np.log( np.sum( mu1.p.reshape( (1,-1) ) * np.exp( (mg - maxg) / self.eps ) , axis = 1 ) )
-			
-			## Iteration of g
-			mf     = self.f.reshape( (-1,1) ) - self.C
-			maxf   = np.max( mf , axis = 0 ).reshape( (1,-1) )
-			self.g = - maxf.ravel() - self.eps * np.log( np.sum( mu0.p.reshape( (-1,1) ) * np.exp( ( mf - maxf ) / self.eps ) , axis = 0 ) )
-			
-			## Find plan
-			self.P = mu0.p.reshape( (-1,1) ) * mu1.p.reshape( (1,-1) ) * np.exp( ( self.f.reshape( (-1,1) ) + self.g.reshape( (1,-1) ) - self.C ) / self.eps )
-			
-			## Find margins
-			self.hp0 = np.sum( self.P , axis = 1 )
-			self.hp1 = np.sum( self.P , axis = 0 )
-			
-			## Update error
-			err = max( np.linalg.norm( mu0.p - self.hp0 ) , np.linalg.norm( mu1.p - self.hp1 ) )
-			nit += 1
-	##}}}
-	
-	def proj0( self ):##{{{
-		"""
-		Projection on first margin
-		
-		Returns
-		-------
-		hp0 : np.array
-			Vector of probability of the first margin (from plan)
-		"""
-		return self.hp0
-	##}}}
-	
-	def proj1( self ):##{{{
-		"""
-		Projection on second margin
-		
-		Returns
-		-------
-		hp1 : np.array
-			Vector of probability of the second margin (from plan)
-		"""
-		return self.hp1
-	##}}}
-	
-	def plan( self ):##{{{
-		"""
-		Return plan estimated
-		
-		Return
-		------
-		P : np.array
-			Plan
-		"""
-		return self.P
-	##}}}
-	
+    """Sinkhorn method to solve optimal transport problem, on dual problem with
+    min max acceleration, more robust.
+    """
+    
+    power: float
+    eps: float
+    tol: float
+    f: _Array
+    g: _Array
+    C: _Array
+    
+    P: _Array
+    hp0: _Array
+    hp1: _Array
+
+    def __init__( self , power: float = 2 , eps: float = 0.1 , tol: float = 1e-6 ) -> None:##{{{
+        """
+        Parameters
+        ----------
+        power : float
+            Power of the plan (default = 2)
+        eps : float
+            Regularization parameter
+        tol : float
+            Numerical tolerance
+        """
+        self.power = power
+        self.eps = eps
+        self.tol = tol
+    ##}}}
+    
+    def fit( self , mu0: SparseHist | OTHist , mu1: SparseHist | OTHist ) -> None:##{{{
+        """Fit optimal plan from two measures mu0 and mu1.
+        
+        Parameters
+        ----------
+        mu0: SBCK.stats.SparseHist | SBCK.stats.OTHist
+            Source histogram
+        mu1: SBCK.stats.SparseHist | SBCK.stats.OTHist
+            Target histogram
+        """
+        self.f = np.zeros_like( mu0.p )
+        self.g = np.zeros_like( mu1.p )
+        self.C = ssd.cdist( mu0.c , mu1.c )**self.power
+        
+        
+        err = 1. + self.tol
+        nit = 0
+        while err > self.tol and nit < 1000:
+            ## Iteration of f
+            mg     = self.g.reshape( (1,-1) ) - self.C
+            maxg   = np.max( mg , axis = 1 ).reshape(-1,1)
+            self.f = - maxg.ravel() - self.eps * np.log( np.sum( mu1.p.reshape( (1,-1) ) * np.exp( (mg - maxg) / self.eps ) , axis = 1 ) )
+            
+            ## Iteration of g
+            mf     = self.f.reshape( (-1,1) ) - self.C
+            maxf   = np.max( mf , axis = 0 ).reshape( (1,-1) )
+            self.g = - maxf.ravel() - self.eps * np.log( np.sum( mu0.p.reshape( (-1,1) ) * np.exp( ( mf - maxf ) / self.eps ) , axis = 0 ) )
+            
+            ## Find plan
+            self.P = mu0.p.reshape( (-1,1) ) * mu1.p.reshape( (1,-1) ) * np.exp( ( self.f.reshape( (-1,1) ) + self.g.reshape( (1,-1) ) - self.C ) / self.eps )
+            
+            ## Find margins
+            self.hp0 = np.sum( self.P , axis = 1 )
+            self.hp1 = np.sum( self.P , axis = 0 )
+            
+            ## Update error
+            err = max( np.linalg.norm( mu0.p - self.hp0 ) , np.linalg.norm( mu1.p - self.hp1 ) )
+            nit += 1
+    ##}}}
+    
+    def proj0( self ) -> _Array:##{{{
+        """Projection on first margin
+        
+        Returns
+        -------
+        p0 : numpy.array
+            Vector of probability of the first margin (from plan)
+        """
+        return self.hp0
+    ##}}}
+    
+    def proj1( self ) -> _Array:##{{{
+        """Projection on second margin
+        
+        Returns
+        -------
+        p1 : numpy.array
+            Vector of probability of the second margin (from plan)
+        """
+        return self.hp1
+    ##}}}
+    
+    def plan( self ) -> _Array:##{{{
+        """Return plan estimated
+        
+        Return
+        ------
+        P : numpy.array
+            Plan
+        """
+        return self.P
+    ##}}}
+    
 ##}}}
 
 

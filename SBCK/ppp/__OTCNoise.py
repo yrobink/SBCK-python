@@ -25,39 +25,55 @@ from .__PrePostProcessing import PrePostProcessing
 from ..misc.__sys import deprecated
 
 
+############
+## Typing ##
+############
+
+from typing import Sequence
+from typing import Any
+
+_Array = np.ndarray
+_Cols = Sequence[int] | int | None
+
+
 ###########
 ## Class ##
 ###########
 
 class OTCNoise(PrePostProcessing):##{{{
-	"""
-	SBCK.ppp.OTCNoise
-	=================
-	
-	Add a random uniform noise in the cells defined by bin_width.
-	
-	"""
-	
-	def __init__( self , *args , **kwargs ):
-		PrePostProcessing.__init__( self , *args , **kwargs )
-		self._name = "OTCNoise"
-	
-	def transform( self , X ):
-		return X
-	
-	def itransform( self , Xt ):
-		bw = np.array( self._bc_method.bin_width).ravel()
-		noise = np.random.uniform( low = -bw / 2 , high = bw / 2 , size = Xt.shape )
-		return Xt + noise
+    """Add a random uniform noise in the cells defined by bin_width.
+    """
+    
+    def __init__( self , *args: Any , **kwargs: Any ) -> None:
+        """
+        Arguments
+        ---------
+        *args:
+            All others arguments are passed to SBCK.ppp.PrePostProcessing
+        *kwargs:
+            All others arguments are passed to SBCK.ppp.PrePostProcessing
+        """
+        PrePostProcessing.__init__( self , *args , **kwargs )
+        self._name = "OTCNoise"
+    
+    def transform( self , X: _Array ) -> _Array:
+        """Transform"""
+        return X
+    
+    def itransform( self , Xt: _Array ) -> _Array:
+        """Inverse transform"""
+        bw = np.array( self._bc_method.bin_width).ravel()
+        noise = np.random.uniform( low = -bw / 2 , high = bw / 2 , size = Xt.shape )
+        return Xt + noise
 ##}}}
 
 @deprecated( "PPPOTCNoise is renamed OTCNoise since the version 2.0.0" )
 class PPPOTCNoise(OTCNoise):##{{{
-	
-	def __init__( self , *args , **kwargs ):##{{{
-		super().__init__( *args , **kwargs )
-		self._name = "PPPOTCNoise"
-	##}}}
-	
+    
+    def __init__( self , *args: Any , **kwargs: Any ) -> None:##{{{
+        super().__init__( *args , **kwargs )
+        self._name = "PPPOTCNoise"
+    ##}}}
+    
 ##}}}
 

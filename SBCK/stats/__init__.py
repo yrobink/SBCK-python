@@ -37,3 +37,8 @@ from .__rv_extend import rv_density
 from .__rv_extend import rv_mixture
 from .__rv_extend import mrv_base
 
+from .__transport import POTemd
+from .__transport import OTSinkhorn
+from .__transport import OTSinkhornLogDual
+
+

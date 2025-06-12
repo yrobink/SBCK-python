@@ -22,8 +22,8 @@
 
 
 from .__PrePostProcessing import PrePostProcessing
-from ..tools.__linalg import as2d
-from ..tools.__sys import deprecated
+from ..misc.__linalg import as2d
+from ..misc.__sys import deprecated
 
 import warnings
 import numpy as np

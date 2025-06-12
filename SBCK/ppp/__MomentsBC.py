@@ -23,7 +23,7 @@
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 
-from ..tools.__linalg import sqrtm
+from ..misc.__linalg import sqrtm
 
 
 ###########

@@ -25,7 +25,7 @@ import scipy.spatial.distance as ssd
 
 from .__SparseHist import bin_width_estimator
 from .__SparseHist import SparseHist
-from ..tools.__OT import POTemd
+from .__transport import POTemd
 
 
 ##############

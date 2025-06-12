@@ -27,9 +27,6 @@ import scipy.stats as sc
 import scipy.interpolate as sci
 import scipy.optimize as sco
 
-from ..tools.__stats import gpdfit
-from ..tools.__sys import deprecated
-
 
 ############
 ## Typing ##
@@ -43,6 +40,23 @@ _rv_scipy        = sc._distn_infrastructure.rv_continuous
 _rv_scipy_frozen = sc._distn_infrastructure.rv_continuous_frozen
 _kernel_scipy    = sc._kde.gaussian_kde
 
+
+## Some generators ##
+
+def rvs_spd_matrix( dim ):##{{{
+	"""A generator to draw random symetric positive definite matrix.
+
+	Parameters
+	----------
+	dim: int
+		
+
+
+	"""
+	O = sc.ortho_group.rvs(dim)
+	S = np.diag(np.random.exponential(size = dim))
+	return O @ S @ O.T
+##}}}
 
 ##############
 ## rv_class ##
@@ -459,6 +473,14 @@ class rv_empirical_gpd(rv_empirical):##{{{
 		
 		## Empirical part
 		rvXm = rv_empirical.fit(Xm)
+		
+		def gpdfit(X):
+			lmom  = sc.lmoment( X , order = [1,2] )
+			itau  = lmom[0] / lmom[1]
+			scale = lmom[0] * ( itau - 1 )
+			scale = scale if scale > 0 else 1e-8
+			shape = 2 - itau
+			return scale,shape
 		
 		## GPD left fit
 		scl,shl = gpdfit(-Xl)

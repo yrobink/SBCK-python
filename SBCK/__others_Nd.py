@@ -33,14 +33,48 @@ from .__CDFt      import CDFt
 
 from .stats.__sparse_distance import wasserstein
 from .stats.__rv_extend import rv_empirical
-from .tools.__misc import SlopeStoppingCriteria
-from .tools.__shuffle import SchaakeShuffle
 from .ppp.__PrePostProcessing import PrePostProcessing
 
 
 ###########
 ## Class ##
 ###########
+
+class SlopeStoppingCriteria:##{{{
+	def __init__( self , minit , maxit , tol ):
+		self.minit    = minit
+		self.maxit    = maxit
+		self.nit      = -1
+		self.tol      = tol
+		self.stop     = False
+		self.criteria = list()
+		self.slope    = list()
+	
+	def initialize(self):
+		self.nit      = -1
+		self.stop     = False
+		self.criteria = list()
+		self.slope    = list()
+	
+	def append( self , value ):
+		self.criteria.append(value)
+		if self.nit > self.minit:
+			slope,_,_,_,_ = sc.linregress( range(len(self.criteria)) , self.criteria )
+			self.stop = np.abs(slope) < self.tol
+			self.slope.append(slope)
+	
+	def __iter__(self):
+		return self
+	
+	def __next__(self):
+		self.nit += 1
+		if not self.nit < self.maxit-1:
+			self.stop = True
+		if not self.stop:
+			return self.nit
+		raise StopIteration
+##}}}
+
 
 class MBCn(AbstractBC):##{{{
 	"""
@@ -302,80 +336,6 @@ class MRec(AbstractBC):##{{{
 		X1g = self._qmX1.predict( X1 , **okwargs )
 		X1r = np.transpose( self._re_un_mat @ X1g.T )
 		Z1  = self._qmY0.predict(X1r)
-		return Z1
-	##}}}
-	
-##}}}
-
-class ECBC(AbstractBC):##{{{
-	"""
-	SBCK.ECBC
-	=========
-	
-	Description
-	-----------
-	This class implements the method Empirical Copula Bias Correction discribed in [1].
-	
-	References
-	----------
-	[1] Vrac, M. and P. Friederichs, 2015: Multivariate—Intervariable, Spatial,
-	and Temporal—Bias Correction. J. Climate, 28, 218–237,
-	https://doi.org/10.1175/JCLI-D-14-00059.1
-	"""
-	
-	def __init__( self , bc_method = CDFt , **kwargs ):##{{{
-		"""
-		Initialisation of ECBC
-		
-		Parameters
-		----------
-		
-		**kwargs: Any named arguments
-			All are passed to SBCK.CDFt
-		
-		Attributes
-		----------
-		"""
-		super().__init__( "ECBC" , "NS" )
-		self._bcm = bc_method(**kwargs)
-		self._ss  = SchaakeShuffle()
-	##}}}
-	
-	@io_fit
-	def fit( self , Y0 , X0 , X1 ):##{{{
-		"""
-		Fit ECBC
-		
-		Parameters
-		----------
-		Y0	: np.ndarray
-			Reference dataset during calibration period
-		X0	: np.ndarray
-			Biased dataset during calibration period
-		X1	: np.ndarray or None
-			Biased dataset during projection period.
-		"""
-		self._bcm.fit( Y0 , X0 , X1 )
-		self._ss.fit(Y0)
-		
-		return self
-	##}}}
-	
-	def _predictZ0( self , X0 , **kwargs ):##{{{
-		
-		if X0 is None:
-			return None
-		Z0 = self._bcm.predict( X0 , **kwargs )
-		Z0 = self._ss.predict(Z0)
-		return Z0
-	##}}}
-	
-	def _predictZ1( self , X1 , **kwargs ):##{{{
-		
-		if X1 is None:
-			return None
-		Z1 = self._bcm.predict( X1 , **kwargs )
-		Z1 = self._ss.predict(Z1)
 		return Z1
 	##}}}
 	

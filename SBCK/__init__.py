@@ -42,7 +42,6 @@ from .__dTSMBC import dTSMBC
 from .__others_1d import QDM
 from .__others_1d import QQD
 
-from .__others_Nd import ECBC
 from .__others_Nd import MBCn
 from .__others_Nd import MRec
 from .__others_Nd import XClimNPPP

@@ -25,9 +25,10 @@ from .__AbstractBC import AbstractBC
 from .__decorators import io_fit
 from .__decorators import io_predict
 from .__CDFt import CDFt
-from .tools.__shuffle import MVQuantilesShuffle
-from .tools.__shuffle import MVRanksShuffle
-from .tools.__sys import deprecated
+
+from .misc.__sys import deprecated
+from .stats.__shuffle import MVQuantilesShuffle
+from .stats.__shuffle import MVRanksShuffle
 
 
 ###########

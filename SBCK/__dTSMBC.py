@@ -24,9 +24,9 @@
 from .__AbstractBC import AbstractBC
 from .__dOTC import OTC
 from .__dOTC import dOTC
-from .tools.__misc import Shift
 from .__decorators import io_fit
 
+from .stats.__shift import Shift
 
 ###########
 ## Class ##

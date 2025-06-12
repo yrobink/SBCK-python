@@ -25,7 +25,7 @@ import numpy as np
 import scipy.stats as sc
 
 from ..__QM import QM
-from ..tools.__stats import rvs_spd_matrix
+from ..stats.__rv_extend import rvs_spd_matrix
 
 
 ###############

@@ -34,9 +34,9 @@ from .stats.__SparseHist import SparseHist
 from .stats.__SparseHist import bin_width_estimator
 from .stats.__rv_extend import rv_base
 from .stats.__rv_extend import rv_empirical
-from .tools.__OT         import POTemd
-from .tools.__linalg import sqrtm
-from .tools.__linalg import choleskym
+from .stats.__transport import POTemd
+from .misc.__linalg import sqrtm
+from .misc.__linalg import choleskym
 
 from typing import Self
 from typing import Sequence

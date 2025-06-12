@@ -22,7 +22,7 @@
 #############
 
 import numpy as np
-from .tools.__linalg import as2d
+from .misc.__linalg import as2d
 
 
 ################

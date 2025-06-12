@@ -33,7 +33,6 @@ import scipy.stats as sc
 
 import SBCK as bc
 import SBCK.stats as bcs
-import SBCK.tools as bct
 import SBCK.datasets as bcd
 
 has_mpl = True

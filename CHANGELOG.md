@@ -23,14 +23,19 @@
       * Define a new class SBCK.stats.rv_scipy to manage scipy rv
       * SBCK.tools.WrapperStatisticalDistribution has been removed,
       * All tests have been updated accordingly
-
+- New SBCK.clim modules:
+   - Add a the yearly_window function for BC
+- New SBCK.misc modules:
+   - Add linalg extension
+   - Add sys extension
 
 ### Changed
-- R2D2 and ECBC are only non-stationary methods.
+- R2D2 is only a non-stationary method.
 - Add normalization in distance SBCK.stats.chebyshev
 
 ### Removed
 - AR2D2 and QMrs are removed, use R2D2.
+- Remove SBCK.ECBC
 - Remove SBCK.stats.entropy
 - Remove the module SBCK.metrics (moved to SBCK.stats.__sparse_distance)
 

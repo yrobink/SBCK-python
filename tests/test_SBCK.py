@@ -33,7 +33,6 @@ import scipy.stats as sc
 
 import SBCK as bc
 import SBCK.stats as bcs
-import SBCK.tools as bct
 import SBCK.datasets as bcd
 
 has_mpl = True
@@ -736,14 +735,6 @@ class Test_MRec(NonStationaryBCTest,unittest.TestCase):##{{{
 	
 	def __init__( self , *args, **kwargs ):
 		NonStationaryBCTest.__init__( self , r"MRec" , bc.MRec )
-		unittest.TestCase.__init__( self , *args , **kwargs )
-	
-##}}}
-
-class Test_ECBC(NonStationaryBCTest,unittest.TestCase):##{{{
-	
-	def __init__( self , *args, **kwargs ):
-		NonStationaryBCTest.__init__( self , r"ECBC" , bc.ECBC )
 		unittest.TestCase.__init__( self , *args , **kwargs )
 	
 ##}}}

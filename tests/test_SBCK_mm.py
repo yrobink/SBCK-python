@@ -35,7 +35,6 @@ import pandas as pd
 
 import SBCK as bc
 import SBCK.ppp as bcp
-import SBCK.tools as bct
 import SBCK.stats as bcs
 import SBCK.datasets as bcd
 import SBCK.mm as bcmm

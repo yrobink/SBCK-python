@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2023 Yoann Robin
+## Copyright(c) 2021 / 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -99,16 +99,6 @@ class CDFt:
 			Numerical tolerance, default 1e-6
 		version: int, optional
 			...
-		scale_left_tail: float, optional
-			Scale applied on the left support (min to median) between
-			calibration and projection period. If None (default), it is
-			determined during the fit. If == 1, equivalent to the original
-			algorithm of CDFt.
-		scale_right_tail: float, optional
-			Scale applied on the right support (median to max) between
-			calibration and projection period. If None (default), it is
-			determined during the fit. If == 1, equivalent to the original
-			algorithm of CDFt.
 		normalize_cdf: bool or list of bool
 			If a normalization is applied to the data to maximize the overlap
 			of the support. Can be a bool (True or False, applied for all
@@ -120,15 +110,13 @@ class CDFt:
 		self._tol        = kwargs.get( "tol"       , 1e-6  )
 		self._dsupp      = kwargs.get( "dsupp"     , 1000  )
 		self._samples_Y1 = kwargs.get("samples_Y1" , 10000 )
-		self._version    = kwargs.get("version"    , 3     )
+		self._version    = kwargs.get("version"    , 2     )
 		self._v3_e       = kwargs.get("v3_e"       , "auto"  )
 		
 		self._distY0 = _Dist( dist = kwargs.get("distY0") , kwargs = kwargs.get("kwargsY0") )
 		self._distY1 = _Dist( dist = kwargs.get("distY1") , kwargs = kwargs.get("kwargsY1") )
 		self._distX0 = _Dist( dist = kwargs.get("distX0") , kwargs = kwargs.get("kwargsX0") )
 		self._distX1 = _Dist( dist = kwargs.get("distX1") , kwargs = kwargs.get("kwargsX1") )
-		self._scale_left_tail  = kwargs.get("scale_left_tail")
-		self._scale_right_tail = kwargs.get("scale_right_tail")
 		self._normalize_cdf    = kwargs.get("normalize_cdf")
 		if ~(type(self._normalize_cdf) in [bool,list]):
 			self._normalize_cdf = True
@@ -309,14 +297,10 @@ class CDFt:
 				if idx == 0:
 					extend_support = True
 				else:
-					if self._scale_left_tail is None:
-						supp_l_X0s = rvX0s.ppf(cdfY1[0]) - rvX0s.ppf(p_min)
-						supp_l_X1s = rvX1s.ppf(cdfY1[0]) - rvX1s.ppf(p_min)
-						supp_l_Y0  = rvY0.ppf(cdfY1[0])  - rvY0.ppf(p_min)
-						scale_left_tail = supp_l_X1s / supp_l_X0s
-					else:
-						scale_left_tail = self._scale_left_tail
-					supp_l_Y1  = supp_l_Y0 * scale_left_tail
+					supp_l_X0s = rvX0s.ppf(cdfY1[0]) - rvX0s.ppf(p_min)
+					supp_l_X1s = rvX1s.ppf(cdfY1[0]) - rvX1s.ppf(p_min)
+					supp_l_Y0  = rvY0.ppf(cdfY1[0])  - rvY0.ppf(p_min)
+					supp_l_Y1  = supp_l_Y0
 					if x[idx] - supp_l_Y1 < x[0]:
 						extend_support = True
 					else:
@@ -331,13 +315,9 @@ class CDFt:
 					extend_support = True
 				else:
 					supp_r_Y0  = rvY0.ppf(p_max)  - rvY0.ppf(cdfY1[-1])
-					if self._scale_right_tail is None:
-						supp_r_X0s = rvX0s.ppf(p_max) - rvX0s.ppf(cdfY1[-1]) 
-						supp_r_X1s = rvX1s.ppf(p_max) - rvX1s.ppf(cdfY1[-1]) 
-						scale_right_tail = supp_r_X1s / supp_r_X0s
-					else:
-						scale_right_tail = self._scale_right_tail
-					supp_r_Y1  = supp_r_Y0 * scale_right_tail
+					supp_r_X0s = rvX0s.ppf(p_max) - rvX0s.ppf(cdfY1[-1]) 
+					supp_r_X1s = rvX1s.ppf(p_max) - rvX1s.ppf(cdfY1[-1]) 
+					supp_r_Y1  = supp_r_Y0
 					if x[idx] + supp_r_Y1 > x[-1]:
 						extend_support = True
 					else:

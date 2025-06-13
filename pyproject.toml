@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools >= 77.0.3","pybind11>=2.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SBCK"
+dynamic = ["version"]
+dependencies = [
+  "numpy",
+  "scipy",
+  "pot>=0.9.0",
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Yoann Robin", email = "yoann.robin.k@gmail.com"},
+]
+maintainers = [
+  {name = "Yoann Robin", email = "yoann.robin.k@gmail.com"},
+]
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["COPYING"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Natural Language :: English",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Mathematics"
+]

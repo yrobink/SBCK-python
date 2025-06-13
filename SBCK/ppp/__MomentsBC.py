@@ -165,7 +165,7 @@ class UMNAdjust(PrePostProcessing):##{{{
     univariate: bool
     _p: dict[str,MNPar]
 
-    def __init__( self , *args: Any , univariate: bool = False , **kwargs: Any ):##{{{
+    def __init__( self , *args: Any , univariate: bool = False , **kwargs: Any ) -> None:##{{{
         """
         Arguments
         ---------

@@ -32,6 +32,8 @@ from .misc.__sys import deprecated
 from .stats.__shuffle import MVQuantilesShuffle
 from .stats.__shuffle import MVRanksShuffle
 
+from .ppp.__Shuffle import Shuffle
+
 
 ############
 ## Typing ##
@@ -46,11 +48,11 @@ _Array = np.ndarray
 _NArray = _Array | None
 
 
-###########
-## Class ##
-###########
+#############
+## Classes ##
+#############
 
-class R2D2(AbstractBC):##{{{
+class R2D2(Shuffle):##{{{
     """Multivariate bias correction with quantiles shuffle, see [1].
     
     References
@@ -65,13 +67,7 @@ class R2D2(AbstractBC):##{{{
         doi :10.5194/gmd-13-5367-2020.
     """
     
-    mvq: MVQuantilesShuffle | MVRanksShuffle
-    bc_method: type
-    bckwargs: dict[Any]
-    _bcm: AbstractBC
-    _reverse: bool
-
-    def __init__( self , col_cond: Sequence[int] = [0] , lag_search: int = 1 , lag_keep: int = 1 , bc_method: AbstractBC = CDFt , shuffle: str = "quantile" , reverse: bool = False , **kwargs: Any ) -> None:##{{{
+    def __init__( self , col_cond: Sequence[int] = [0] , lag_search: int = 1 , lag_keep: int = 1 , method: str = "quantile" , start_by_margins: bool = False , **kwargs ) -> None:##{{{
         """
         Parameters
         ----------
@@ -81,105 +77,22 @@ class R2D2(AbstractBC):##{{{
             Number of lags to transform the dependence structure
         lag_keep: int
             Number of lags to keep
-        bc_method: SBCK.<bc_method>
-            Bias correction method
-        shuffle: str
+        method: str
             Shuffle method used, can be "quantile" or "rank".
-        reverse: bool
-            If False, first apply bc_method, and after the shuffle. If True, 
+        start_by_margins: bool
+            If True, first apply bc_method, and after the shuffle. If False, 
             reverse this operation.
         **kwargs: ...
-            all others named arguments are passed to bc_method
+            all others named arguments are passed to CDFt
         """
-        super().__init__( "R2D2" , "NS" )
-        if shuffle == "quantile":
-            self.mvq = MVQuantilesShuffle( col_cond , lag_search , lag_keep )
-        else:
-            self.mvq = MVRanksShuffle( col_cond , lag_search , lag_keep )
-        self.bc_method = bc_method
-        self.bckwargs  = kwargs
-        self._bcm      = None
-        self._reverse  = reverse
+        super().__init__( bc_method = CDFt , bc_method_kwargs = kwargs , col_cond = col_cond , lag_search = lag_search , lag_keep = lag_keep , method = method , start_by_margins = start_by_margins )
     ##}}}
-    
-    @io_fit
-    def fit( self , Y0: _Array  , X0: _Array  , X1: _Array  ) -> Self:##{{{
-        """
-        Parameters
-        ----------
-        Y0: numpy.ndarray | None
-            Reference in calibration period
-        X0: numpy.ndarray | None
-            Biased model in calibration period
-        X1: numpy.ndarray | None
-            Biased model in projection period
-
-        Returns
-        -------
-        bcm: SBCK.R2D2
-            Bias Correction class fitted
-        """
-        self.mvq.fit(Y0)
-        self._bcm = self.bc_method(**self.bckwargs)
-        if self._reverse:
-            Z0 = self.mvq.transform(X0)
-            Z1 = self.mvq.transform(X1)
-            self._bcm.fit( Y0 , Z0 , Z1 )
-        else:
-            self._bcm.fit( Y0 , X0 , X1 )
-        
-        return self
-    ##}}}
-    
-    def _predictZ0( self , X0: _NArray , **kwargs: Any ) -> _NArray:##{{{
-        """
-        Parameters
-        ----------
-        X0: numpy.ndarray | None
-            Biased model in calibration period
-
-        Returns
-        -------
-        Z0: numpy.ndarray | None
-            Corrected biased model in calibration period
-        """
-        if X0 is None:
-            return None
-        if self._reverse:
-            Z0 = self.mvq.transform(X0)
-            Z0 = self._bcm._predictZ0( Z0 , **kwargs )
-        else:
-            Z0 = self._bcm._predictZ0( X0 , **kwargs )
-            Z0 = self.mvq.transform(Z0)
-        return Z0
-    ##}}}
-    
-    def _predictZ1( self , X1: _NArray , **kwargs: Any ) -> _NArray:##{{{
-        """
-        Parameters
-        ----------
-        X1: numpy.ndarray | None
-            Biased model in projection period
-        reinfer_X1: bool
-            If the CDF of X1 must be fitted again
-
-        Returns
-        -------
-        Z1: numpy.ndarray | None
-            Corrected biased model in projection period
-        """
-        if X1 is None:
-            return None
-        if self._reverse:
-            Z1 = self.mvq.transform(X1)
-            Z1 = self._bcm._predictZ1( Z1 , **kwargs )
-        else:
-            Z1 = self._bcm._predictZ1( X1 , **kwargs )
-            Z1 = self.mvq.transform(Z1)
-        return Z1
-    ##}}}
-    
 ##}}}
+
+
+########################
+## Deprecated Classes ##
+########################
 
 @deprecated( "AR2D2 code is transfered to R2R2 since the version 2.0.0" )
 class AR2D2(R2D2):##{{{
@@ -187,6 +100,7 @@ class AR2D2(R2D2):##{{{
     """
     
     def __init__( self , *args: Any , **kwargs: Any ) -> None:
+        __doc__ = R2D2.__init__.__doc__
         super().__init__( *args , **kwargs )
         self._name = "AR2D2"
     

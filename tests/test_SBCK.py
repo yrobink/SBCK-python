@@ -662,11 +662,22 @@ class Test_R2D2(NonStationaryBCTest,unittest.TestCase):##{{{
     
 ##}}}
 
+class Test_R2D2Reverse(NonStationaryBCTest,unittest.TestCase):##{{{
+    
+    def __init__( self , *args, **kwargs ):
+        NonStationaryBCTest.__init__( self , r"R$^2$D$^2$" , bc.R2D2 , start_by_margins = False )
+        unittest.TestCase.__init__( self , *args , **kwargs )
+    
+##}}}
+
 class Test_dOTC(NonStationaryBCTest,unittest.TestCase):##{{{
     
     def __init__( self , *args, **kwargs ):
         NonStationaryBCTest.__init__( self , "dOTC" , bc.dOTC , cov_factor = 'std' )
         unittest.TestCase.__init__( self , *args , **kwargs )
+    
+    def test_fig_BCX1(self):
+        NonStationaryBCTest.test_fig_BCX1( self , 1_000 )
     
 ##}}}
 
@@ -728,6 +739,9 @@ class Test_MBCn(NonStationaryBCTest,unittest.TestCase):##{{{
     def __init__( self , *args, **kwargs ):
         NonStationaryBCTest.__init__( self , r"MBCn" , bc.MBCn )
         unittest.TestCase.__init__( self , *args , **kwargs )
+    
+    def test_fig_BCX1(self):
+        NonStationaryBCTest.test_fig_BCX1( self , 1_000 )
     
 ##}}}
 

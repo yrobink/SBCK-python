@@ -42,6 +42,7 @@ from .__DiffRef           import DeltaRef
 from .__DiffRef           import DeltaVars
 from .__MomentsBC         import UMNAdjust
 from .__Shift             import Shift
+from .__Shuffle           import Shuffle
 
 ## Deprecated
 from .__checkf       import skipNotValid

@@ -261,6 +261,9 @@ class MultiUBC(AbstractBC):##{{{
         marginals
         """
         
+        if len(args) == 0 and len(kwargs) == 0:
+            return args,kwargs
+
         ## Find size
         lsizes = set()
         for arg in args:
@@ -347,7 +350,7 @@ class MultiUBC(AbstractBC):##{{{
         """Check input args and kwargs"""
         
         ## Check args
-        if self.ubcm_args is None:
+        if self.ubcm_args is None or len(self.ubcm_args) == 0:
             self.ubcm_args = [ [] for _ in range(self.ndim) ]
         elif isinstance(self.ubcm_args,(list,tuple)):
             if not len(self.ubcm_args) == self.ndim:
@@ -362,7 +365,7 @@ class MultiUBC(AbstractBC):##{{{
                 raise ValueError( "args must be a list of a tuple of list or tuple" )
         
         ## Check kwargs
-        if self.ubcm_kwargs is None:
+        if self.ubcm_kwargs is None or len(self.ubcm_kwargs) == 0:
             self.ubcm_kwargs = [ {} for _ in range(self.ndim) ]
         elif isinstance(self.ubcm_kwargs,(list,tuple)):
             if not len(self.ubcm_kwargs) == self.ndim:

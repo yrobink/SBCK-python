@@ -239,6 +239,33 @@ class LFSquare(LinkFunction):##{{{
         LinkFunction.__init__( self , *args , name = "LFSquare" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
 ##}}}
 
+class LFLog(LinkFunction):##{{{
+    """Log link transform, i.e.:
+    - transform is given by log(x)
+    - inverse transform is given by exp(x)
+    
+    """
+    
+    def __init__( self , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+        """
+        Arguments
+        ---------
+        cols: Sequence[int] | int | None
+            The columns to apply the Link function
+        *args:
+            All others arguments are passed to SBCK.ppp.PrePostProcessing
+        *kwargs:
+            All others arguments are passed to SBCK.ppp.PrePostProcessing
+        """
+        if not s > 0:
+            raise Exception( f"Parameter s = {s} must be non negative!" )
+        self.s = s
+        transform  = lambda x: np.log(x)
+        itransform = lambda x: np.exp(x)
+        LinkFunction.__init__( self , *args , name = "LFLoglin" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+    
+##}}}
+
 class LFLoglin(LinkFunction):##{{{
     """Log linear link transform, i.e.:
     - transform is given by s*log(x/s) + s if 0 < x < s, else x

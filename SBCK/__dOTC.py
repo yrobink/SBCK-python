@@ -363,8 +363,9 @@ class Univariate_dOTC1d(UnivariateBC):##{{{
     _rvX1: _rv_type
     _planX0Y0: QM | None
     _planX1Y1: QM | None
+    _cfactor: float | None
 
-    def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical ) -> None:##{{{
+    def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical , **kwargs: Any ) -> None:##{{{
         """
         Parameters
         ----------
@@ -381,9 +382,13 @@ class Univariate_dOTC1d(UnivariateBC):##{{{
         self._rvY0 = rvY0
         self._rvX0 = rvX0
         self._rvX1 = rvX1
-
         self._planX0Y0 = None
         self._planX1Y1 = None
+        
+        cfactor = kwargs.get("cfactor")
+        if cfactor is not None:
+            cfactor = float(cfactor)
+        self._cfactor = cfactor
         
     ##}}}
     
@@ -405,12 +410,13 @@ class Univariate_dOTC1d(UnivariateBC):##{{{
         """
         
         ## cfactor
-        cfactor  = Y0.std() / X0.std()
+        if self._cfactor is None:
+            self._cfactor  = Y0.std() / X0.std()
         
         ## Inference of Y1
         D0  = QM( rvY0 = self._rvX0 , rvX0 = self._rvY0 ).fit( X0 , Y0 ).predict(Y0)
         D1  = QM( rvY0 = self._rvX1 , rvX0 = self._rvX0 ).fit( X1 , X0 ).predict(D0)
-        D10 = cfactor * (D1 - D0)
+        D10 = self._cfactor * (D1 - D0)
         Y1  = Y0 + D10
         
         ##
@@ -471,10 +477,10 @@ class Univariate_dOTC1d(UnivariateBC):##{{{
 class dOTC1d(MultiUBC):##{{{
     __doc__ = Univariate_dOTC1d.__doc__
     
-    def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical ) -> None:
+    def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical , **kwargs: Any ) -> None:
         __doc__ = Univariate_dOTC1d.__init__.__doc__
-        args   = tuple()
-        kwargs = { 'rvY0' : rvY0 , 'rvX0' : rvX0 , 'rvX1' : rvX1 }
-        super().__init__( "dOTC1d" , Univariate_dOTC1d , args = args , kwargs = kwargs )
+        args    = tuple()
+        gkwargs = { **kwargs , **{ 'rvY0' : rvY0 , 'rvX0' : rvX0 , 'rvX1' : rvX1 } }
+        super().__init__( "dOTC1d" , Univariate_dOTC1d , args = args , kwargs = gkwargs )
 ##}}}
 

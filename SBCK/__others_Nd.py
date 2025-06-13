@@ -27,9 +27,9 @@ import scipy.stats as sc
 from .__AbstractBC import AbstractBC
 from .__decorators import io_fit
 from .__decorators import io_predict
-from .__QM        import QM
-from .__others_1d import QDM
-from .__CDFt      import CDFt
+from .__QM   import QM
+from .__QDM  import QDM
+from .__CDFt import CDFt
 
 from .stats.__sparse_distance import wasserstein
 from .stats.__rv_extend import rv_empirical

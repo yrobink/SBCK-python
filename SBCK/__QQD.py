@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2025 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -22,10 +21,9 @@
 ###############
 
 import numpy as np
+
 from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
-from .__QM import QM
-
 from .stats.__rv_extend import rv_base
 from .stats.__rv_extend import rv_empirical
 
@@ -36,165 +34,15 @@ from .stats.__rv_extend import rv_empirical
 
 from typing import Any
 from typing import Self
-from typing import Sequence
-from typing import Callable
 from .__AbstractBC import _rv_type
 from .__AbstractBC import _mrv_type
-_Array  = np.ndarray
+_Array = np.ndarray
 _NArray = _Array | None
 
 
-###########
-## Class ##
-###########
-
-class Univariate_QDM(UnivariateBC):##{{{
-    
-    """QDM Bias correction method, see [1]
-    
-    References
-    ----------
-    [1] Cannon, A. J., Sobie, S. R., and Murdock, T. Q.: Bias correction of
-    simulated precipitation by quantile mapping: how well do methods preserve
-    relative changes in quantiles and extremes?, J. Climate, 28, 6938–6959,
-    https://doi.org/10.1175/JCLI-D-14- 00754.1, 2015.
-    """
-    
-    _rvY0: _rv_type
-    _rvX0: _rv_type
-    _rvX1: _rv_type
-    _planX0Y0: QM | None
-    _planX1Y1: QM | None
-    _delta_method: Callable
-    _idelta_method: Callable
-
-    def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical , delta: str = "additive" ) -> None:##{{{
-        """
-        Parameters
-        ----------
-        rvY0: type | rv_base
-            Law of references
-        rvX0: type | rv_base
-            Law of models in calibration period
-        rvX1: type | rv_base
-            Law of models in projection period
-        delta: str
-            delta method, 'additive' or 'multiplicative'
-        """
-        
-        super().__init__( "Univariate_QDM" , "NS" )
-        
-        self._rvY0 = rvY0
-        self._rvX0 = rvX0
-        self._rvX1 = rvX1
-        
-        match delta:
-            case "additive":
-                self._delta_method  = np.add
-                self._idelta_method = np.subtract
-            case "multiplicative":
-                self._delta_method  = np.multiply
-                self._idelta_method = np.divide
-            case _:
-                raise ValueError("delta method must be 'additive' or 'multiplicative'")
-
-        self._planX0Y0 = None
-        self._planX1Y1 = None
-        
-    ##}}}
-    
-    def fit( self , Y0: _Array , X0: _Array , X1: _Array ) -> Self:##{{{
-        """
-        Parameters
-        ----------
-        Y0: numpy.ndarray | None
-            Reference in calibration period
-        X0: numpy.ndarray | None
-            Biased model in calibration period
-        X1: numpy.ndarray | None
-            Biased model in projection period
-
-        Returns
-        -------
-        bcm: SBCK.QDM
-            Bias Correction class fitted
-        """
-        
-        ## Inference of Y1
-        D0  = QM( rvY0 = self._rvX0 , rvX0 = self._rvY0 ).fit( X0 , Y0 ).predict(Y0)
-        D1  = QM( rvY0 = self._rvX1 , rvX0 = self._rvX0 ).fit( X1 , X0 ).predict(D0)
-        D10 = self._delta_method(D1 , D0)
-        Y1  = self._idelta_method( Y0 , D10 )
-        
-        ##
-        self._planX0Y0 = QM( rvY0 = self._rvY0 , rvX0 = self._rvX0 ).fit( Y0 , X0 )
-        self._planX1Y1 = QM(                     rvX0 = self._rvX1 ).fit( Y1 , X1 )
-        
-        return self
-    ##}}}
-    
-    def _predictZ1( self , X1: _NArray , reinfer_X1: bool = False , **kwargs: Any ) -> _NArray:##{{{
-        """
-        Parameters
-        ----------
-        X1: numpy.ndarray | None
-            Biased model in projection period
-        reinfer_X1: bool
-            If the CDF of X1 must be fitted again
-
-        Returns
-        -------
-        Z1: numpy.ndarray | None
-            Corrected biased model in projection period
-        """
-        if X1 is None:
-            return None
-        if reinfer_X1:
-            Z1 = QM( rvY0 = self._planX1Y1._rvY0 ).fit(None,X1).predict(X1)
-        else:
-            Z1 = self._planX1Y1.predict(X1)
-        return Z1
-    ##}}}
-    
-    def _predictZ0( self , X0: _NArray , reinfer_X0: bool = False , **kwargs: Any ) -> _NArray:##{{{
-        """
-        Parameters
-        ----------
-        X0: numpy.ndarray | None
-            Biased model in calibration period
-        reinfer_X0: bool
-            If the CDF of X0 must be fitted again
-
-        Returns
-        -------
-        Z0: numpy.ndarray | None
-            Corrected biased model in calibration period
-        """
-        if X0 is None:
-            return None
-        if reinfer_X0:
-            Z0 = QM( rvY0 = self._planX0Y0._rvY0 ).fit(None,X0).predict(X0)
-        else:
-            Z0 = self._planX0Y0.predict(X0)
-        return Z0
-    ##}}}
-    
-##}}}
-
-class QDM(MultiUBC):##{{{
-    
-    __doc__ = Univariate_QDM.__doc__
-    
-    def __init__( self , rvY0: _mrv_type = rv_empirical , rvX0: _mrv_type = rv_empirical , rvX1: _mrv_type = rv_empirical , delta: str = "additive" ):##{{{
-        __doc__ = Univariate_QDM.__init__.__doc__
-        ## And init upper class
-        args   = tuple()
-        kwargs = { 'delta' : delta , 'rvY0' : rvY0 , 'rvX0' : rvX0 }
-        super().__init__( "QDM" , Univariate_QDM , args = args , kwargs = kwargs )
-    ##}}}
-    
-##}}}
-
+#############
+## Classes ##
+#############
 
 class Univariate_QQD(UnivariateBC):##{{{
     """
@@ -361,6 +209,4 @@ class QQD(MultiUBC):##{{{
     ##}}}
     
 ##}}}
-
-
 

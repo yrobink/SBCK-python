@@ -20,6 +20,15 @@
 from .__release import version
 __version__ = version
 
+## Import sub modules
+from . import clim
+from . import datasets
+from . import misc
+from . import mm
+from . import ppp
+from . import stats
+
+## Import main classes
 from .__AbstractBC import AbstractBC
 
 from .__miscBC import RBC
@@ -39,8 +48,8 @@ from .__dOTC import dOTC1d
 from .__dTSMBC import  TSMBC
 from .__dTSMBC import dTSMBC
 
-from .__others_1d import QDM
-from .__others_1d import QQD
+from .__QDM import QDM
+from .__QQD import QQD
 
 from .__others_Nd import MBCn
 from .__others_Nd import MRec

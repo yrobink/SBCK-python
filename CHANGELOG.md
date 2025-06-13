@@ -34,6 +34,7 @@
     all BC methods
 - Add a ppp SBCK.ppp.Shuffle for R2D2, it is now a generic ppp for
     all BC methods
+- Add the SBCK.ppp.LFLog link function (log / exp)
 
 ### Changed
 - R2D2:
@@ -44,6 +45,8 @@
 - All documentations updated
 - dTSMBC and TSBC are now just a derivation of the ppp SBCK.ppp.Shift with dOTC
     and OTC methods
+- QDM is moved to SBCK.__QDM, and it is now an herited class from SBCK.dOTC1d
+- QQD is modev to SBCK.__QQD
 
 ### Removed
 - AR2D2 and QMrs are removed, use R2D2.

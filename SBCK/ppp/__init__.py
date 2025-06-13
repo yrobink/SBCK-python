@@ -31,6 +31,7 @@ from .__LinkFunction      import LFMult
 from .__LinkFunction      import LFMax
 from .__LinkFunction      import LFMin
 from .__LinkFunction      import LFSquare
+from .__LinkFunction      import LFLog
 from .__LinkFunction      import LFLoglin
 from .__LinkFunction      import LFArctan
 from .__LinkFunction      import LFLogistic

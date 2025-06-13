@@ -32,9 +32,13 @@
 - typing all the package
 - Add a ppp SBCK.ppp.Shift for the dTSMBC shift, it is now a generic ppp for
     all BC methods
+- Add a ppp SBCK.ppp.Shuffle for R2D2, it is now a generic ppp for
+    all BC methods
 
 ### Changed
-- R2D2 is only a non-stationary method.
+- R2D2:
+    - is only a non-stationary method.
+    - Now derived from the ppp SBCK.ppp.Shuffle
 - Add normalization in distance SBCK.stats.chebyshev
 - Indentation used is 4 spaces instead of tabulation
 - All documentations updated

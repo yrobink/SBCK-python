@@ -41,6 +41,7 @@ from .__DiffRef           import PreserveOrder
 from .__DiffRef           import DeltaRef
 from .__DiffRef           import DeltaVars
 from .__MomentsBC         import UMNAdjust
+from .__Shift             import Shift
 
 ## Deprecated
 from .__checkf       import skipNotValid

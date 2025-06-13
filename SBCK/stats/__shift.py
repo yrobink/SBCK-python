@@ -50,7 +50,7 @@ class Shift:##{{{
     _ref: int
     _method: str
     
-    def __init__( self , lag: int , method: str = "row" , ref: int = 0 ):##{{{
+    def __init__( self , lag: int , method: str = "row" , ref: int | str = "middle" ):##{{{
         """
         Parameters
         ----------
@@ -73,7 +73,9 @@ class Shift:##{{{
         return self._ref
     
     @ref.setter
-    def ref( self , ref: int ) -> None:
+    def ref( self , ref: int | str ) -> None:
+        if isinstance(ref,str):
+            ref = int(0.5*(self.lag+1))
         self._ref = ref % ( self.lag + 1 )
     
     @property

@@ -128,12 +128,12 @@ class Univariate_QQD(UnivariateBC):##{{{
         ## Correction of left tail
         idxL = cdfX1 < self.p_left
         if idxL.any():
-            Y1[idxL] = self.rvX0.icdf(self.rvX1.cdf(X1[idxL])) + self._corr_left
+            Y1[idxL] = X1[idxL] + self._corr_left
         
         ## Correction of right tail
         idxR = cdfX1 > self.p_right
         if idxR.any():
-            Y1[idxR] = self.rvX0.icdf(self.rvX1.cdf(X1[idxR])) + self._corr_right
+            Y1[idxR] = X1[idxR] + self._corr_right
         
         ## And store cdf
         self.rvY1 = rv_empirical.fit(Y1)

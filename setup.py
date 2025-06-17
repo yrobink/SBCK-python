@@ -43,40 +43,47 @@ cpath = Path(__file__).parent
 ####################################################
 
 class EigenNotFoundError(Exception):
-	def __init__( self , *args , **kwargs ):
-		super().__init__( *args , **kwargs )
+    def __init__( self , *args , **kwargs ):
+        super().__init__( *args , **kwargs )
 
 def get_eigen_include():##{{{
-	possible_path = []
-	
-	## Priority 1: custom user installation
-	if os.environ.get("EIGEN_INCLUDE_PATH") is not None:
-		possible_path.append( os.environ["EIGEN_INCLUDE_PATH"] )
-	
-	## Priority 2: user installation
-	if os.environ.get("HOME") is not None:
-		possible_path.append( os.path.join( os.environ["HOME"] , ".local/include" ) )
-	
-	## Priority 3: conda installation
-	if os.environ.get("CONDA_PREFIX") is not None:
-		possible_path.append( os.path.join( os.environ["CONDA_PREFIX"] , "include" ) )
-	
-	## Priority >3: others installations
-	for p in [ os.path.dirname(sysconfig.get_paths()['include']), "/usr/include/" , "/usr/local/include/" ]:
-		possible_path.append(p)
-	
-	## Check if eigen in this path
-	for path in possible_path:
-		
-		eigen_include = os.path.join( path , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return path
-		
-		eigen_include = os.path.join( path , "eigen3" , "Eigen" )
-		if os.path.isdir( eigen_include ):
-			return os.path.join( path , "eigen3" )
-	
-	raise EigenNotFoundError("Eigen not found in all possible path, try to install if from conda or set the environement variable 'EIGEN_INCLUDE_PATH' to the path to Eigen")
+    possible_path = []
+    
+    ## Priority 1: custom user installation
+    if os.environ.get("EIGEN_INCLUDE_PATH") is not None:
+        possible_path.append( os.environ["EIGEN_INCLUDE_PATH"] )
+    
+    ## Priority 2: user installation
+    if os.environ.get("HOME") is not None:
+        possible_path.append( os.path.join( os.environ["HOME"] , ".local" , "include" ) )
+    
+    ## Priority 3: conda installation
+    if os.environ.get("CONDA_PREFIX") is not None:
+        possible_path.append( os.path.join( os.environ["CONDA_PREFIX"] , "include" ) )
+    
+    ## Priority >3: others UNIX-like installations
+    root = Path("/")
+    for p in [ os.path.dirname(sysconfig.get_paths()['include']), root / "usr" / "include" , root / "usr" / "local" / "include" ]:
+        possible_path.append(p)
+    
+    ## Priority >3: others windows installations
+    root = Path("C:")
+    for p in [ root / "vcpkg" / "installed" / "x64-windows" / "include" / "eigen3" , root / "eigen" , root / "libs" / "eigen" , root / "Program Files" / "eigen" ]:
+        possible_path.append(p)
+
+
+    ## Check if eigen in this path
+    for path in possible_path:
+        
+        eigen_include = os.path.join( path , "Eigen" )
+        if os.path.isdir( eigen_include ):
+            return path
+        
+        eigen_include = os.path.join( path , "eigen3" , "Eigen" )
+        if os.path.isdir( eigen_include ):
+            return os.path.join( path , "eigen3" )
+    
+    raise EigenNotFoundError("Eigen not found in all possible path, try to install if from conda or set the environement variable 'EIGEN_INCLUDE_PATH' to the path to Eigen")
 ##}}}
 
 
@@ -85,20 +92,21 @@ def get_eigen_include():##{{{
 ##########################
 
 ext_modules = [
-	Extension(
-		"SBCK.stats.__stats_cpp",
-		[ 'SBCK/stats/src/stats.cpp' ],
-		include_dirs=[
-			get_eigen_include(),
-			pybind11.get_include(True),
-			pybind11.get_include(False),
-		],
-		language='c++',
-		depends = [
-			"SBCK/stats/src/SparseHist.hpp"
-			],
-		extra_compile_args = ["-O3"]
-	),
+    Extension(
+        "SBCK.stats.__stats_cpp",
+        [ 'src/stats.cpp' ],
+        include_dirs=[
+            "include",
+            get_eigen_include(),
+            pybind11.get_include(True),
+            pybind11.get_include(False),
+        ],
+        language='c++',
+        depends = [
+            "include/SparseHist.hpp"
+            ],
+        extra_compile_args = ["-O3"]
+    ),
 ]
 
 
@@ -131,34 +139,34 @@ long_description = long_description.replace(":warning:"," ~       ")
 #######################
 
 setup(
-	name         = release['name'],
-	description  = release['description'],
-	long_description = long_description,
-	long_description_content_type = 'text/markdown',
-	version      = release['version'],
-	author       = release['author'],
-	author_email = release['author_email'],
-	license      = release['license'],
-	platforms        = [ "linux" , "macosx" ],
-	classifiers      = [
-		"Development Status :: 5 - Production/Stable",
-		"Natural Language :: English",
-		"Operating System :: MacOS :: MacOS X",
-		"Operating System :: POSIX :: Linux",
-		"Programming Language :: Python :: 3",
-		"Programming Language :: Python :: 3.10",
-		"Programming Language :: Python :: 3.11",
-		"Programming Language :: Python :: 3.12",
-		"Programming Language :: Python :: 3.13",
-		"Topic :: Scientific/Engineering :: Mathematics"
-	],
-	ext_modules      = ext_modules,
-	build_requires   = ["pybind11>=2.2"],
-	install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" ],
-	python_requires  = '>=3.10',
-	zip_safe         = False,
-	packages         = list_packages,
-	package_dir      = package_dir
+    name         = release['name'],
+    description  = release['description'],
+    long_description = long_description,
+    long_description_content_type = 'text/markdown',
+    version      = release['version'],
+    author       = release['author'],
+    author_email = release['author_email'],
+    license      = release['license'],
+    platforms        = [ "linux" , "macosx" ],
+    classifiers      = [
+        "Development Status :: 5 - Production/Stable",
+        "Natural Language :: English",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: Microsoft :: Windows",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Topic :: Scientific/Engineering :: Mathematics"
+    ],
+    ext_modules      = ext_modules,
+#    install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" , "pybind11>=2.2"],
+    python_requires  = '>=3.10',
+    zip_safe         = False,
+    packages         = list_packages,
+    package_dir      = package_dir
 )
 
 

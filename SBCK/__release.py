@@ -20,12 +20,13 @@
 version_major = 2
 version_minor = 0
 version_patch = 0
-version_extra = "a41"
+version_extra = "a42"
 version       = "{}.{}.{}{}".format(version_major,version_minor,version_patch,version_extra)
 
 name         = "SBCK"
 description  = "Statistical Bias Correction Kit"
 author       = "Yoann Robin"
 author_email = "yoann.robin.k@gmail.com"
-license      = "GNU General Public License v3"
+#license      = "GNU General Public License v3"
+license      = "GPL-3.0-or-later"
 

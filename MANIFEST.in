@@ -1,4 +1,6 @@
 include COPYING
 include README.md
 
-recursive-include SBCK *.py *.hpp *.cpp
+recursive-include SBCK *.py
+recursive-include src *.cpp
+recursive-include include *.hpp

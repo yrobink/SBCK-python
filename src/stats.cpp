@@ -24,7 +24,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 
-#include "SparseHist.hpp"
+#include <SparseHist.hpp>
 
 //============//
 // namespaces //
@@ -71,6 +71,6 @@ PYBIND11_MODULE( __stats_cpp , m )
 	//============//
 	
 //	m.doc() = "pybind11 example plugin" ; // optional module docstring
-	m.attr("__name__") = "SBCK.tools.__tools_cpp";
+	m.attr("__name__") = "SBCK.stats.__stats_cpp";
 //	m.attr("the_answer") = 42;
 }

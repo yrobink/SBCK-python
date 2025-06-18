@@ -30,6 +30,7 @@ import scipy.stats as sc
 ############
 
 from typing import Generator
+from typing import Any
 
 
 ###############
@@ -45,7 +46,7 @@ def yearly_window( ybeg_: int | str,
                   wright: int | str,
                   tleft_: int | str,
                  tright_: int | str
-                 ) -> Generator[tuple[str,str,str,str,str,str]]:
+                 ) -> Generator[tuple[str,str,str,str,str,str],Any,Any]:
     """Generator to iterate over years between ybeg_ and yend_, with a fitting
     window of lenght wleft + wpred + wright, and a centered predict window of
     length wpred.

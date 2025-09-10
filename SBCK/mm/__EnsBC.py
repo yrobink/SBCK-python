@@ -131,14 +131,9 @@ class EnsITE(AbstractBC):##{{{
         Z0: numpy.ndarray | None
             Correction of the biased model in calibration period
         """
-        ## Reshape X0 and X1
-        X0 = self._reshapeX(X0)
-        X1 = self._reshapeX(X1)
-        
-        if not X0.shape[0] == X1.shape[0]:
-            raise ValueError("Different number of members between X0 and X1")
         
         ## Correction
+        X1 = self._reshapeX(X1)
         Z1 = np.zeros_like(X1) + np.nan
         for i in range(X1.shape[0]):
             Z1[i,:,:] = self._bcm[i]._predictZ1( X1[i,:,:] )
@@ -147,6 +142,7 @@ class EnsITE(AbstractBC):##{{{
         if X0 is None:
             return Z1
         
+        X0 = self._reshapeX(X0)
         Z0 = np.zeros_like(X0) + np.nan
         for i in range(X0.shape[0]):
             Z0[i,:,:] = self._bcm[i]._predictZ0( X0[i,:,:] )
@@ -251,14 +247,8 @@ class EnsCTE(AbstractBC):##{{{
             Correction of the biased model in calibration period
         """
         
-        ## Reshape X0 and X1
-        X0 = self._reshapeX(X0)
-        X1 = self._reshapeX(X1)
-        
-        if not X0.shape[0] == X1.shape[0]:
-            raise ValueError("Different number of members between X0 and X1")
-        
         ## Correction
+        X1 = self._reshapeX(X1)
         Z1 = np.zeros_like(X1) + np.nan
         for i in range(X1.shape[0]):
             Z1[i,:,:] = self._bcm[i]._predictZ1( X1[i,:,:] , reinfer_X1 = False )
@@ -267,6 +257,7 @@ class EnsCTE(AbstractBC):##{{{
         if X0 is None:
             return Z1
         
+        X0 = self._reshapeX(X0)
         Z0 = np.zeros_like(X0) + np.nan
         for i in range(X0.shape[0]):
             Z0[i,:,:] = self._bcm[i]._predictZ0( X0[i,:,:] , reinfer_X0 = False )

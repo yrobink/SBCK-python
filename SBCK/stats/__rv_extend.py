@@ -780,6 +780,7 @@ class rv_mixture(rv_base):##{{{
         
         
         ## Init laws
+        self._dist = []
         for d in args:
             if isinstance( d, rv_base ):
                 self._dist.append(d)

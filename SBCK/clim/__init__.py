@@ -17,4 +17,5 @@
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
 from .__tools import yearly_window
+from .__apply_bcm import apply_bcm
 

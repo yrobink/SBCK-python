@@ -26,6 +26,7 @@
         * All tests have been updated accordingly
 - New SBCK.clim modules:
     - Add a the yearly_window function for BC
+    - Add a function to apply a bias correction method
 - New SBCK.misc modules:
     - Add linalg extension
     - Add sys extension

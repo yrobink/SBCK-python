@@ -23,14 +23,11 @@
 
 import numpy as np
 
-from .__AbstractBC import AbstractBC
 from .__decorators import io_fit
 from .__decorators import io_predict
 from .__CDFt import CDFt
 
 from .misc.__sys import deprecated
-from .stats.__shuffle import MVQuantilesShuffle
-from .stats.__shuffle import MVRanksShuffle
 
 from .ppp.__Shuffle import Shuffle
 
@@ -40,10 +37,7 @@ from .ppp.__Shuffle import Shuffle
 ############
 
 from typing import Any
-from typing import Self
 from typing import Sequence
-from .__AbstractBC import _rv_type
-from .__AbstractBC import _mrv_type
 _Array = np.ndarray
 _NArray = _Array | None
 

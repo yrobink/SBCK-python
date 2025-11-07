@@ -29,7 +29,6 @@ from ..misc.__sys import deprecated
 ############
 
 from typing import Sequence
-from typing import Any
 
 _Array = np.ndarray
 _Cols = Sequence[int] | int | None

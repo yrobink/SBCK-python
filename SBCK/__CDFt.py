@@ -37,10 +37,8 @@
 ## Libraries ##
 ###############
 
-import itertools as itt
 
 import numpy       as np
-import scipy.stats as sc
 import scipy.interpolate as sci
 
 from .__AbstractBC import UnivariateBC

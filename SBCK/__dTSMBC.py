@@ -22,10 +22,8 @@
 ###############
 
 import numpy as np
-from .__AbstractBC import AbstractBC
 from .__dOTC import OTC
 from .__dOTC import dOTC
-from .__decorators import io_fit
 
 from .ppp.__Shift import Shift
 
@@ -34,7 +32,6 @@ from .ppp.__Shift import Shift
 ## Typing ##
 ############
 
-from typing import Self
 from typing import Any
 _Array = np.ndarray
 _NArray = _Array | None

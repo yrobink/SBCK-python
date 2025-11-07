@@ -22,7 +22,6 @@
 ###############
 
 import numpy as np
-import scipy.stats as sc
 
 from .__AbstractBC import UnivariateBC
 from .__AbstractBC import MultiUBC
@@ -35,8 +34,6 @@ from .stats.__rv_extend import rv_empirical
 ############
 
 from typing import Self
-from typing import Any
-from typing import Sequence
 from .__AbstractBC import _rv_type
 from .__AbstractBC import _mrv_type
 _Array = np.ndarray

@@ -33,7 +33,6 @@ from .__transport import POTemd
 ############
 
 _Array = np.ndarray
-from typing import Any
 from typing import Callable
 
 

@@ -25,18 +25,12 @@
 import sys
 import os
 import argparse
-import itertools as itt
 import unittest
 
 import numpy as np
-import scipy.stats as sc
-import xarray as xr
-import pandas as pd
 
 import SBCK as bc
-import SBCK.ppp as bcp
 import SBCK.stats as bcs
-import SBCK.datasets as bcd
 import SBCK.mm as bcmm
 
 

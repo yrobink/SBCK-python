@@ -29,10 +29,7 @@ import scipy.spatial.distance as ssd
 ## Typing ##
 ############
 
-from typing import Self
 from typing import Sequence
-from typing import Tuple
-from typing import Any
 _Array = np.ndarray
 from .__rv_extend import mrv_base
 

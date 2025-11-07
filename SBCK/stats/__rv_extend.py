@@ -25,7 +25,6 @@
 import numpy as np
 import scipy.stats as sc
 import scipy.interpolate as sci
-import scipy.optimize as sco
 
 
 ############
@@ -35,7 +34,6 @@ import scipy.optimize as sco
 from typing import Self
 from typing import Sequence
 from typing import Callable
-from typing import Tuple
 from typing import Any
 _rv_scipy        = sc._distn_infrastructure.rv_continuous
 _rv_scipy_frozen = sc._distn_infrastructure.rv_continuous_frozen

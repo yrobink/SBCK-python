@@ -33,8 +33,6 @@ from .__SparseHist import SparseHist
 ############
 
 _Array = np.ndarray
-from typing import Any
-from typing import Callable
 
 
 #############

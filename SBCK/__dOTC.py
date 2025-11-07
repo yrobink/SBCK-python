@@ -22,7 +22,6 @@
 ###############
 
 import numpy       as np
-import scipy.stats as sc
 
 from .__AbstractBC import AbstractBC
 from .__AbstractBC import UnivariateBC
@@ -32,7 +31,6 @@ from .__decorators import io_fit
 
 from .stats.__SparseHist import SparseHist
 from .stats.__SparseHist import bin_width_estimator
-from .stats.__rv_extend import rv_base
 from .stats.__rv_extend import rv_empirical
 from .stats.__transport import POTemd
 from .misc.__linalg import sqrtm

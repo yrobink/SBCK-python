@@ -25,7 +25,6 @@
 import sys
 import os
 import argparse
-import itertools as itt
 import unittest
 
 import numpy as np
@@ -33,7 +32,6 @@ import scipy.stats as sc
 
 import SBCK as bc
 import SBCK.stats as bcs
-import SBCK.datasets as bcd
 
 has_mpl = True
 try:

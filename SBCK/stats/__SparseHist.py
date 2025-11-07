@@ -31,7 +31,6 @@ from .__stats_cpp import SparseHist as SparseHistCPP
 ############
 
 from typing import Sequence
-from typing import Any
 
 _Array = np.ndarray
 

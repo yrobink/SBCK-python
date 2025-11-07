@@ -29,7 +29,6 @@ import itertools as itt
 import unittest
 
 import numpy as np
-import xarray as xr
 import pandas as pd
 
 import SBCK as bc

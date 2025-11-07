@@ -42,9 +42,6 @@ from typing import Sequence
 from typing import Callable
 from typing import Self
 
-from ..__AbstractBC import _rv_type
-from ..__AbstractBC import _mrv_type
-
 _Array = np.ndarray
 
 

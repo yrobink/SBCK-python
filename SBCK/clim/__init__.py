@@ -19,3 +19,13 @@
 from .__tools import yearly_window
 from .__apply_bcm import apply_bcm
 
+from .__stats import phaversine_distances
+from .__stats import xcorr
+from .__stats import cacorrelogram
+
+## Import only if zxarray is available
+import importlib.util
+if importlib.util.find_spec("zxarray"):
+    from .__zstats import zcorr
+    from .__zstats import zcacorrelogram
+

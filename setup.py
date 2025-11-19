@@ -155,15 +155,13 @@ setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Topic :: Scientific/Engineering :: Mathematics"
     ],
     ext_modules      = ext_modules,
 #    install_requires = [ "numpy" , "scipy" , "pybind11>=2.2" , "pot>=0.9.0" , "pybind11>=2.2"],
-    python_requires  = '>=3.10',
+    python_requires  = '>=3.12',
     zip_safe         = False,
     packages         = list_packages,
     package_dir      = package_dir

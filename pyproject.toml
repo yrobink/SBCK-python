@@ -9,7 +9,7 @@ dependencies = [
   "numpy",
   "scipy",
   "pot>=0.9.0",
-  "zxarray>=0.13.0"
+  "zxarray>=0.13.1"
 ]
 requires-python = ">=3.12"
 authors = [

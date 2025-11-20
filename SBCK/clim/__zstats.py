@@ -72,15 +72,16 @@ def zcorr( da_a: zr.ZXArray, da_b: zr.ZXArray, dim: str, method: str = "pearson"
         "kwargs": { "ndim_a": len(da_a.dims) - 1, "ndim_b": len(da_b.dims) - 1, "method": method }
     }
     
-    ##
-    nbits = 64
-    sdim  = da_a[dim].size
-    block_memory = lambda b : 2 * ( 2 * sdim * np.prod(b) + np.prod(b)**2 ) * zr.DMUnit( n = nbits // zr.DMUnit.bits_per_octet , unit = 'o' )
+    ## Block memory function
+    key = "block_memory"
+    if kwargs.get(key) is None:
+        nbits = zr.DMUnit.nbitsof_dtype(da_a.dtype)
+        sdim  = da_a[dim].size
+        kwargs[key] = lambda b : 5 * sdim * np.prod(b) * zr.DMUnit( n = nbits // zr.DMUnit.bits_per_octet , unit = 'o' )
     
     ## Compute
     zc = zr.apply_ufunc( _zcorr, da_a, da_b,
                          block_dims = zdims,
-                         block_memory = block_memory,
                          output_dims = [zdims],
                          output_coords = [zcoords],
                          dask_kwargs = dask_kwargs,

@@ -192,7 +192,7 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
         i0 = k0  % lon.size
         j1 = k1 // lon.size
         i1 = k1  % lon.size
-        zz[:,:,:,:,k] = zc[:,:,:,j0,i0,:,j1,i1]
+        zz[:,:,:,:,k] = zc[:,:,:,j0,i0,:,j1,i1,"x"]
 
     return zz
 ##}}}

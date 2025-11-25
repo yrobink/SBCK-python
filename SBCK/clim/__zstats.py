@@ -20,6 +20,8 @@
 ## Libraries ##
 ###############
 
+import logging
+import psutil
 import itertools as itt
 import numpy as np
 import xarray as xr
@@ -35,10 +37,14 @@ from .__stats import xcorr
 
 from typing import Sequence
 
+##################
+## Init logging ##
+##################
 
-###############
-## Functions ##
-###############
+logging.captureWarnings(True)
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
 
 #####################################
 ## Cross-auto-correlogram function ##
@@ -127,7 +133,8 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     dim_lat  = zX.dims[2]
     dim_lon  = zX.dims[3]
     months   = [m + 1 for m in range(12)]
-    
+    cvars    = zX[dim_cvar]
+
     ## Lags
     if isinstance(lags,int):
         lags = [lags]
@@ -141,6 +148,7 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     zA1 = zA.copy().rename( **{ d : f"{d}1" for d in zA.dims[1:] } )
 
     ## Compute correlations
+    logger.info("Start lags / months cross-product")
     xrdims = ["lag","month"] + [f"{d}0" for d in zX.dims[1:]]\
                              + [f"{d}1" for d in zX.dims[1:]]
     xrcoords = [lags,months] + [zX[d].values for d in zX.dims[1:]]\
@@ -165,6 +173,7 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
                      )
     
     ## Compute pairwise distances
+    logger.info("Compute pairwise distances")
     lat = zX[zX.dims[-2]].values
     lon = zX[zX.dims[-1]].values
     coords_rad   = np.array([[np.radians(_lat), np.radians(_lon)] 
@@ -183,16 +192,50 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     zz = zr.ZXArray( dims  = ["lag","month",f"{dim_cvar}0",f"{dim_cvar}1","distance"],
                     coords = [lags,months,zc[f"{dim_cvar}0"],zc[f"{dim_cvar}1"],dist_km]
     )
-
-    for k in range(dist_km.size):
+    
+    ## Find total memory available
+    total_memory = kwargs.get("total_memory")
+    memory_per_worker = kwargs.get("memory_per_worker")
+    n_workers = kwargs.get("n_workers")
+    if total_memory is not None and memory_per_worker is not None:
+        raise ValueError( "total_memory and memory_per_worker can not be set simultaneously" )
+    if total_memory is None and memory_per_worker is None:
+        total_memory = zr.DMUnit( n = int( 0.8 * psutil.virtual_memory().total ) , unit = 'B' )
+    if memory_per_worker is not None:
+        memory_per_worker = zr.DMUnit(memory_per_worker)
+        total_memory = n_workers * memory_per_worker
+    else:
+        total_memory = zr.DMUnit(total_memory)
+    
+    ## Find step to minimize operations
+    logger.info("Find step size")
+    max_mem_used = zr.DMUnit.sizeof_array(zz)
+    min_mem_used = max_mem_used // dist_km.size
+    
+    if 3 * max_mem_used < total_memory:
+        step = dist_km.size
+    elif 3 * min_mem_used < total_memory:
+        step = int(np.floor( np.pow( total_memory.b // (3 * min_mem_used.b ) , 1 / 4 ) ))
+    else:
+        raise MemoryError("Not enough memory available")
+    logger.info( f"Step size found: {step}, {dist_km.size // step} copy required" )
+    
+    ##
+    idx_lags   = np.arange( 0, len(lags)   , 1 ).astype(int).tolist()
+    idx_months = np.arange( 0, len(months) , 1 ).astype(int).tolist()
+    idx_cvars  = np.arange( 0, len(cvars)  , 1 ).astype(int).tolist()
+    ij         = [i for i in range(step)]
+    for k in range(0,dist_km.size,step):
         
-        k0 = idx_0[k]
-        k1 = idx_1[k]
+        ks = slice( k, k + step, 1 )
+        k0 = idx_0[ks]
+        k1 = idx_1[ks]
         j0 = k0 // lon.size
         i0 = k0  % lon.size
         j1 = k1 // lon.size
         i1 = k1  % lon.size
-        zz[:,:,:,:,k] = zc[:,:,:,j0,i0,:,j1,i1,"x"]
+        args = (idx_lags,idx_months,idx_cvars,j0.tolist(),i0.tolist(),idx_cvars,j1.tolist(),i1.tolist())
+        zz[:,:,:,:,ks] = zc._internal.zdata.oindex[*args][:,:,:,ij,ij,:,ij,ij].transpose(1,2,3,4,0)
 
     return zz
 ##}}}

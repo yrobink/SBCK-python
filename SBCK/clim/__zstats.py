@@ -21,6 +21,7 @@
 ###############
 
 import logging
+import gc
 import psutil
 import itertools as itt
 import numpy as np
@@ -154,6 +155,8 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     xrcoords = [lags,months] + [zX[d].values for d in zX.dims[1:]]\
                              + [zX[d].values for d in zX.dims[1:]]
     zc = zr.ZXArray( dims = xrdims, coords = xrcoords )
+    logger.info( " * Temporary file initialized:" )
+    logger.info( f" * {zc}" )
     for l,m in itt.product(lags,months):
         
         ## Extract
@@ -171,6 +174,8 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
                      method = method,
                      **kwargs
                      )
+        break
+    gc.collect()
     
     ## Compute pairwise distances
     logger.info("Compute pairwise distances")
@@ -182,16 +187,18 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     dist_km      = phaversine_distances(coords_rad) * earth_radius
     idx_0,idx_1  = np.tril_indices(dist_km.shape[0])
     dist_km      = dist_km[(idx_0,idx_1)]
-    
     sidx = np.argsort(dist_km)
-
     dist_km = dist_km[sidx]
     idx_0   = idx_0[sidx]
     idx_1   = idx_1[sidx]
+    del coords_rad
+    gc.collect()
     
+    logger.info( "Init output file" )
     zz = zr.ZXArray( dims  = ["lag","month",f"{dim_cvar}0",f"{dim_cvar}1","distance"],
                     coords = [lags,months,zc[f"{dim_cvar}0"],zc[f"{dim_cvar}1"],dist_km]
     )
+    logger.info( f" * {zz}" )
     
     ## Find total memory available
     total_memory = kwargs.get("total_memory")
@@ -215,10 +222,10 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     if 3 * max_mem_used < total_memory:
         step = dist_km.size
     elif 3 * min_mem_used < total_memory:
-        step = int(np.floor( np.pow( total_memory.b // (3 * min_mem_used.b ) , 1 / 4 ) ))
+        step = min( int(np.floor( np.pow( total_memory.b // (3 * min_mem_used.b ) , 1 / 4 ) )), dist_km.size )
     else:
         raise MemoryError("Not enough memory available")
-    logger.info( f"Step size found: {step}, {dist_km.size // step} copy required" )
+    logger.info( f" * Step size found: {step}, {dist_km.size // step} copy required" )
     
     ##
     idx_lags   = np.arange( 0, len(lags)   , 1 ).astype(int).tolist()
@@ -235,7 +242,12 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
         j1 = k1 // lon.size
         i1 = k1  % lon.size
         args = (idx_lags,idx_months,idx_cvars,j0.tolist(),i0.tolist(),idx_cvars,j1.tolist(),i1.tolist())
-        zz[:,:,:,:,ks] = zc._internal.zdata.oindex[*args][:,:,:,ij,ij,:,ij,ij].transpose(1,2,3,4,0)
+        S = np.prod([len(idx) for idx in args])
+        logger.info( f"S: {S}" )
+        T = zc.isel( drop = False, **{ d: idx for d,idx in zip(zc.dims,args) } ).values
+        T = T[:,:,:,ij,ij,:,ij,ij].transpose(1,2,3,4,0)
+        zz[:,:,:,:,ks] = T
+#        zz[:,:,:,:,ks] = zc._internal.zdata.oindex[*args][:,:,:,ij,ij,:,ij,ij].transpose(1,2,3,4,0)
 
     return zz
 ##}}}

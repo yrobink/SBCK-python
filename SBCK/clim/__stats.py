@@ -207,5 +207,54 @@ def cacorrelogram( X: xr.DataArray , lags: int | Sequence[int] = [0,3] , method:
     return corr
 ##}}}
 
+def cadescribe( xca: xr.DataArray , bins: np.ndarray | None = None, q_level: Sequence[float] = [0,0.05/2,0.33,0.5,0.66,1-0.05/2,1], q_name: Sequence[str] = ["QN","QL","Q33","MED","Q66","QU","QX"] ) -> xr.Dataset:##{{{
+    """
+    SBCK.clim.cadescribe
+    =====================
+    Function to compute some statistics of a cross-auto-correlogram.
+
+    Arguments
+    ---------
+    xca: xarray.DataArray
+        DataArray containing the cross-auto-correlogram computed
+        with SBCK.clim.cacorrelogram
+    bins: np.ndarray | None
+        Bins used for the distance
+    q_level: Sequence[float]
+        Quantile level. Default is [0,0.05/2,0.33,0.5,0.66,1-0.05/2,1]: the min
+        and max, the 95% confidence interval, the 33% and 66% level, and
+        the median.
+    q_name: Sequence[str]
+        Names of the quantile level. Default
+        is ["QN","QL","Q33","MED","Q66","QU","QX"]
+
+    Returns
+    -------
+    xres: xarray.Dataset
+        Dataset containing 4 variables:
+        - w: the weight of each bin defined by bins,
+        - m: the mean in each bin,
+        - s: the standard deviation of each bin
+        - q: the quantile given by q_level
+    """
+
+
+    ## Distances
+    distances  = xca["distance"].values.copy()
+    if bins is None:
+        db = np.diff(np.quantile( distances, [0.25,0.75] )) / 20
+        bins = np.arange( 0 - db / 2, distances.max() + db / 2 + db / 4 , db )
+    bdistances = (bins[1:] + bins[:-1] ) / 2
+    
+    ##
+    xres = xr.Dataset( {
+        "w": xr.DataArray( distances, dims = ["distance"], coords = [distances] ).groupby_bins( "distance" , bins = bins ).sum() / distances.size,
+        "m": xca.groupby_bins( "distance" , bins = bins ).mean(),
+        "s": xca.groupby_bins( "distance" , bins = bins ).std(),
+        "q": xca.groupby_bins( "distance" , bins = bins ).quantile( q_level ).transpose( *(xca.dims[:-1] + ("quantile","distance_bins")) ).assign_coords( quantile = q_name ),
+    } ).rename( distance_bins = "bdistance" ).assign_coords( bdistance = bdistances)
+
+    return xres
+##}}}
 
 

@@ -35,7 +35,7 @@ from .__stats import xcorr
 ## Typing ##
 ############
 
-from typing import Sequence
+from typing import Sequence, Any
 
 ##################
 ## Init logging ##
@@ -257,5 +257,100 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
         zz[:,:,:,:,ks] = zc._internal.zdata.oindex[*argsO][*argsV].transpose(1,2,3,4,0)
 
     return zz
+##}}}
+
+
+def _zcadescribe( X: np.ndarray , bins: np.ndarray , distances: np.ndarray , q_level: np.ndarray ) -> tuple[np.ndarray,np.ndarray,np.ndarray]:##{{{
+    
+    if X.size == 1:
+        return X
+    m = xr.DataArray( X, dims = ["dim0","dim1","dim2","dim3","distance"] ).assign_coords( distance = distances ).groupby_bins( "distance", bins = bins ).mean().values
+    s = xr.DataArray( X, dims = ["dim0","dim1","dim2","dim3","distance"] ).assign_coords( distance = distances ).groupby_bins( "distance", bins = bins ).std().values
+    q = xr.DataArray( X, dims = ["dim0","dim1","dim2","dim3","distance"] ).assign_coords( distance = distances ).groupby_bins( "distance", bins = bins ).quantile( q_level, method = "median_unbiased" ).values.transpose(0,1,2,3,5,4)
+    
+    return m,s,q
+##}}}
+
+def zcadescribe( zca: zr.ZXArray , bins: np.ndarray | None = None, q_level: Sequence[float] = [0,0.05/2,0.33,0.5,0.66,1-0.05/2,1], q_name: Sequence[str] = ["QN","QL","Q33","MED","Q66","QU","QX"] , **kwargs: dict[str,Any]) -> xr.Dataset:##{{{
+    """
+    SBCK.clim.zcadescribe
+    =====================
+    Function to compute some statistics of a cross-auto-correlogram.
+
+    Arguments
+    ---------
+    zca: zxarray.ZXArray
+        ZXArray containing the cross-auto-correlogram computed
+        with SBCK.clim.zcacorrelogram
+    bins: np.ndarray | None
+        Bins used for the distance
+    q_level: Sequence[float]
+        Quantile level. Default is [0,0.05/2,0.33,0.5,0.66,1-0.05/2,1]: the min
+        and max, the 95% confidence interval, the 33% and 66% level, and
+        the median.
+    q_name: Sequence[str]
+        Names of the quantile level. Default
+        is ["QN","QL","Q33","MED","Q66","QU","QX"]
+    kwargs:
+        All others arguments are passed to zxarray.apply_ufunc
+
+    Returns
+    -------
+    xres: xarray.Dataset
+        Dataset containing 4 variables:
+        - w: the weight of each bin defined by bins,
+        - m: the mean in each bin,
+        - s: the standard deviation of each bin
+        - q: the quantile given by q_level
+    """
+
+
+    ## Distances
+    distances  = zca["distance"].values.copy()
+    if bins is None:
+        db = np.diff(np.quantile( distances, [0.25,0.75] )) / 20
+        bins = np.arange( 0 - db / 2, distances.max() + db / 2 + db / 4 , db )
+    bdistances = (bins[1:] + bins[:-1] ) / 2
+    zca = zca.assign_coords( distance = np.arange(distances.size) )
+    
+    ## Parallel arguments
+    xargs = { "input_core_dims": [["distance"]],
+             "output_core_dims": [["bdistance"],["bdistance"],["quantile","bdistance"]],
+             "dask": "parallelized",
+             "dask_gufunc_kwargs": { "output_sizes" : { "bdistance": bins.size - 1 , "quantile": len(q_level)} },
+             "output_dtypes": [zca.dtype for _ in range(3)],
+             "kwargs": { "bins": bins , "distances": distances , "q_level": q_level }
+             }
+    ocoords = [
+        { d : zca[d].values for d in zca.dims[:-1] } | { "bdistance": bdistances },
+        { d : zca[d].values for d in zca.dims[:-1] } | { "bdistance": bdistances },
+        { d : zca[d].values for d in zca.dims[:-1] } | { "bdistance": bdistances , "quantile": q_name },
+    ]
+
+    ## Apply
+    zres = zr.apply_ufunc( _zcadescribe, zca.assign_coords( distance = np.arange(distances.size) ),
+                          block_dims = ["lag","month","cvar0","cvar1"],
+                          output_dims = [("lag","month","cvar0","cvar1","bdistance"),("lag","month","cvar0","cvar1","bdistance"),("lag","month","cvar0","cvar1","quantile","bdistance")],
+                          output_coords = ocoords,
+                          output_dtypes = [zca.dtype for _ in range(3)],
+                          dask_kwargs = xargs,
+                          **kwargs
+                          )
+    
+    ## Weights
+    weights = xr.DataArray( distances, dims = ["distance"], coords = [distances] ).groupby_bins( "distance" , bins = bins ).sum().rename( distance_bins = "bdistance" ).assign_coords( bdistance = bdistances) / distances.size 
+    
+    ## In xarray
+    xres = xr.Dataset({
+        "w": weights,
+        "m": zres[0].dataarray,
+        "s": zres[1].dataarray,
+        "q": zres[2].dataarray,
+    })
+
+    ## Restore coordinates of input
+    zca.assign_coords( distance = distances )
+
+    return xres
 ##}}}
 

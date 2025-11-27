@@ -21,7 +21,6 @@
 ###############
 
 import logging
-import gc
 import psutil
 import itertools as itt
 import numpy as np
@@ -95,6 +94,18 @@ def zcorr( da_a: zr.ZXArray, da_b: zr.ZXArray, dim: str, method: str = "pearson"
                          **kwargs )
 
     return zc
+##}}}
+
+
+def _build_vidx(idx):##{{{
+    ix   = np.unique(idx).size
+    vidx = idx.copy()
+    vidx = vidx - idx.min()
+    for i in range(1,ix,1):
+        if i in vidx:
+            continue
+        vidx[vidx > i-1] -= 1
+    return vidx.astype(int)
 ##}}}
 
 def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method: str = "pearson" , **kwargs ) -> zr.ZXArray:##{{{
@@ -174,8 +185,6 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
                      method = method,
                      **kwargs
                      )
-        break
-    gc.collect()
     
     ## Compute pairwise distances
     logger.info("Compute pairwise distances")
@@ -191,8 +200,6 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     dist_km = dist_km[sidx]
     idx_0   = idx_0[sidx]
     idx_1   = idx_1[sidx]
-    del coords_rad
-    gc.collect()
     
     logger.info( "Init output file" )
     zz = zr.ZXArray( dims  = ["lag","month",f"{dim_cvar}0",f"{dim_cvar}1","distance"],
@@ -231,7 +238,6 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
     idx_lags   = np.arange( 0, len(lags)   , 1 ).astype(int).tolist()
     idx_months = np.arange( 0, len(months) , 1 ).astype(int).tolist()
     idx_cvars  = np.arange( 0, len(cvars)  , 1 ).astype(int).tolist()
-    ij         = [i for i in range(step)]
     for k in range(0,dist_km.size,step):
         
         ks = slice( k, k + step, 1 )
@@ -241,13 +247,14 @@ def zcacorrelogram( zX: zr.ZXArray , lags: int | Sequence[int] = (0,3) , method:
         i0 = k0  % lon.size
         j1 = k1 // lon.size
         i1 = k1  % lon.size
-        args = (idx_lags,idx_months,idx_cvars,j0.tolist(),i0.tolist(),idx_cvars,j1.tolist(),i1.tolist())
-        S = np.prod([len(idx) for idx in args])
-        logger.info( f"S: {S}" )
-        T = zc.isel( drop = False, **{ d: idx for d,idx in zip(zc.dims,args) } ).values
-        T = T[:,:,:,ij,ij,:,ij,ij].transpose(1,2,3,4,0)
-        zz[:,:,:,:,ks] = T
-#        zz[:,:,:,:,ks] = zc._internal.zdata.oindex[*args][:,:,:,ij,ij,:,ij,ij].transpose(1,2,3,4,0)
+        argsO = (idx_lags,idx_months,idx_cvars,np.unique(j0),np.unique(i0),idx_cvars,np.unique(j1),np.unique(i1))
+        
+        vj0 = _build_vidx(j0)
+        vi0 = _build_vidx(i0)
+        vj1 = _build_vidx(j1)
+        vi1 = _build_vidx(i1)
+        argsV  = (slice(None),slice(None),slice(None),vj0,vi0,slice(None),vj1,vi1)
+        zz[:,:,:,:,ks] = zc._internal.zdata.oindex[*argsO][*argsV].transpose(1,2,3,4,0)
 
     return zz
 ##}}}

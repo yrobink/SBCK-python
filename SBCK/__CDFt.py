@@ -193,6 +193,10 @@ class Univariate_CDFt(UnivariateBC):##{{{
         sX1 = X1.std()
         NY0 = Y0
         
+        if not sY0 > 0: sY0 = 1
+        if not sX0 > 0: sX0 = 1
+        if not sX1 > 0: sX1 = 1
+
         match self.norm.lower():
             case 'none':
                 NX0 = X0

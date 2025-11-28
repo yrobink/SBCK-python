@@ -399,8 +399,9 @@ class rv_empirical(rv_base):##{{{
         
         Xs = np.sort(X.squeeze())
         Xr = sc.rankdata(Xs,method="max")
-        p  = np.unique(Xr) / X.size
-        q  = Xs[np.unique(Xr)-1]
+        Xu = np.unique(Xr)
+        p  = Xu / X.size
+        q  = Xs[Xu - 1]
         
         if p[0] > 0:
             q  = np.hstack( (q[0] - np.sqrt(np.finfo(float).resolution),q) )

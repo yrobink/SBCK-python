@@ -34,6 +34,65 @@ from typing import Sequence
 ## Functions ##
 ###############
 
+##########################################
+## Fake climate data generator function ##
+##########################################
+
+## fakeclimdata ##{{{
+
+def fakeclimdata( cvars: Sequence[str] = ["tas","pr"],
+                 rangeY: Sequence[str] = ("1961","1980"),
+                 rangeX: Sequence[str] = ("1951","2000"),
+                 nlat: int = 5,
+                 nlon: int = 4,
+                 calendarY: str = "standard",
+                 calendarX: str = "standard",
+                 ):
+    """
+    Function used to create fake climate data. The generated data can be used
+    to test the behaviour of SBCK function.
+
+    Arguments
+    ---------
+    cvars: Sequence[str]
+        List of names of climate variable
+    rangeY: Sequence[str]
+        Start and end year of reference Y
+    rangeX: Sequence[str]
+        Start and end year of biased data X
+    nlat: int
+        Numbers of latitude points
+    nlon: int
+        Numbers of longitude points
+    calendarY: str
+        Calendar of Y, see the cftime package
+    calendarX: str
+        Calendar of X, see the cftime package
+    
+    Returns
+    -------
+    Y: xarray.DataArray
+        Reference data, with dimension ("time","cvar","lat","lon"), following
+        a normal distribution N(10,0.5)
+    X: xarray.DataArray
+        Biased data, with dimension ("time","cvar","lat","lon"), following
+        a normal distribution N(0,1)
+    """
+    ## Create coordinates
+    timeY  = xr.date_range( f"{rangeY[0]}-01-01", f"{int(rangeY[1])+1}-01-01", use_cftime = True , calendar = calendarY )[:-1]
+    timeX  = xr.date_range( f"{rangeX[0]}-01-01", f"{int(rangeX[1])+1}-01-01", use_cftime = True , calendar = calendarX )[:-1]
+    lat    = np.linspace(  -90,  90, nlat )
+    lon    = np.linspace( -180, 180, nlon + 1 )[1:]
+    xrdims  = ("time","cvar","lat","lon")
+    
+    ## Random data
+    Y = xr.DataArray( np.random.normal( size = (timeY.size,len(cvars),lat.size,lon.size) ) / 2 + 10 , dims = xrdims, coords = [timeY,cvars,lat,lon] )
+    X = xr.DataArray( np.random.normal( size = (timeX.size,len(cvars),lat.size,lon.size) )          , dims = xrdims, coords = [timeX,cvars,lat,lon] )
+    
+    return Y,X
+##}}}
+
+
 #####################################
 ## Cross-auto-correlogram function ##
 #####################################

@@ -51,9 +51,9 @@ logger.addHandler(logging.NullHandler())
 ###############
 
 
-## _apply_bcm ##{{{
+## _apply_bcm_along_time ##{{{
 
-def _apply_bcm( Y0: np.ndarray , X0: np.ndarray , X1f: np.ndarray , X1p: np.ndarray ,
+def _apply_bcm_along_time( Y0: np.ndarray , X0: np.ndarray , X1f: np.ndarray , X1p: np.ndarray ,
                bc_method: AbstractBC,
                bc_method_kwargs: dict[str,Any] = {},
                n_multivariate_dims: int = 0 ) -> np.ndarray:
@@ -83,9 +83,9 @@ def _apply_bcm( Y0: np.ndarray , X0: np.ndarray , X1f: np.ndarray , X1p: np.ndar
 
 ##}}}
 
-## apply_bcm ##{{{
+## apply_bcm_along_time ##{{{
 
-def apply_bcm( Y: xr.DataArray, X: xr.DataArray,
+def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
               bc_method: AbstractBC,
               calibration_period: tuple[str | int,str | int],
               projection_range:tuple[str | int,str | int] | None = None,
@@ -156,7 +156,7 @@ def apply_bcm( Y: xr.DataArray, X: xr.DataArray,
         raise ValueError(f"Calibration period '{cal0} / {cal1}' is not available for biased data")
     
     ## Check the projection range
-    bleft,bright = (X.time.dt.year[0],X.time.dt.year[-1])
+    bleft,bright = (X[time_dim].dt.year[0],X[time_dim].dt.year[-1])
     if projection_range is None:
         projection_range = (bleft,bright)
     prj0 = int(projection_range[0])
@@ -190,9 +190,9 @@ def apply_bcm( Y: xr.DataArray, X: xr.DataArray,
             groupsY = groups
             grp_name = "month"
         case "window":
-            ngrpX   = X.groupby(f"{time_dim}.dayofyear").groupers[0].size
+            ngrpX   = X[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
             groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
-            ngrpY   = Y.groupby(f"{time_dim}.dayofyear").groupers[0].size
+            ngrpY   = Y[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
             if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
                 groupsY = groupsX
             else:
@@ -218,63 +218,46 @@ def apply_bcm( Y: xr.DataArray, X: xr.DataArray,
     ## Create output
     Z = X.copy() + np.nan
     
-    ## Extract calibration
-    Y0 = Y.sel( { time_dim : slice(str(cal0),str(cal1)) } )
-    X0 = X.sel( { time_dim : slice(str(cal0),str(cal1)) } )
-    
     ## Dask arguments
     input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0",f"{time_dim}X1f",f"{time_dim}X1p"] ]
     output_core_dims = [(f"{time_dim}X1p",) + multivariate_dims]
     
     ## Chunks
     if chunks is None:
-        chunks = { d: "auto" for d in Y0.dims if d not in input_core_dims[0] + ("time",) }
+        chunks = { d: "auto" for d in Y.dims if d not in input_core_dims[0] + ("time",) }
     
-    ## Old way for the loop ##{{{
-#    ## Loop on years
-#    for tf0,tp0,tp1,tf1 in yearly_window( prj0 , prj1 , wl , wm , wr , bleft , bright ):
-#        X1f = X.sel( { time_dim : slice(str(tf0),str(tf1)) } )
-#        
-#        print("   | step (not reverse)")
-#
-#        ## Loop on groups
-#        for grps in groups:
-#            
-#            ## Extract sub-group
-#            Y0s  = xr.concat( [ Y0.groupby(f"{time_dim}.{grp_name}")[g] for g in grps] , dim = time_dim ).sortby(time_dim).rename( { time_dim : f"{time_dim}0" } )
-#            X0s  = xr.concat( [ X0.groupby(f"{time_dim}.{grp_name}")[g] for g in grps] , dim = time_dim ).sortby(time_dim).rename( { time_dim : f"{time_dim}0" } )
-#            X1fs = xr.concat( [X1f.groupby(f"{time_dim}.{grp_name}")[g] for g in grps] , dim = time_dim ).sortby(time_dim).rename( { time_dim : f"{time_dim}1f" } )
-#            X1ps = X1fs.sel( { f"{time_dim}1f" : slice(str(tp0),str(tp1)) } ).sortby(f"{time_dim}1f").rename( { f"{time_dim}1f" : f"{time_dim}1p" } )
-#            
-#            ## Correction
-#            Z1ps = xr.apply_ufunc( _apply_bcm, Y0s.chunk(chunks) , X0s.chunk(chunks) , X1fs.chunk(chunks) , X1ps.chunk(chunks) ,
-#                                  input_core_dims  = input_core_dims,
-#                                  output_core_dims = output_core_dims,
-#                                  dask = "parallelized",
-#                                  kwargs = { "bc_method": bc_method , "bc_method_kwargs": bc_method_kwargs , "n_multivariate_dims": len(multivariate_dims) },
-#                                  ).rename( { f"{time_dim}1p" : time_dim } ).transpose(*X.dims).compute()
-#            
-#            ## Store correction
-#            Z.loc[Z1ps.coords] = Z1ps
-    ##}}}
+    ## Time axis
+    timeY0 = Y[time_dim].sel( { time_dim: slice(str(cal0),str(cal1)) } )
+    timeX0 = X[time_dim].sel( { time_dim: slice(str(cal0),str(cal1)) } )
+    timeX  = X[time_dim]
     
     ## Loop on groups
     for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
         
         logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
-
-        ## Extract sub-group
-        Y0s  = xr.concat( [ Y0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY] , dim = time_dim ).sortby(time_dim).rename( { time_dim : f"{time_dim}Y0" } )
-        X0s  = xr.concat( [ X0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX] , dim = time_dim ).sortby(time_dim).rename( { time_dim : f"{time_dim}X0" } )
-        X1s  = xr.concat( [  X.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX] , dim = time_dim ).sortby(time_dim).rename( { time_dim : f"{time_dim}X1" } )
+        
+        ## Sub-time axis for the group
+        timeY0s = xr.concat( [timeY0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
+        timeX0s = xr.concat( [timeX0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeX1s = xr.concat( [ timeX.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        
+        ## Calibration period extraction
+        Y0s = Y.sel( **{ time_dim: timeY0s } ).rename( { time_dim: f"{time_dim}Y0" } )
+        X0s = X.sel( **{ time_dim: timeX0s } ).rename( { time_dim: f"{time_dim}X0" } )
         
         ## Loop on years
         for tf0,tp0,tp1,tf1 in yearly_window( prj0 , prj1 , wl , wm , wr , bleft , bright ):
-            X1fs =  X1s.sel( { f"{time_dim}X1" : slice(str(tf0),str(tf1)) } ).rename( { f"{time_dim}X1" : f"{time_dim}X1f" } )
-            X1ps = X1fs.sel( { f"{time_dim}X1f" : slice(str(tp0),str(tp1)) } ).sortby(f"{time_dim}X1f").rename( { f"{time_dim}X1f" : f"{time_dim}X1p" } )
+            
+            ## Sub-time axis for the projection period
+            timeX1fs = timeX1s.sel( { time_dim : slice(str(tf0),str(tf1)) } ).sortby(time_dim)
+            timeX1ps = timeX1s.sel( { time_dim : slice(str(tp0),str(tp1)) } ).sortby(time_dim)
+            
+            ## Data extraction
+            X1fs = X.sel( **{ time_dim: timeX1fs } ).rename( { time_dim: f"{time_dim}X1f" } )
+            X1ps = X.sel( **{ time_dim: timeX1ps } ).rename( { time_dim: f"{time_dim}X1p" } )
             
             ## Correction
-            Z1ps = xr.apply_ufunc( _apply_bcm, Y0s.chunk(chunks) , X0s.chunk(chunks) , X1fs.chunk(chunks) , X1ps.chunk(chunks) ,
+            Z1ps = xr.apply_ufunc( _apply_bcm_along_time, Y0s.chunk(chunks) , X0s.chunk(chunks) , X1fs.chunk(chunks) , X1ps.chunk(chunks) ,
                                   input_core_dims  = input_core_dims,
                                   output_core_dims = output_core_dims,
                                   dask = "parallelized",
@@ -290,5 +273,6 @@ def apply_bcm( Y: xr.DataArray, X: xr.DataArray,
     return Z
 
 ##}}}
+
 
 

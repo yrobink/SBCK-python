@@ -9,14 +9,14 @@ dependencies = [
   "numpy",
   "scipy",
   "pot>=0.9.0",
-  "zxarray>=0.13.1"
+  "zxarray>=0.13.4"
 ]
 requires-python = ">=3.12"
 authors = [
-  {name = "Yoann Robin", email = "yoann.robin.k@gmail.com"},
+  {name = "Yoann Robin", email = "yoann.robin+dev.github@ikmail.com"},
 ]
 maintainers = [
-  {name = "Yoann Robin", email = "yoann.robin.k@gmail.com"},
+  {name = "Yoann Robin", email = "yoann.robin+dev.github@ikmail.com"},
 ]
 readme = "README.md"
 license-files = ["COPYING"]

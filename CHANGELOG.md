@@ -27,7 +27,11 @@
 - New SBCK.clim modules:
     - Add a the yearly_window function for BC
     - Add a function to apply a bias correction method
+    - Add a function to apply a bias correction method along the time axis
     - Add a function to compute cross-auto-correlogram
+    - Add an optional function to apply a bias correction method with zxarray
+    - Add an optional function to apply a bias correction method along the time
+      axis with zxarray
     - Add an optional function to compute cross-auto-correlogram with zxarray
 - New SBCK.misc modules:
     - Add linalg extension

@@ -51,6 +51,189 @@ logger.addHandler(logging.NullHandler())
 ###############
 
 
+## _apply_bcm ##{{{
+
+def _apply_bcm( Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray,
+               bc_method: AbstractBC,
+               bc_method_kwargs: dict[str,Any] = {},
+               n_multivariate_dims: int = 0 ) -> np.ndarray:
+    
+    ## Create output
+    Z0 = X0.copy() + np.nan
+    Z1 = X1.copy() + np.nan
+
+    ## Special case
+    if Z1.size == 1:
+        return Z1,Z0
+    
+    ## For dev
+#    print( f"{Y0.shape} / {X0.shape} / {X1.shape} / {n_multivariate_dims}" )
+    
+    ## Find uni and multi-axis
+    tdim  = Y0.ndim - 1 - n_multivariate_dims
+    
+    ## Loop
+    for pidx in itt.product(*[range(s) for s in Y0.shape[:tdim]]):
+        idx = pidx + (slice(None),) + tuple([slice(None) for _ in range(n_multivariate_dims)])
+        shp = [1 for _ in range(len(pidx))] + [-1] + [Y0.shape[s+tdim+1] for s in range(n_multivariate_dims)]
+        if not (np.isfinite(Y0[idx]).all() and np.isfinite(X0[idx]).all() and np.isfinite(X1[idx]).all()):
+            continue
+        _Z1,_Z0 = bc_method( **bc_method_kwargs ).fit( Y0[idx] , X0[idx] , X1[idx] ).predict( X1[idx], X0[idx] )
+        Z1[idx] = _Z1.reshape(*shp)
+        Z0[idx] = _Z0.reshape(*shp)
+    
+    return Z1,Z0
+
+##}}}
+
+## apply_bcm ##{{{
+
+def apply_bcm( Y0: xr.DataArray, X0: xr.DataArray, X1: xr.DataArray,
+              bc_method: AbstractBC,
+              time_dim: str = "time",
+              seas_cycle: str = "month",
+              seas_cycle_window: int = 15,
+              multivariate_dims: Sequence | str = tuple(),
+              chunks: dict[str,int | str] | None = None,
+              bc_method_kwargs: dict[str,Any] = {},
+              **kwargs: Any
+              ) -> xr.DataArray:
+    """Function for correcting `X0` and `X1` biased data with the `Y0`
+    reference. The `bcm` method is used, and must be a non-stationary method.
+    The firs dimension must be the time axis.
+    
+    Arguments
+    ---------
+    Y0: xarray.DataArray
+        Reference data in calibration period
+    X0: xarray.DataArray
+        Biased data in calibration period
+    X1: xarray.DataArray
+        Biased data in projection period
+    bc_method: SBCK.AbstractBC
+        Bias correction method
+    time_dim: str = "time"
+        Name of the time dimension
+    seas_cycle: str = "month"
+        How to deal with the seasonnal cycle.
+        "month": correction is performed month by month
+        "season": correction is performed season by season
+        "window": each day is corrected with a window around of the day. The
+                  length of the window is given by the
+                  parameter `seas_cycle_window`
+    seas_cycle_window: int = 15
+        Half-length of the window for the "window" parameter of "seas_cycle" 
+    multivariate_dims: tuple[str]
+        Dimensions used for multivariate correction
+    chunks: dict[str,int | str] | None = None
+        Chunks for parallelization. Default is "auto".
+    bc_method_kwargs: dict
+        Keyword arguments passed to bcm
+    
+    Returns
+    -------
+    Z1: xarray.DataArray
+        Corrected data in projection period
+    Z0: xarray.DataArray
+        Corrected data in calibration period
+    """
+    ## Check if time axis is in dimensions of Y and X
+    if time_dim not in Y0.dims:
+        raise ValueError(f"Time axis dimension '{time_dim}' is not a dimension of reference data")
+    if time_dim not in X0.dims:
+        raise ValueError(f"Time axis dimension '{time_dim}' is not a dimension of biased data (calibration)")
+    if time_dim not in X1.dims:
+        raise ValueError(f"Time axis dimension '{time_dim}' is not a dimension of biased data (projection)")
+    
+    ## Check how we deal with the seasonal cycle
+    match seas_cycle:
+        case "season":
+            groups  = ["MAM","JJA","SON","DJF"]
+            groups  = [ [g] for g in groups ]
+            groupsX = groups
+            groupsY = groups
+            grp_name = "season"
+        case "month":
+            groups  = [ m + 1 for m in range(12) ]
+            groups  = [ [g] for g in groups ]
+            groupsX = groups
+            groupsY = groups
+            grp_name = "month"
+        case "window":
+            ngrpX   = X0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
+            ngrpY   = Y0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
+                groupsY = groupsX
+            else:
+                groupsY = [ [ ( (d + w) % ngrpY ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in np.linspace(0,ngrpY-1,ngrpX).astype(int)]
+            grp_name = "dayofyear"
+        case _:
+            raise ValueError(f"Unknow parameters '{seas_cycle}' for 'seas_cycle', value must be 'month', 'season' or 'window'")
+    
+    ## Check dimensions
+    if not X0.dims == Y0.dims:
+        raise ValueError("Different dimensions between X0 and Y0")
+    if not X0.dims == X1.dims:
+        raise ValueError("Different dimensions between X0 and X1")
+    if not (X0.dims[0] == time_dim and Y0.dims[0] == time_dim and X1.dims[0] == time_dim):
+        raise ValueError( f"The first fdimension of Y0, X0 and X1 must be the time (={time_dim}) dimension" )
+    if isinstance( multivariate_dims , str ):
+        multivariate_dims = (multivariate_dims,)
+    multivariate_dims = tuple(multivariate_dims)
+    for d in multivariate_dims:
+        if d not in X0.dims:
+            raise ValueError(f"Dimension '{d}' of multivariate_dims is not in Y0, X0 and X1")
+    if time_dim in multivariate_dims:
+        raise ValueError("Time dimension '{time_dim}' can not be in multivariate_dims argument")
+
+    ## Create output
+    Z1 = X1.copy() + np.nan
+    Z0 = X0.copy() + np.nan
+    
+    ## Dask arguments
+    input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0",f"{time_dim}X1"] ]
+    output_core_dims = [(f"{time_dim}X1",) + multivariate_dims,(f"{time_dim}X0",) + multivariate_dims]
+    
+    ## Chunks
+    if chunks is None:
+        chunks = { d: "auto" for d in Y0.dims if d not in input_core_dims[0] + ("time",) }
+    
+    ## Loop on groups
+    for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
+        
+        logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
+        
+        ## Sub-time axis for the group
+        timeY0s = xr.concat( [Y0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
+        timeX0s = xr.concat( [X0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeX1s = xr.concat( [X1[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        
+        ## Calibration period extraction
+        Y0s = Y0.sel( **{ time_dim: timeY0s } ).rename( { time_dim: f"{time_dim}Y0" } )
+        X0s = X0.sel( **{ time_dim: timeX0s } ).rename( { time_dim: f"{time_dim}X0" } )
+        X1s = X1.sel( **{ time_dim: timeX1s } ).rename( { time_dim: f"{time_dim}X1" } )
+        
+        ## Correction
+        res = xr.apply_ufunc( _apply_bcm, Y0s.chunk(chunks) , X0s.chunk(chunks) , X1s.chunk(chunks),
+                          input_core_dims  = input_core_dims,
+                          output_core_dims = output_core_dims,
+                          dask = "parallelized",
+                          kwargs = { "bc_method": bc_method , "bc_method_kwargs": bc_method_kwargs , "n_multivariate_dims": len(multivariate_dims) },
+                          )
+        res = xr.Dataset( { "Z1s": res[0], "Z0s": res[1] } ).compute()
+        
+        ## Store correction
+        Z1s = res.Z1s.rename( { f"{time_dim}X1": time_dim } ).transpose(*X1.dims)
+        Z0s = res.Z0s.rename( { f"{time_dim}X0": time_dim } ).transpose(*X0.dims)
+        Z1.loc[Z1s.coords] = Z1s
+        Z0.loc[Z0s.coords] = Z0s
+
+    return Z1,Z0
+
+##}}}
+
+
 ## _apply_bcm_along_time ##{{{
 
 def _apply_bcm_along_time( Y0: np.ndarray , X0: np.ndarray , X1f: np.ndarray , X1p: np.ndarray ,

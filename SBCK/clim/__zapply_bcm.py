@@ -30,6 +30,7 @@ import zxarray as zr
 
 from ..__AbstractBC import AbstractBC
 from .__tools import yearly_window
+from .__apply_bcm import _apply_bcm
 from .__apply_bcm import _apply_bcm_along_time
 
 ############
@@ -50,6 +51,164 @@ logger.addHandler(logging.NullHandler())
 ###############
 ## Functions ##
 ###############
+
+## zapply_bcm ##{{{
+
+def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
+              bc_method: AbstractBC,
+              time_dim: str = "time",
+              seas_cycle: str = "month",
+              seas_cycle_window: int = 15,
+              multivariate_dims: Sequence | str = tuple(),
+              chunks: dict[str,int | str] | None = None,
+              bc_method_kwargs: dict[str,Any] = {},
+              **kwargs: dict[str,Any]
+              ) -> zr.ZXArray:
+    """Function for correcting `X0` and `X1` biased data with the `Y0`
+    reference. The `bcm` method is used, and must be a non-stationary method.
+    The firs dimension must be the time axis.
+    
+    Arguments
+    ---------
+    Y0: zxarray.ZXArray
+        Reference data in calibration period
+    X0: zxarray.ZXArray
+        Biased data in calibration period
+    X1: zxarray.ZXArray
+        Biased data in projection period
+    bc_method: SBCK.AbstractBC
+        Bias correction method
+    time_dim: str = "time"
+        Name of the time dimension
+    seas_cycle: str = "month"
+        How to deal with the seasonnal cycle.
+        "month": correction is performed month by month
+        "season": correction is performed season by season
+        "window": each day is corrected with a window around of the day. The
+                  length of the window is given by the
+                  parameter `seas_cycle_window`
+    seas_cycle_window: int = 15
+        Half-length of the window for the "window" parameter of "seas_cycle" 
+    multivariate_dims: tuple[str]
+        Dimensions used for multivariate correction
+    chunks: dict[str,int | str] | None = None
+        Chunks for parallelization. Default is "auto".
+    bc_method_kwargs: dict[str,Any]
+        Keyword arguments passed to bcm
+    kwargs:
+        Others arguments are passed to zxarray.apply_ufunc
+    Returns
+    -------
+    Z1: zxarray.ZXArray
+        Corrected data in projection period
+    Z0: zxarray.ZXArray
+        Corrected data in calibration period
+    """
+    ## Check if time axis is in dimensions of Y and X
+    if time_dim not in Y0.dims:
+        raise ValueError(f"Time axis dimension '{time_dim}' is not a dimension of reference data")
+    if time_dim not in X0.dims:
+        raise ValueError(f"Time axis dimension '{time_dim}' is not a dimension of biased data (calibration)")
+    if time_dim not in X1.dims:
+        raise ValueError(f"Time axis dimension '{time_dim}' is not a dimension of biased data (projection)")
+    
+    ## Check how we deal with the seasonal cycle
+    match seas_cycle:
+        case "season":
+            groups  = ["MAM","JJA","SON","DJF"]
+            groups  = [ [g] for g in groups ]
+            groupsX = groups
+            groupsY = groups
+            grp_name = "season"
+        case "month":
+            groups  = [ m + 1 for m in range(12) ]
+            groups  = [ [g] for g in groups ]
+            groupsX = groups
+            groupsY = groups
+            grp_name = "month"
+        case "window":
+            ngrpX   = X0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
+            ngrpY   = Y0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
+                groupsY = groupsX
+            else:
+                groupsY = [ [ ( (d + w) % ngrpY ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in np.linspace(0,ngrpY-1,ngrpX).astype(int)]
+            grp_name = "dayofyear"
+        case _:
+            raise ValueError(f"Unknow parameters '{seas_cycle}' for 'seas_cycle', value must be 'month', 'season' or 'window'")
+    
+    ## Check dimensions
+    if not X0.dims == Y0.dims:
+        raise ValueError("Different dimensions between X0 and Y0")
+    if not X0.dims == X1.dims:
+        raise ValueError("Different dimensions between X0 and X1")
+    if not (X0.dims[0] == time_dim and Y0.dims[0] == time_dim and X1.dims[0] == time_dim):
+        raise ValueError( f"The first fdimension of Y0, X0 and X1 must be the time (={time_dim}) dimension" )
+    if isinstance( multivariate_dims , str ):
+        multivariate_dims = (multivariate_dims,)
+    multivariate_dims = tuple(multivariate_dims)
+    for d in multivariate_dims:
+        if d not in X0.dims:
+            raise ValueError(f"Dimension '{d}' of multivariate_dims is not in Y0, X0 and X1")
+    if time_dim in multivariate_dims:
+        raise ValueError("Time dimension '{time_dim}' can not be in multivariate_dims argument")
+        
+
+    ## Create output
+    Z1 = X1.copy()
+    Z0 = X0.copy()
+    
+    ## Dask arguments
+    input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0",f"{time_dim}X1"] ]
+    output_core_dims = [(f"{time_dim}X1",) + multivariate_dims,(f"{time_dim}X0",) + multivariate_dims]
+    
+    dask_kwargs = {
+        "input_core_dims": input_core_dims,
+        "output_core_dims": output_core_dims,
+        "dask": "parallelized",
+        "kwargs": { "bc_method": bc_method , "bc_method_kwargs": bc_method_kwargs , "n_multivariate_dims": len(multivariate_dims) }
+    }
+    
+    ## Chunks
+    if chunks is None:
+        chunks = { d: "auto" for d in Y0.dims if d not in input_core_dims[0] + ("time",) }
+    
+    ## Find block dims
+    block_dims = [d for d in Y0.dims if d not in (time_dim,) + multivariate_dims]
+
+    ## Loop on groups
+    for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
+        
+        logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
+
+        ## Sub-time axis for the group
+        timeY0s = xr.concat( [Y0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
+        timeX0s = xr.concat( [X0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeX1s = xr.concat( [X1[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        
+        ## Calibration period extraction
+        Y0s = Y0.zsel( **{ time_dim: timeY0s } , drop = False ).rename( { time_dim: f"{time_dim}Y0" } )
+        X0s = X0.zsel( **{ time_dim: timeX0s } , drop = False ).rename( { time_dim: f"{time_dim}X0" } )
+        X1s = X1.zsel( **{ time_dim: timeX1s } , drop = False ).rename( { time_dim: f"{time_dim}X1" } )
+        
+        ## Correction
+        Z1s,Z0s = zr.apply_ufunc( _apply_bcm, Y0s, X0s, X1s,
+                              block_dims = block_dims,
+                              output_dims = [X1s.dims,X0s.dims],
+                              output_coords = [ {d: X1s[d] for d in X1s.dims}, {d: X0s[d] for d in X0s.dims}],
+                              output_dtypes = [X1s.dtype,X0s.dtype],
+                              dask_kwargs = dask_kwargs,
+                              **kwargs
+        )
+        
+        ## Store correction
+        Z1.zloc[*tuple([timeX1s.values] + [slice(None) for _ in range(Z1.ndim - 1)])] = Z1s
+        Z0.zloc[*tuple([timeX0s.values] + [slice(None) for _ in range(Z0.ndim - 1)])] = Z0s
+
+    return Z1,Z0
+
+##}}}
 
 ## zapply_bcm_along_time ##{{{
 
@@ -207,7 +366,10 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
     timeY0 = Y[time_dim].sel( { time_dim: slice(str(cal0),str(cal1)) } )
     timeX0 = X[time_dim].sel( { time_dim: slice(str(cal0),str(cal1)) } )
     timeX  = X[time_dim]
-
+    
+    ## Find block dims
+    block_dims = [d for d in Y.dims if d not in (time_dim,) + multivariate_dims]
+    
     ## Loop on groups
     for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
         
@@ -235,7 +397,7 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
             
             ## Correction
             Z1ps = zr.apply_ufunc( _apply_bcm_along_time, Y0s, X0s, X1fs, X1ps,
-                                  block_dims = multivariate_dims + X.dims[2:],
+                                  block_dims = block_dims,
                                   output_dims = [X1ps.dims],
                                   output_coords = [ {d: X1ps[d] for d in X1ps.dims}],
                                   output_dtypes = [X1ps.dtype],
@@ -244,7 +406,8 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
             )
             
             ## Store correction
-            Z.zloc[timeX1ps.values,:,:,:] = Z1ps
+            idx = tuple([timeX1ps.values] + [slice(None) for _ in range(Z.ndim - 1)])
+            Z.zloc[*idx] = Z1ps
     
     ## Final sub-selection
     Z = Z.zsel( **{ time_dim : slice(str(prj0),str(prj1)) } , drop = False )

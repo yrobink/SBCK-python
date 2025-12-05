@@ -17,6 +17,7 @@
 ## along with SBCK.  If not, see <https://www.gnu.org/licenses/>.
 
 from .__tools import yearly_window
+from .__apply_bcm import apply_bcm
 from .__apply_bcm import apply_bcm_along_time
 
 from .__stats import fakeclimdata
@@ -28,6 +29,7 @@ from .__stats import cadescribe
 ## Import only if zxarray is available
 import importlib.util
 if importlib.util.find_spec("zxarray"):
+    from .__zapply_bcm import zapply_bcm
     from .__zapply_bcm import zapply_bcm_along_time
     from .__zstats import zcorr
     from .__zstats import zcacorrelogram

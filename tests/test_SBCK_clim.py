@@ -27,11 +27,13 @@ import sys
 import distributed
 import unittest
 import argparse
+import itertools as itt
 
 import numpy as np
 import xarray as xr
 
 import SBCK as bc
+import zxarray as zr
 
 has_mpl = True
 try:
@@ -84,80 +86,169 @@ class Test_Apply(SBCKTestParameters,unittest.TestCase):##{{{
     def __init__( self , *args, **kwargs ):##{{{
         SBCKTestParameters.__init__( self )
         unittest.TestCase.__init__( self , *args , **kwargs )
+        
+        self.calendars = ["standard","noleap","360_day"]
     ##}}}
     
     def _data_generator( self, calY = "standard" , calX = "standard" ):##{{{
-        timeY = xr.date_range( "1961-01-01" , "1965-12-30" , calendar = calY )
-        timeX = xr.date_range( "1961-01-01" , "1970-12-30" , calendar = calX )
-        cvars = ["tas","pr"]
-        lat   = np.linspace(41,52,3+2)[1:-1]
-        lon   = np.linspace(-5,10,4+2)[1:-1]
-        Y = xr.DataArray( np.random.normal( size = timeY.size * 2 * lat.size * lon.size ).reshape(timeY.size,2,lat.size,lon.size),
-                          dims = ["time","cvar","lat","lon"],
-                         coords = [timeY,cvars,lat,lon]
-                         )
-        X = xr.DataArray( np.random.normal( size = timeX.size * 2 * lat.size * lon.size ).reshape(timeX.size,2,lat.size,lon.size),
-                          dims = ["time","cvar","lat","lon"],
-                         coords = [timeX,cvars,lat,lon]
-                         )
-        return Y,X
+        return bc.clim.fakeclimdata( rangeY = ("1961","1965"),
+                                     rangeX = ("1961","1970"),
+                                    calendarY = calY,
+                                    calendarX = calX,
+                                    )
+    ##}}}
+    
+    
+    def _test_apply( self, Y0, X0, X1, multivariate_dims = tuple() ):##{{{
+        
+        ## Correction with xarray
+        Z1,Z0 = bc.clim.apply_bcm( Y0, X0, X1,
+                              bc_method = bc.dOTC1d,
+                              seas_cycle = "season",
+                              multivariate_dims = multivariate_dims,
+                              )
+        
+        ## Transform in zxarray
+        zY0 = zr.ZXArray.from_xarray(Y0)
+        zX0 = zr.ZXArray.from_xarray(X0)
+        zX1 = zr.ZXArray.from_xarray(X1)
+        
+        ## Correction with zxarray
+        zZ1,zZ0 = bc.clim.zapply_bcm( zY0, zX0, zX1,
+                              bc_method = bc.dOTC1d,
+                              seas_cycle = "season",
+                              multivariate_dims = multivariate_dims,
+                              )
+        
+        ## Test equality
+        self.assertAlmostEqual( np.abs(zZ1.dataarray - Z1).values.max(), 0 )
+        self.assertAlmostEqual( np.abs(zZ0.dataarray - Z0).values.max(), 0 )
     ##}}}
     
     def test_apply_nospatial_univariate( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            Y0 = Y.sel( time = slice("1961","1965") )[:,:,0,0].drop_vars(["lat","lon"])
+            X0 = X.sel( time = slice("1961","1965") )[:,:,0,0].drop_vars(["lat","lon"])
+            X1 = X.sel( time = slice("1966","1970") )[:,:,0,0].drop_vars(["lat","lon"])
+            
+            self._test_apply( Y0, X0, X1, multivariate_dims = tuple() )
 
-        Y,X = self._data_generator( "noleap" , "360_day" )
-        Y = Y[:,:,0,0].drop_vars(["lat","lon"])
-        X = X[:,:,0,0].drop_vars(["lat","lon"])
-        bc.clim.apply_bcm( Y, X,
-                              bc_method = bc.IdBC,
-                              calibration_period = ("1961","1965"),
-                              projection_range = ("1961","1970"),
-                              projection_window = (1,5,1),
-                              seas_cycle = "season",
-                              )
     ##}}}
 
     def test_apply_nospatial_multivariate( self ):##{{{
-
-        Y,X = self._data_generator( "noleap" , "360_day" )
-        Y = Y[:,:,0,0].drop_vars(["lat","lon"])
-        X = X[:,:,0,0].drop_vars(["lat","lon"])
-        bc.clim.apply_bcm( Y, X,
-                              bc_method = bc.IdBC,
-                              calibration_period = ("1961","1965"),
-                              projection_range = ("1961","1970"),
-                              projection_window = (1,5,1),
-                              seas_cycle = "season",
-                              multivariate_dims = "cvar",
-                              )
-    ##}}}
-
-    def test_apply_multivariate( self ):##{{{
-
-        Y,X = self._data_generator( "noleap" , "360_day" )
-        bc.clim.apply_bcm( Y, X,
-                              bc_method = bc.IdBC,
-                              calibration_period = ("1961","1965"),
-                              projection_range = ("1961","1970"),
-                              projection_window = (1,5,1),
-                              seas_cycle = "season",
-                              multivariate_dims = "cvar",
-                              )
-    ##}}}
-
-    def test_apply_window( self ):##{{{
-
-        Y,X = self._data_generator( "noleap" , "360_day" )
-        bc.clim.apply_bcm( Y, X,
-                              bc_method = bc.IdBC,
-                              calibration_period = ("1961","1965"),
-                              projection_range = ("1961","1970"),
-                              projection_window = (1,5,1),
-                              seas_cycle = "window",
-    #                          multivariate_dims = "cvar",
-                              )
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            Y0 = Y.sel( time = slice("1961","1965") )[:,:,0,0].drop_vars(["lat","lon"])
+            X0 = X.sel( time = slice("1961","1965") )[:,:,0,0].drop_vars(["lat","lon"])
+            X1 = X.sel( time = slice("1966","1970") )[:,:,0,0].drop_vars(["lat","lon"])
+            
+            self._test_apply( Y0, X0, X1 , multivariate_dims = "cvar" )
     ##}}}
     
+    def test_apply_spatial_univariate( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            Y0 = Y.sel( time = slice("1961","1965") )
+            X0 = X.sel( time = slice("1961","1965") )
+            X1 = X.sel( time = slice("1966","1970") )
+            
+            self._test_apply( Y0, X0, X1 , multivariate_dims = "cvar" )
+
+    ##}}}
+
+    def test_apply_spatial_multivariate( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            Y0 = Y.sel( time = slice("1961","1965") )
+            X0 = X.sel( time = slice("1961","1965") )
+            X1 = X.sel( time = slice("1966","1970") )
+            
+            self._test_apply( Y0, X0, X1 , multivariate_dims = "cvar" )
+
+    ##}}}
+    
+    
+    def _test_apply_along_time( self, Y, X, multivariate_dims = tuple() ):##{{{
+        
+        ## Correction with xarray
+        Z = bc.clim.apply_bcm_along_time( Y, X,
+                              bc_method = bc.dOTC1d,
+                              calibration_period = ("1961","1965"),
+                              projection_range = ("1961","1970"),
+                              projection_window = (1,5,1),
+                              seas_cycle = "season",
+                              multivariate_dims = multivariate_dims,
+                              )
+        
+        ## Transform in zxarray
+        zY = zr.ZXArray.from_xarray(Y)
+        zX = zr.ZXArray.from_xarray(X)
+        
+        ## Correction with zxarray
+        zZ = bc.clim.zapply_bcm_along_time( zY, zX,
+                              bc_method = bc.dOTC1d,
+                              calibration_period = ("1961","1965"),
+                              projection_range = ("1961","1970"),
+                              projection_window = (1,5,1),
+                              seas_cycle = "season",
+                              multivariate_dims = multivariate_dims,
+                              )
+        
+        ## Test equality
+        self.assertAlmostEqual( np.abs(zZ.dataarray - Z).values.max(), 0 )
+    ##}}}
+    
+    def test_apply_nospatial_univariate_along_time( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            Y = Y[:,:,0,0].drop_vars(["lat","lon"])
+            X = X[:,:,0,0].drop_vars(["lat","lon"])
+            
+            self._test_apply_along_time( Y, X, multivariate_dims = tuple() )
+
+    ##}}}
+
+    def test_apply_nospatial_multivariate_along_time( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            Y = Y[:,:,0,0].drop_vars(["lat","lon"])
+            X = X[:,:,0,0].drop_vars(["lat","lon"])
+            
+            self._test_apply_along_time( Y, X, multivariate_dims = "cvar" )
+
+    ##}}}
+
+    def test_apply_spatial_univariate_along_time( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            self._test_apply_along_time( Y, X, multivariate_dims = tuple() )
+
+    ##}}}
+
+    def test_apply_spatial_multivariate_along_time( self ):##{{{
+        
+        for calY,calX in itt.product(self.calendars,self.calendars):
+            Y,X = self._data_generator( calY = calY, calX = calX )
+            
+            self._test_apply_along_time( Y, X, multivariate_dims = "cvar" )
+
+    ##}}}
+
 ##}}}
 
 ##########

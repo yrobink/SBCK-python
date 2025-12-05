@@ -1,0 +1,4 @@
+cxx_compiler:
+  - gxx                           # [linux]
+  - clangxx                       # [osx]
+  # - vs2017                        # [win]

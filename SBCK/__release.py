@@ -1,5 +1,5 @@
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2021 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,7 +20,7 @@
 version_major = 2
 version_minor = 0
 version_patch = 0
-version_extra = "a57"
+version_extra = "a58"
 version       = "{}.{}.{}{}".format(version_major,version_minor,version_patch,version_extra)
 
 name         = "SBCK"

@@ -1,5 +1,5 @@
 
-## Copyright(c) 2025 Yoann Robin
+## Copyright(c) 2025, 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,8 +20,11 @@
 ## Libraries ##
 ###############
 
+import itertools as itt
 import numpy as np
 import xarray as xr
+
+from ..ppp.__MomentsBC import MNPar
 
 ############
 ## Typing ##
@@ -33,6 +36,119 @@ from typing import Sequence
 ###############
 ## Functions ##
 ###############
+
+######################################
+## Dynamical Normalization function ##
+######################################
+
+def _dnormalization( Y0, X0, X1, timeY0, timeX0, timeX1 ):##{{{
+    
+    ## Output
+    NX0 = X0.copy() + np.nan
+    NX1 = X1.copy() + np.nan
+    
+    ##
+    if X0.size == 1:
+        return X0,X1
+    
+    ##
+    ny,nx,ncvar,_ = Y0.shape
+    cvars = range(ncvar)
+    
+    ## Loop
+    for iy,ix,m in itt.product(range(ny),range(nx),range(12)):
+
+        ## Extract sub-data
+        idxY0 = timeY0.dt.month == m + 1
+        idxX0 = timeX0.dt.month == m + 1
+        idxX1 = timeX1.dt.month == m + 1
+        mY0 = Y0[iy,ix,idxY0,:]
+        mX0 = X0[iy,ix,idxX0,:]
+        mX1 = X1[iy,ix,idxX1,:]
+
+        ## Find parameters
+        mnpY0 = MNPar(mY0)
+        mnpX0 = MNPar(mX0)
+        mnpX1 = MNPar(mX1)
+
+        ## And apply normalization
+        NX0[iy,ix,idxX0,:] = ( mnpY0._S @ mnpX0._ivS @ (mX0 - mnpX0._m).T ).T + mnpY0._m
+        NX1[iy,ix,idxX1,:] = ( mnpX1._S @ mnpX0._ivS @ mnpY0._S @ mnpX1._ivS @ (mX1 - mnpX1._m).T ).T +\
+                            mnpY0._s / mnpX0._s * ( mnpX1._m - mnpX0._m ) +\
+                            mnpY0._m
+
+    return NX0,NX1
+
+##}}}
+
+## dnormalization ##{{{
+
+def dnormalization( Y0: xr.DataArray,
+                    X0: xr.DataArray,
+                    X1: xr.DataArray,
+                   **kwargs,
+                   ) -> tuple[xr.DataArray,xr.DataArray]:
+    """
+    SBCK.clim.dnormalization
+    ========================
+    Apply dynamical normalization of data to take into account of the dynamic
+    between X0 and X1 to compute statistics
+
+    Arguments
+    ---------
+    Y0: xarray.DataArray
+        Reference in calibration period, with dimensions
+        (time_name,time_cvar) + spatial_coordinates
+    X0: xarray.DataArray
+        Biased model in calibration period, with dimensions
+        (time_name,time_cvar) + spatial_coordinates
+    X1: xarray.DataArray
+        Biased model in projection period, with dimensions
+        (time_name,time_cvar) + spatial_coordinates
+    kwargs:
+        Some keywords arguments
+        - "time_name": name of the time axis, default is "time"
+        - "cvar_name": name of the cvar axis, default is "cvar"
+        - "chunks": chunk for parallelization
+        
+    Returns
+    -------
+    NX0: xarray.DataArray
+         Normalized biased model in calibration period, with dimensions
+         (time_name,time_cvar) + spatial_coordinates
+    NX1: xarray.DataArray
+         Normalized biased model in projection period, with dimensions
+         (time_name,time_cvar) + spatial_coordinates
+    """
+    
+    ## Parameters
+    time_name = kwargs.get("time_name","time")
+    cvar_name = kwargs.get("cvar_name","cvar")
+    
+    ## Prepare
+    chunks = kwargs.get("chunks")
+    if chunks is None:
+        chunks = { d: "auto" for d in Y0.dims[2:] }
+    xY0 = Y0.rename( time = f"{time_name}Y0" ).chunk(chunks)
+    xX0 = X0.rename( time = f"{time_name}X0" ).chunk(chunks)
+    xX1 = X1.rename( time = f"{time_name}X1" ).chunk(chunks)
+    
+    ## Compute
+    res = xr.apply_ufunc( _dnormalization, xY0, xX0, xX1,
+                         input_core_dims  = [[f"{time_name}Y0",cvar_name],[f"{time_name}X0",cvar_name],[f"{time_name}X1",cvar_name]],
+                         output_core_dims = [                             [f"{time_name}X0",cvar_name],[f"{time_name}X1",cvar_name]],
+                         dask = "parallelized",
+                         kwargs = { "timeY0": Y0[time_name], "timeX0": X0[time_name], "timeX1": X1[time_name] }
+                         )
+    res = xr.Dataset( { s: NK for s,NK in zip(["NX0","NX1"],res) } ).compute()
+    
+    ## Extract
+    NX0 = res.NX0.rename( timeX0 = time_name ).transpose(*X0.dims)
+    NX1 = res.NX1.rename( timeX1 = time_name ).transpose(*X1.dims)
+
+    return NX0,NX1
+##}}}
+
 
 ##########################################
 ## Fake climate data generator function ##
@@ -98,7 +214,6 @@ def fakeclimdata( cvars: Sequence[str] = ["tas","pr"],
 #####################################
 
 def phaversine_distances( X: np.ndarray ) -> np.ndarray:##{{{
-    
     """
     SBCK.clim.phaversine_distances
     ==============================

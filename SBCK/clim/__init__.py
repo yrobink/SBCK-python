@@ -1,5 +1,5 @@
 
-## Copyright(c) 2025 Yoann Robin
+## Copyright(c) 2025, 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,6 +20,7 @@ from .__tools import yearly_window
 from .__apply_bcm import apply_bcm
 from .__apply_bcm import apply_bcm_along_time
 
+from .__stats import dnormalization
 from .__stats import fakeclimdata
 from .__stats import phaversine_distances
 from .__stats import xcorr

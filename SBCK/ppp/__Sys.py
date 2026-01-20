@@ -1,5 +1,5 @@
 
-## Copyright(c) 2023 / 2025 Yoann Robin
+## Copyright(c) 2023 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -101,7 +101,7 @@ class Xarray(PrePostProcessing):###{{{
             self._sX1["coords"] = X.coords
             self._sX1["shape"]  = X.shape
         
-        Xt = X.values
+        Xt = X.values.reshape(X.shape[0],-1)
         return Xt
     
     def itransform( self , Xt: _Array ) -> _Array:

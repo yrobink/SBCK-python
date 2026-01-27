@@ -1,5 +1,5 @@
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2021 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,8 +21,7 @@
 #############
 
 import numpy as np
-import scipy.linalg as scl
-import scipy.spatial.distance as ssd
+import scipy as sp
 
 
 ############
@@ -72,8 +71,8 @@ class SchaakeShuffle:##{{{
         X0 = X0.squeeze()
         Y0 = Y0.squeeze()
         
-        rank_X0 = sc.rankdata( X0 , method = "ordinal" )
-        rank_Y0 = sc.rankdata( Y0 , method = "ordinal" )
+        rank_X0 = sp.stats.rankdata( X0 , method = "ordinal" )
+        rank_Y0 = sp.stats.rankdata( Y0 , method = "ordinal" )
         
         arank_X0 = np.argsort(rank_X0)
         Z0 = X0[arank_X0][rank_Y0-1]
@@ -192,8 +191,8 @@ class SchaakeShuffleRef(SchaakeShuffle):##{{{
         if X0.ndim == 1: X0 = X0.reshape(-1,1)
         Z0 = SchaakeShuffle.predict( self , X0 )
         
-        rank_ref_X0  = sc.rankdata( X0[:,self._ref] , method = "ordinal" )
-        rank_ref_Z0  = sc.rankdata( Z0[:,self._ref] , method = "ordinal" )
+        rank_ref_X0  = sp.stats.rankdata( X0[:,self._ref] , method = "ordinal" )
+        rank_ref_Z0  = sp.stats.rankdata( Z0[:,self._ref] , method = "ordinal" )
         arank_ref_Z0 = np.argsort(rank_ref_Z0)
         Z0 = Z0[arank_ref_Z0,:][rank_ref_X0-1,:]
         
@@ -251,7 +250,7 @@ class MVQuantilesShuffle: ##{{{
         rvY = mrv_base().fit(Y)
         
         ## Index to build block search matrix
-        tiY = (n_samplesY - 1 - scl.toeplitz(range(n_samplesY)))[::-1,:][:self.lag_search,:(n_samplesY-self.lag_search+1)]
+        tiY = (n_samplesY - 1 - sp.linalg.toeplitz(range(n_samplesY)))[::-1,:][:self.lag_search,:(n_samplesY-self.lag_search+1)]
         
         ## Find quantiles (i.e. ranks)
         self.qY = rvY.cdf(Y)
@@ -283,7 +282,7 @@ class MVQuantilesShuffle: ##{{{
         rvX  = mrv_base().fit(X)
         
         ## Index to build block search matrix
-        tiX  = (n_samplesX - 1 - scl.toeplitz(range(n_samplesX)))[::-1,:][:self.lag_search,:(n_samplesX-self.lag_search+1)]
+        tiX  = (n_samplesX - 1 - sp.linalg.toeplitz(range(n_samplesX)))[::-1,:][:self.lag_search,:(n_samplesX-self.lag_search+1)]
         
         ## Find quantiles (i.e. ranks)
         qX = rvX.cdf(X)
@@ -295,7 +294,7 @@ class MVQuantilesShuffle: ##{{{
         bsXc = np.array( [ qXc[tiX[:,i],:].ravel() for i in range(0,n_samplesX-self.lag_search+1,self.lag_keep) ] + [qXc[tiX[:,-1],:].ravel()] )
         
         ## Now pairwise dist between cond. X / Y block search
-        bsdistc = ssd.cdist( bsXc , self.bsYc )
+        bsdistc = sp.spatial.distance.cdist( bsXc , self.bsYc )
         idx_bsc = np.argmin( bsdistc , axis = 1 )
         
         ## Find associated quantiles in unconditioning Y
@@ -371,10 +370,10 @@ class MVRanksShuffle: ##{{{
         self.col_ucond  = [ i for i in range(self.ndim) if i not in self.col_cond ]
         
         ## Index to build block search matrix
-        tiY = (n_samplesY - 1 - scl.toeplitz(range(n_samplesY)))[::-1,:][:self.lag_search,:(n_samplesY-self.lag_search+1)]
+        tiY = (n_samplesY - 1 - sp.linalg.toeplitz(range(n_samplesY)))[::-1,:][:self.lag_search,:(n_samplesY-self.lag_search+1)]
         
         ## Find quantiles (i.e. ranks)
-        self.qY = sc.rankdata( Y , axis = 0 , method = "ordinal" )
+        self.qY = sp.stats.rankdata( Y , axis = 0 , method = "ordinal" )
         
         ## Build conditionning block search
         qYc = self.qY[:,self.col_cond]
@@ -401,10 +400,10 @@ class MVRanksShuffle: ##{{{
         ## Build non-parametric marginal distribution of X
         
         ## Index to build block search matrix
-        tiX  = (n_samplesX - 1 - scl.toeplitz(range(n_samplesX)))[::-1,:][:self.lag_search,:(n_samplesX-self.lag_search+1)]
+        tiX  = (n_samplesX - 1 - sp.linalg.toeplitz(range(n_samplesX)))[::-1,:][:self.lag_search,:(n_samplesX-self.lag_search+1)]
         
         ## Find quantiles (i.e. ranks)
-        qX = sc.rankdata( X , axis = 0 , method = "ordinal" )
+        qX = sp.stats.rankdata( X , axis = 0 , method = "ordinal" )
         
         ## Shrink
         qY = self.qY
@@ -420,7 +419,7 @@ class MVRanksShuffle: ##{{{
         bsXc = np.array( [ qXc[tiX[:,i],:].ravel() for i in range(0,n_samplesX-self.lag_search+1,self.lag_keep) ] + [qXc[tiX[:,-1],:].ravel()] )
         
         ## Now pairwise dist between cond. X / Y block search
-        bsdistc = ssd.cdist( bsXc , self.bsYc )
+        bsdistc = sp.spatial.distance.cdist( bsXc , self.bsYc )
         idx_bsc = np.argmin( bsdistc , axis = 1 )
         
         ## Find associated quantiles in unconditioning Y

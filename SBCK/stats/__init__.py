@@ -1,5 +1,5 @@
 
-## Copyright(c) 2025 Yoann Robin
+## Copyright(c) 2025, 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -42,4 +42,11 @@ from .__transport import POTemd
 from .__transport import OTSinkhorn
 from .__transport import OTSinkhornLogDual
 
+from .__shuffle import SchaakeShuffle
+from .__shuffle import schaake_shuffle
+from .__shuffle import SchaakeShuffleRef
+from .__shuffle import MVQuantilesShuffle
+from .__shuffle import MVRanksShuffle
+
+from .__shift import Shift
 

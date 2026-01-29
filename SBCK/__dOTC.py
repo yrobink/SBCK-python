@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2021 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -133,7 +133,7 @@ class OTC(AbstractBC):##{{{
         
         return self
     ##}}}
-    
+
     def _predictZ0( self , X0: _Array , reinfer_X0: bool = False , **kwargs: Any ) -> _Array:##{{{
         """
         Parameters
@@ -167,7 +167,25 @@ class OTC(AbstractBC):##{{{
         
         return Z0
     ##}}}
-    
+
+    def _predictZ1( self , X1: _Array , reinfer_X1: bool = False , **kwargs: Any ) -> _Array:##{{{
+        """
+        Parameters
+        ----------
+        X1: numpy.ndarray
+            Biased model in calibration period
+        reinfer_X1: bool
+            If the law of X1 must be fitted again
+
+        Returns
+        -------
+        Z1: numpy.ndarray | None
+            Corrected biased model in calibration period
+        """
+        
+        return self._predictZ0( X1, reinfer_X1, **kwargs )
+    ##}}}
+
 ##}}}
 
 class dOTC(AbstractBC):##{{{

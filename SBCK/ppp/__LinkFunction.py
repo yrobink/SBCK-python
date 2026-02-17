@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 / 2025 Yoann Robin
+## Copyright(c) 2022 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -257,9 +257,6 @@ class LFLog(LinkFunction):##{{{
         *kwargs:
             All others arguments are passed to SBCK.ppp.PrePostProcessing
         """
-        if not s > 0:
-            raise Exception( f"Parameter s = {s} must be non negative!" )
-        self.s = s
         transform  = lambda x: np.log(x)
         itransform = lambda x: np.exp(x)
         LinkFunction.__init__( self , *args , name = "LFLoglin" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )

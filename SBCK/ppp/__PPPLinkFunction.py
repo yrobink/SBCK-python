@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022, 2023 Yoann Robin
+## Copyright(c) 2022 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -269,7 +269,7 @@ class PPPLogLinLink(PPPLinkFunction):##{{{
 	- inverse transform is given by s*exp( (x-s) / s ) if x < s, else x
 	
 	"""
-	def __init__( self , *args , s = 1e-5 , cols = None , **kwargs ):
+	def __init__( self , *args , s: float = 1e-5 , cols = None , **kwargs ):
 		"""
 		Constructor
 		===========

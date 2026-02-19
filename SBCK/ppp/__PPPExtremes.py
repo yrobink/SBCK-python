@@ -1,5 +1,5 @@
 
-## Copyright(c) 2023 Yoann Robin
+## Copyright(c) 2023 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -49,7 +49,7 @@ class PPPLimitTailsRatio(PrePostProcessing):
 	
 	"""
 	
-	def __init__( self , *args , ratio = 1.5 , p_r = 0.95 , p_l = 0.05 , p_c = 0.5 , tails = "both" , cols = None , **kwargs ):##{{{
+	def __init__( self , *args , ratio: float = 1.5 , p_r: float = 0.95 , p_l: float = 0.05 , p_c: float = 0.5 , tails: str = "both" , cols = None , **kwargs ):##{{{
 		"""
 		Constructor
 		===========

@@ -1,0 +1,48 @@
+context:
+  refname: "{{ environ['GITHUB_REF_NAME'] }}"
+
+package:
+  name: sbck
+  version: "{{ refname }}"
+
+source:
+  - path: ..
+  # - git_url: https://github.com/yrobink/SBCK-python.git
+  #   git_rev: 4f2f165f18650fffe64ac0db45e7f30891dc0b77
+  #   git_depth: 1
+
+build:
+  number: 0
+  script: python -m pip install --ignore-installed .
+  include_recipe: false
+
+requirements:
+  # build:
+  #   - "{{ compiler('cxx') }}"
+  #   - "python {{ python }}"
+  #   - pybind11 >=2.2
+  #   - eigen >=3.4.0
+
+  # build:
+  #   - python
+  #   - setuptools
+  #   - pybind11 >=2.2
+  #   - eigen >=3.4.0
+
+  host:
+    - python
+    - setuptools
+    - pybind11 >=2.2
+    - eigen >=3.4.0
+
+  run:
+    - python
+    - numpy
+    - scipy
+    - matplotlib
+    - pybind11 >=2.2
+    - pot >=0.9.0
+
+test:
+  imports:
+    - SBCK

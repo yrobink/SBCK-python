@@ -407,7 +407,7 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
             
             ## Store correction
             idx = tuple([timeX1ps.values] + [slice(None) for _ in range(Z.ndim - 1)])
-            Z.zloc[*idx] = Z1ps
+            Z.zloc[*idx] = Z1ps.rename( { f"{time_dim}X1p": time_dim } )
     
     ## Final sub-selection
     Z = Z.zsel( **{ time_dim : slice(str(prj0),str(prj1)) } , drop = False )

@@ -8,8 +8,11 @@ dynamic = ["version","description","license"]
 dependencies = [
   "numpy",
   "scipy",
+  "xarray",
   "pot>=0.9.0",
-  "zxarray>=0.13.4"
+  "zxarray>=0.13.4",
+  "cftime",
+  "netCDF4"
 ]
 requires-python = ">=3.12"
 authors = [

@@ -1,5 +1,5 @@
 
-## Copyright(c) 2025 Yoann Robin
+## Copyright(c) 2025, 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -25,6 +25,11 @@
 ############
 
 from typing import Generator
+from typing import Sequence
+
+import cftime
+import numpy as np
+import xarray as xr
 
 
 ###############
@@ -129,4 +134,19 @@ def yearly_window( ybeg_: int | str,
         tf1 = tp1 + wright
 ##}}}
 
+def round_hour00_time( time: Sequence[cftime.datetime] ) -> np.ndarray:##{{{
+    """Function used to round hours in time axis to 00:00.
+
+    Arguments
+    ---------
+    time:
+        List of array of time to round
+
+    Returns
+    -------
+    time0:
+        A numpy array containing the rounded values
+    """
+    return xr.DataArray( time, dims = ["time"], coords = [time] ).dt.floor("1D").values
+##}}}
 

@@ -1,5 +1,5 @@
 
-## Copyright(c) 2025 Yoann Robin
+## Copyright(c) 2025, 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -206,6 +206,13 @@ def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
         Z1.zloc[*tuple([timeX1s.values] + [slice(None) for _ in range(Z1.ndim - 1)])] = Z1s
         Z0.zloc[*tuple([timeX0s.values] + [slice(None) for _ in range(Z0.ndim - 1)])] = Z0s
 
+        ## Clean
+        del Y0s
+        del X0s
+        del X1s
+        del Z0s
+        del Z1s
+
     return Z1,Z0
 
 ##}}}
@@ -408,6 +415,15 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
             ## Store correction
             idx = tuple([timeX1ps.values] + [slice(None) for _ in range(Z.ndim - 1)])
             Z.zloc[*idx] = Z1ps.rename( { f"{time_dim}X1p": time_dim } )
+
+            ## Clean
+            del X1fs
+            del X1ps
+            del Z1ps
+
+        ## Clean
+        del Y0s
+        del X0s
     
     ## Final sub-selection
     Z = Z.zsel( **{ time_dim : slice(str(prj0),str(prj1)) } , drop = False )

@@ -10,7 +10,7 @@ dependencies = [
   "scipy",
   "xarray",
   "pot>=0.9.0",
-  "zxarray>=0.13.4",
+  "zxarray>=0.15.0",
   "cftime",
   "netCDF4"
 ]

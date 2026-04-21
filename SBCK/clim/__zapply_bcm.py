@@ -389,7 +389,13 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
         
         ## Calibration period extraction
         Y0s = Y.zsel( **{ time_dim: timeY0s } , drop = False ).rename( { time_dim: f"{time_dim}Y0" } )
+        if not Y0s.size > 0:
+            logger.warning( f"0-size for Y0 (grp: {grpsY})" )
+            continue
         X0s = X.zsel( **{ time_dim: timeX0s } , drop = False ).rename( { time_dim: f"{time_dim}X0" } )
+        if not X0s.size > 0:
+            logger.warning( f"0-size for X0 (grp: {grpsY})" )
+            continue
 
         ## Loop on years
         for tf0,tp0,tp1,tf1 in yearly_window( prj0 , prj1 , wl , wm , wr , bleft , bright ):
@@ -400,7 +406,13 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
             
             ## Data extraction
             X1fs = X.zsel( **{ time_dim: timeX1fs } , drop = False ).rename( { time_dim: f"{time_dim}X1f" } )
+            if not X1fs.size > 0:
+                logger.warning( f"0-size for X1fs (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                continue
             X1ps = X.zsel( **{ time_dim: timeX1ps } , drop = False ).rename( { time_dim: f"{time_dim}X1p" } )
+            if not X1ps.size > 0:
+                logger.warning( f"0-size for X1ps (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                continue
             
             ## Correction
             Z1ps = zr.apply_ufunc( _apply_bcm_along_time, Y0s, X0s, X1fs, X1ps,

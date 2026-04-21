@@ -1,5 +1,5 @@
 
-## Copyright(c) 2025 Yoann Robin
+## Copyright(c) 2025, 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -426,7 +426,13 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
         
         ## Calibration period extraction
         Y0s = Y.sel( **{ time_dim: timeY0s } ).rename( { time_dim: f"{time_dim}Y0" } )
+        if not Y0s.size > 0:
+            logger.warning( f"0-size for Y0 (grp: {grpsY})" )
+            continue
         X0s = X.sel( **{ time_dim: timeX0s } ).rename( { time_dim: f"{time_dim}X0" } )
+        if not X0s.size > 0:
+            logger.warning( f"0-size for X0 (grp: {grpsY})" )
+            continue
         
         ## Loop on years
         for tf0,tp0,tp1,tf1 in yearly_window( prj0 , prj1 , wl , wm , wr , bleft , bright ):
@@ -437,7 +443,13 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
             
             ## Data extraction
             X1fs = X.sel( **{ time_dim: timeX1fs } ).rename( { time_dim: f"{time_dim}X1f" } )
+            if not X1fs.size > 0:
+                logger.warning( f"0-size for X1fs (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                continue
             X1ps = X.sel( **{ time_dim: timeX1ps } ).rename( { time_dim: f"{time_dim}X1p" } )
+            if not X1ps.size > 0:
+                logger.warning( f"0-size for X1ps (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                continue
             
             ## Correction
             Z1ps = xr.apply_ufunc( _apply_bcm_along_time, Y0s.chunk(chunks) , X0s.chunk(chunks) , X1fs.chunk(chunks) , X1ps.chunk(chunks) ,

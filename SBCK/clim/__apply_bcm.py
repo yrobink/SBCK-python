@@ -51,23 +51,26 @@ logger.addHandler(logging.NullHandler())
 ###############
 
 
+def group2time( time: xr.DataArray, time_dim: str, grps: Sequence[Any], grp_name: str ) -> xr.DataArray:##{{{
+    return xr.concat( [ time.groupby(f"{time_dim}.{grp_name}")[g] for g in grps ], dim = time_dim ).sortby(time_dim).compute()
+##}}}
+
+
 ## _apply_bcm ##{{{
 
-def _apply_bcm( Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray,
+def _apply_bcm( Y0: np.ndarray , X0f: np.ndarray , X1f: np.ndarray,
+                                 X0p: np.ndarray , X1p: np.ndarray,
                bc_method: AbstractBC,
                bc_method_kwargs: dict[str,Any] = {},
                n_multivariate_dims: int = 0 ) -> np.ndarray:
     
     ## Create output
-    Z0 = X0.copy() + np.nan
-    Z1 = X1.copy() + np.nan
+    Z0p = X0p.copy() + np.nan
+    Z1p = X1p.copy() + np.nan
 
     ## Special case
-    if Z1.size == 1:
-        return Z1,Z0
-    
-    ## For dev
-#    print( f"{Y0.shape} / {X0.shape} / {X1.shape} / {n_multivariate_dims}" )
+    if Z1p.size == 1:
+        return Z1p,Z0p
     
     ## Find uni and multi-axis
     tdim  = Y0.ndim - 1 - n_multivariate_dims
@@ -76,13 +79,17 @@ def _apply_bcm( Y0: np.ndarray , X0: np.ndarray , X1: np.ndarray,
     for pidx in itt.product(*[range(s) for s in Y0.shape[:tdim]]):
         idx = pidx + (slice(None),) + tuple([slice(None) for _ in range(n_multivariate_dims)])
         shp = [1 for _ in range(len(pidx))] + [-1] + [Y0.shape[s+tdim+1] for s in range(n_multivariate_dims)]
-        if not (np.isfinite(Y0[idx]).all() and np.isfinite(X0[idx]).all() and np.isfinite(X1[idx]).all()):
+        if not (np.isfinite(Y0[idx]).all() and
+                np.isfinite(X0f[idx]).all() and
+                np.isfinite(X1f[idx]).all() and
+                np.isfinite(X0p[idx]).all() and
+                np.isfinite(X1p[idx]).all()):
             continue
-        _Z1,_Z0 = bc_method( **bc_method_kwargs ).fit( Y0[idx] , X0[idx] , X1[idx] ).predict( X1[idx], X0[idx] )
-        Z1[idx] = _Z1.reshape(*shp)
-        Z0[idx] = _Z0.reshape(*shp)
+        _Z1p,_Z0p = bc_method( **bc_method_kwargs ).fit( Y0[idx] , X0f[idx] , X1f[idx] ).predict( X1p[idx], X0p[idx] )
+        Z1p[idx]  = _Z1p.reshape(*shp)
+        Z0p[idx]  = _Z0p.reshape(*shp)
     
-    return Z1,Z0
+    return Z1p,Z0p
 
 ##}}}
 
@@ -92,7 +99,7 @@ def apply_bcm( Y0: xr.DataArray, X0: xr.DataArray, X1: xr.DataArray,
               bc_method: AbstractBC,
               time_dim: str = "time",
               seas_cycle: str = "month",
-              seas_cycle_window: int = 15,
+              seas_cycle_window: tuple[int,int,int] = (10,10,10),
               multivariate_dims: Sequence | str = tuple(),
               chunks: dict[str,int | str] | None = None,
               bc_method_kwargs: dict[str,Any] = {},
@@ -121,8 +128,11 @@ def apply_bcm( Y0: xr.DataArray, X0: xr.DataArray, X1: xr.DataArray,
         "window": each day is corrected with a window around of the day. The
                   length of the window is given by the
                   parameter `seas_cycle_window`
-    seas_cycle_window: int = 15
-        Half-length of the window for the "window" parameter of "seas_cycle" 
+    seas_cycle_window: tuple[int,int,int] = (10,10,10)
+        Window used to smooth the seasonal cycle. Noted
+        wl,wc,wr = seas_cycle_window, the fit method is applied on the window
+        of length wl + wc + wr, and predict is applied on centered window of
+        size wc.
     multivariate_dims: tuple[str]
         Dimensions used for multivariate correction
     chunks: dict[str,int | str] | None = None
@@ -148,25 +158,26 @@ def apply_bcm( Y0: xr.DataArray, X0: xr.DataArray, X1: xr.DataArray,
     ## Check how we deal with the seasonal cycle
     match seas_cycle:
         case "season":
-            groups  = ["MAM","JJA","SON","DJF"]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = ["MAM","JJA","SON","DJF"]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "season"
         case "month":
-            groups  = [ m + 1 for m in range(12) ]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = [ m + 1 for m in range(12) ]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "month"
         case "window":
-            ngrpX   = X0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
-            ngrpY   = Y0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
-                groupsY = groupsX
-            else:
-                groupsY = [ [ ( (d + w) % ngrpY ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in np.linspace(0,ngrpY-1,ngrpX).astype(int)]
+            wl,wc,wr = seas_cycle_window
+            ndaysX   = X0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            ndaysY   = Y0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            groupsXf = [ [ ( (d + w) % ndaysX ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
+            groupsXp = [ [ ( (d + w) % ndaysX ) + 1 for w in range(  0, wc     )] for d in range(0,ndaysX,wc) ]
+            groupsY  = [ [ ( (d + w) % ndaysY ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
             grp_name = "dayofyear"
         case _:
             raise ValueError(f"Unknow parameters '{seas_cycle}' for 'seas_cycle', value must be 'month', 'season' or 'window'")
@@ -192,30 +203,36 @@ def apply_bcm( Y0: xr.DataArray, X0: xr.DataArray, X1: xr.DataArray,
     Z0 = X0.copy() + np.nan
     
     ## Dask arguments
-    input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0",f"{time_dim}X1"] ]
-    output_core_dims = [(f"{time_dim}X1",) + multivariate_dims,(f"{time_dim}X0",) + multivariate_dims]
+    input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0f",f"{time_dim}X1f",f"{time_dim}X0p",f"{time_dim}X1p"] ]
+    output_core_dims = [(f"{time_dim}X1p",) + multivariate_dims,(f"{time_dim}X0p",) + multivariate_dims]
     
     ## Chunks
     if chunks is None:
         chunks = { d: "auto" for d in Y0.dims if d not in input_core_dims[0] + ("time",) }
-    
+
     ## Loop on groups
-    for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
+    _fmt  = '0>{}'.format( int(np.log10(len(groupsY))+1) )
+    _ngrp = len(groupsY)
+    for igrps,(grpsXf,grpsXp,grpsY) in enumerate(zip(groupsXf,groupsXp,groupsY)):
         
-        logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
+        logger.info( f"Correction of group {igrps+1:{_fmt}} / {_ngrp}" )
         
         ## Sub-time axis for the group
-        timeY0s = xr.concat( [Y0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
-        timeX0s = xr.concat( [X0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
-        timeX1s = xr.concat( [X1[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeY0s  = group2time( Y0[time_dim], time_dim, grpsY , grp_name )
+        timeX0fs = group2time( X0[time_dim], time_dim, grpsXf, grp_name )
+        timeX0ps = group2time( X0[time_dim], time_dim, grpsXp, grp_name )
+        timeX1fs = group2time( X1[time_dim], time_dim, grpsXf, grp_name )
+        timeX1ps = group2time( X1[time_dim], time_dim, grpsXp, grp_name )
         
         ## Calibration period extraction
-        Y0s = Y0.sel( **{ time_dim: timeY0s } ).rename( { time_dim: f"{time_dim}Y0" } )
-        X0s = X0.sel( **{ time_dim: timeX0s } ).rename( { time_dim: f"{time_dim}X0" } )
-        X1s = X1.sel( **{ time_dim: timeX1s } ).rename( { time_dim: f"{time_dim}X1" } )
+        Y0s  = Y0.sel( **{ time_dim: timeY0s  } ).rename( { time_dim: f"{time_dim}Y0"  } )
+        X0fs = X0.sel( **{ time_dim: timeX0fs } ).rename( { time_dim: f"{time_dim}X0f" } )
+        X0ps = X0.sel( **{ time_dim: timeX0ps } ).rename( { time_dim: f"{time_dim}X0p" } )
+        X1fs = X1.sel( **{ time_dim: timeX1fs } ).rename( { time_dim: f"{time_dim}X1f" } )
+        X1ps = X1.sel( **{ time_dim: timeX1ps } ).rename( { time_dim: f"{time_dim}X1p" } )
         
         ## Correction
-        res = xr.apply_ufunc( _apply_bcm, Y0s.chunk(chunks) , X0s.chunk(chunks) , X1s.chunk(chunks),
+        res = xr.apply_ufunc( _apply_bcm, Y0s.chunk(chunks) , X0fs.chunk(chunks) , X1fs.chunk(chunks), X0ps.chunk(chunks) , X1ps.chunk(chunks),
                           input_core_dims  = input_core_dims,
                           output_core_dims = output_core_dims,
                           dask = "parallelized",
@@ -224,8 +241,8 @@ def apply_bcm( Y0: xr.DataArray, X0: xr.DataArray, X1: xr.DataArray,
         res = xr.Dataset( { "Z1s": res[0], "Z0s": res[1] } ).compute()
         
         ## Store correction
-        Z1s = res.Z1s.rename( { f"{time_dim}X1": time_dim } ).transpose(*X1.dims)
-        Z0s = res.Z0s.rename( { f"{time_dim}X0": time_dim } ).transpose(*X0.dims)
+        Z1s = res.Z1s.rename( { f"{time_dim}X1p": time_dim } ).transpose(*X1.dims)
+        Z0s = res.Z0s.rename( { f"{time_dim}X0p": time_dim } ).transpose(*X0.dims)
         Z1.loc[Z1s.coords] = Z1s
         Z0.loc[Z0s.coords] = Z0s
 
@@ -275,7 +292,7 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
               projection_window: tuple[int,int,int] = (5,10,5),
               time_dim: str = "time",
               seas_cycle: str = "month",
-              seas_cycle_window: int = 15,
+              seas_cycle_window: tuple[int,int,int] = (10,10,10),
               multivariate_dims: Sequence | str = tuple(),
               chunks: dict[str,int | str] | None = None,
               bc_method_kwargs: dict[str,Any] = {},
@@ -310,8 +327,11 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
         "window": each day is corrected with a window around of the day. The
                   length of the window is given by the
                   parameter `seas_cycle_window`
-    seas_cycle_window: int = 15
-        Half-length of the window for the "window" parameter of "seas_cycle" 
+    seas_cycle_window: tuple[int,int,int] = (10,10,10)
+        Window used to smooth the seasonal cycle. Noted
+        wl,wc,wr = seas_cycle_window, the fit method is applied on the window
+        of length wl + wc + wr, and predict is applied on centered window of
+        size wc.
     multivariate_dims: tuple[str]
         Dimensions used for multivariate correction
     chunks: dict[str,int | str] | None = None
@@ -361,25 +381,26 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
     ## Check how we deal with the seasonal cycle
     match seas_cycle:
         case "season":
-            groups  = ["MAM","JJA","SON","DJF"]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = ["MAM","JJA","SON","DJF"]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "season"
         case "month":
-            groups  = [ m + 1 for m in range(12) ]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = [ m + 1 for m in range(12) ]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "month"
         case "window":
-            ngrpX   = X[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
-            ngrpY   = Y[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
-                groupsY = groupsX
-            else:
-                groupsY = [ [ ( (d + w) % ngrpY ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in np.linspace(0,ngrpY-1,ngrpX).astype(int)]
+            wl,wc,wr = seas_cycle_window
+            ndaysX   = X[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            ndaysY   = Y[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            groupsXf = [ [ ( (d + w) % ndaysX ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
+            groupsXp = [ [ ( (d + w) % ndaysX ) + 1 for w in range(  0, wc     )] for d in range(0,ndaysX,wc) ]
+            groupsY  = [ [ ( (d + w) % ndaysY ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
             grp_name = "dayofyear"
         case _:
             raise ValueError(f"Unknow parameters '{seas_cycle}' for 'seas_cycle', value must be 'month', 'season' or 'window'")
@@ -415,14 +436,17 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
     timeX  = X[time_dim]
     
     ## Loop on groups
-    for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
+    _fmt  = '0>{}'.format( int(np.log10(len(groupsY))+1) )
+    _ngrp = len(groupsY)
+    for igrps,(grpsXf,grpsXp,grpsY) in enumerate(zip(groupsXf,groupsXp,groupsY)):
         
-        logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
+        logger.info( f"Correction of group {igrps+1:{_fmt}} / {_ngrp}" )
         
         ## Sub-time axis for the group
-        timeY0s = xr.concat( [timeY0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
-        timeX0s = xr.concat( [timeX0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
-        timeX1s = xr.concat( [ timeX.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeY0s  = group2time( timeY0, time_dim, grpsY , grp_name )
+        timeX0s  = group2time( timeX0, time_dim, grpsXf, grp_name )
+        timeX1fs = group2time( timeX , time_dim, grpsXf, grp_name )
+        timeX1ps = group2time( timeX , time_dim, grpsXp, grp_name )
         
         ## Calibration period extraction
         Y0s = Y.sel( **{ time_dim: timeY0s } ).rename( { time_dim: f"{time_dim}Y0" } )
@@ -431,24 +455,24 @@ def apply_bcm_along_time( Y: xr.DataArray, X: xr.DataArray,
             continue
         X0s = X.sel( **{ time_dim: timeX0s } ).rename( { time_dim: f"{time_dim}X0" } )
         if not X0s.size > 0:
-            logger.warning( f"0-size for X0 (grp: {grpsY})" )
+            logger.warning( f"0-size for X0 (grp: {grpsXf})" )
             continue
         
         ## Loop on years
         for tf0,tp0,tp1,tf1 in yearly_window( prj0 , prj1 , wl , wm , wr , bleft , bright ):
             
             ## Sub-time axis for the projection period
-            timeX1fs = timeX1s.sel( { time_dim : slice(str(tf0),str(tf1)) } ).sortby(time_dim)
-            timeX1ps = timeX1s.sel( { time_dim : slice(str(tp0),str(tp1)) } ).sortby(time_dim)
+            _timeX1fs = timeX1fs.sel( { time_dim : slice(str(tf0),str(tf1)) } ).sortby(time_dim)
+            _timeX1ps = timeX1ps.sel( { time_dim : slice(str(tp0),str(tp1)) } ).sortby(time_dim)
             
             ## Data extraction
-            X1fs = X.sel( **{ time_dim: timeX1fs } ).rename( { time_dim: f"{time_dim}X1f" } )
+            X1fs = X.sel( **{ time_dim: _timeX1fs } ).rename( { time_dim: f"{time_dim}X1f" } )
             if not X1fs.size > 0:
-                logger.warning( f"0-size for X1fs (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                logger.warning( f"0-size for X1fs (grp: {grpsXf}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
                 continue
-            X1ps = X.sel( **{ time_dim: timeX1ps } ).rename( { time_dim: f"{time_dim}X1p" } )
+            X1ps = X.sel( **{ time_dim: _timeX1ps } ).rename( { time_dim: f"{time_dim}X1p" } )
             if not X1ps.size > 0:
-                logger.warning( f"0-size for X1ps (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                logger.warning( f"0-size for X1ps (grp: {grpsXp}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
                 continue
             
             ## Correction

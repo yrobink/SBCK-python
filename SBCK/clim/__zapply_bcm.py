@@ -30,8 +30,10 @@ import zxarray as zr
 
 from ..__AbstractBC import AbstractBC
 from .__tools import yearly_window
+from .__apply_bcm import group2time
 from .__apply_bcm import _apply_bcm
 from .__apply_bcm import _apply_bcm_along_time
+
 
 ############
 ## Typing ##
@@ -58,7 +60,7 @@ def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
               bc_method: AbstractBC,
               time_dim: str = "time",
               seas_cycle: str = "month",
-              seas_cycle_window: int = 15,
+              seas_cycle_window: tuple[int,int,int] = (10,10,10),
               multivariate_dims: Sequence | str = tuple(),
               chunks: dict[str,int | str] | None = None,
               bc_method_kwargs: dict[str,Any] = {},
@@ -87,8 +89,11 @@ def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
         "window": each day is corrected with a window around of the day. The
                   length of the window is given by the
                   parameter `seas_cycle_window`
-    seas_cycle_window: int = 15
-        Half-length of the window for the "window" parameter of "seas_cycle" 
+    seas_cycle_window: tuple[int,int,int] = (10,10,10)
+        Window used to smooth the seasonal cycle. Noted
+        wl,wc,wr = seas_cycle_window, the fit method is applied on the window
+        of length wl + wc + wr, and predict is applied on centered window of
+        size wc.
     multivariate_dims: tuple[str]
         Dimensions used for multivariate correction
     chunks: dict[str,int | str] | None = None
@@ -115,25 +120,26 @@ def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
     ## Check how we deal with the seasonal cycle
     match seas_cycle:
         case "season":
-            groups  = ["MAM","JJA","SON","DJF"]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = ["MAM","JJA","SON","DJF"]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "season"
         case "month":
-            groups  = [ m + 1 for m in range(12) ]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = [ m + 1 for m in range(12) ]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "month"
         case "window":
-            ngrpX   = X0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
-            ngrpY   = Y0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
-                groupsY = groupsX
-            else:
-                groupsY = [ [ ( (d + w) % ngrpY ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in np.linspace(0,ngrpY-1,ngrpX).astype(int)]
+            wl,wc,wr = seas_cycle_window
+            ndaysX   = X0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            ndaysY   = Y0[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            groupsXf = [ [ ( (d + w) % ndaysX ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
+            groupsXp = [ [ ( (d + w) % ndaysX ) + 1 for w in range(  0, wc     )] for d in range(0,ndaysX,wc) ]
+            groupsY  = [ [ ( (d + w) % ndaysY ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
             grp_name = "dayofyear"
         case _:
             raise ValueError(f"Unknow parameters '{seas_cycle}' for 'seas_cycle', value must be 'month', 'season' or 'window'")
@@ -153,15 +159,14 @@ def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
             raise ValueError(f"Dimension '{d}' of multivariate_dims is not in Y0, X0 and X1")
     if time_dim in multivariate_dims:
         raise ValueError("Time dimension '{time_dim}' can not be in multivariate_dims argument")
-        
 
     ## Create output
     Z1 = X1.copy()
     Z0 = X0.copy()
     
     ## Dask arguments
-    input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0",f"{time_dim}X1"] ]
-    output_core_dims = [(f"{time_dim}X1",) + multivariate_dims,(f"{time_dim}X0",) + multivariate_dims]
+    input_core_dims  = [(tdim,) + multivariate_dims for tdim in [f"{time_dim}Y0",f"{time_dim}X0f",f"{time_dim}X1f",f"{time_dim}X0p",f"{time_dim}X1p"] ]
+    output_core_dims = [(f"{time_dim}X1p",) + multivariate_dims,(f"{time_dim}X0p",) + multivariate_dims]
     
     dask_kwargs = {
         "input_core_dims": input_core_dims,
@@ -178,38 +183,46 @@ def zapply_bcm( Y0: zr.ZXArray, X0: zr.ZXArray, X1: zr.ZXArray,
     block_dims = [d for d in Y0.dims if d not in (time_dim,) + multivariate_dims]
 
     ## Loop on groups
-    for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
+    _fmt  = '0>{}'.format( int(np.log10(len(groupsY))+1) )
+    _ngrp = len(groupsY)
+    for igrps,(grpsXf,grpsXp,grpsY) in enumerate(zip(groupsXf,groupsXp,groupsY)):
         
-        logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
+        logger.info( f"Correction of group {igrps+1:{_fmt}} / {_ngrp}" )
 
         ## Sub-time axis for the group
-        timeY0s = xr.concat( [Y0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
-        timeX0s = xr.concat( [X0[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
-        timeX1s = xr.concat( [X1[time_dim].groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeY0s  = group2time( Y0[time_dim], time_dim, grpsY , grp_name )
+        timeX0fs = group2time( X0[time_dim], time_dim, grpsXf, grp_name )
+        timeX0ps = group2time( X0[time_dim], time_dim, grpsXp, grp_name )
+        timeX1fs = group2time( X1[time_dim], time_dim, grpsXf, grp_name )
+        timeX1ps = group2time( X1[time_dim], time_dim, grpsXp, grp_name )
         
         ## Calibration period extraction
-        Y0s = Y0.zsel( **{ time_dim: timeY0s } , drop = False ).rename( { time_dim: f"{time_dim}Y0" } )
-        X0s = X0.zsel( **{ time_dim: timeX0s } , drop = False ).rename( { time_dim: f"{time_dim}X0" } )
-        X1s = X1.zsel( **{ time_dim: timeX1s } , drop = False ).rename( { time_dim: f"{time_dim}X1" } )
+        Y0s  = Y0.zsel( **{ time_dim: timeY0s  } , drop = False ).rename( { time_dim: f"{time_dim}Y0"  } )
+        X0fs = X0.zsel( **{ time_dim: timeX0fs } , drop = False ).rename( { time_dim: f"{time_dim}X0f" } )
+        X1fs = X1.zsel( **{ time_dim: timeX1fs } , drop = False ).rename( { time_dim: f"{time_dim}X1f" } )
+        X0ps = X0.zsel( **{ time_dim: timeX0ps } , drop = False ).rename( { time_dim: f"{time_dim}X0p" } )
+        X1ps = X1.zsel( **{ time_dim: timeX1ps } , drop = False ).rename( { time_dim: f"{time_dim}X1p" } )
         
         ## Correction
-        Z1s,Z0s = zr.apply_ufunc( _apply_bcm, Y0s, X0s, X1s,
+        Z1s,Z0s = zr.apply_ufunc( _apply_bcm, Y0s, X0fs, X1fs, X0ps, X1ps,
                               block_dims = block_dims,
-                              output_dims = [X1s.dims,X0s.dims],
-                              output_coords = [ {d: X1s[d] for d in X1s.dims}, {d: X0s[d] for d in X0s.dims}],
-                              output_dtypes = [X1s.dtype,X0s.dtype],
+                              output_dims = [X1ps.dims,X0ps.dims],
+                              output_coords = [ {d: X1ps[d] for d in X1ps.dims}, {d: X0ps[d] for d in X0ps.dims}],
+                              output_dtypes = [X1ps.dtype,X0ps.dtype],
                               dask_kwargs = dask_kwargs,
                               **kwargs
         )
         
         ## Store correction
-        Z1.zloc[*tuple([timeX1s.values] + [slice(None) for _ in range(Z1.ndim - 1)])] = Z1s
-        Z0.zloc[*tuple([timeX0s.values] + [slice(None) for _ in range(Z0.ndim - 1)])] = Z0s
+        Z1.zloc[*tuple([timeX1ps.values] + [slice(None) for _ in range(Z1.ndim - 1)])] = Z1s
+        Z0.zloc[*tuple([timeX0ps.values] + [slice(None) for _ in range(Z0.ndim - 1)])] = Z0s
 
         ## Clean
         del Y0s
-        del X0s
-        del X1s
+        del X0fs
+        del X1fs
+        del X0ps
+        del X1ps
         del Z0s
         del Z1s
 
@@ -226,7 +239,7 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
               projection_window: tuple[int,int,int] = (5,10,5),
               time_dim: str = "time",
               seas_cycle: str = "month",
-              seas_cycle_window: int = 15,
+              seas_cycle_window: tuple[int,int,int] = (10,10,10),
               multivariate_dims: Sequence | str = tuple(),
               chunks: dict[str,int | str] | None = None,
               bc_method_kwargs: dict[str,Any] = {},
@@ -261,8 +274,11 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
         "window": each day is corrected with a window around of the day. The
                   length of the window is given by the
                   parameter `seas_cycle_window`
-    seas_cycle_window: int = 15
-        Half-length of the window for the "window" parameter of "seas_cycle" 
+    seas_cycle_window: tuple[int,int,int] = (10,10,10)
+        Window used to smooth the seasonal cycle. Noted
+        wl,wc,wr = seas_cycle_window, the fit method is applied on the window
+        of length wl + wc + wr, and predict is applied on centered window of
+        size wc.
     multivariate_dims: tuple[str]
         Dimensions used for multivariate correction
     chunks: dict[str,int | str] | None = None
@@ -313,25 +329,26 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
     ## Check how we deal with the seasonal cycle
     match seas_cycle:
         case "season":
-            groups  = ["MAM","JJA","SON","DJF"]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = ["MAM","JJA","SON","DJF"]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "season"
         case "month":
-            groups  = [ m + 1 for m in range(12) ]
-            groups  = [ [g] for g in groups ]
-            groupsX = groups
-            groupsY = groups
+            groups   = [ m + 1 for m in range(12) ]
+            groups   = [ [g] for g in groups ]
+            groupsXf = groups
+            groupsXp = groups
+            groupsY  = groups
             grp_name = "month"
         case "window":
-            ngrpX   = X[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            groupsX = [ [ ( (d + w) % ngrpX ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in range(ngrpX)]
-            ngrpY   = Y[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
-            if ngrpY == ngrpX: ## Easy case, same calendar for X and Y
-                groupsY = groupsX
-            else:
-                groupsY = [ [ ( (d + w) % ngrpY ) + 1 for w in range(-seas_cycle_window,seas_cycle_window+1,1) ] for d in np.linspace(0,ngrpY-1,ngrpX).astype(int)]
+            wl,wc,wr = seas_cycle_window
+            ndaysX   = X[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            ndaysY   = Y[time_dim].groupby(f"{time_dim}.dayofyear").groupers[0].size
+            groupsXf = [ [ ( (d + w) % ndaysX ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
+            groupsXp = [ [ ( (d + w) % ndaysX ) + 1 for w in range(  0, wc     )] for d in range(0,ndaysX,wc) ]
+            groupsY  = [ [ ( (d + w) % ndaysY ) + 1 for w in range(-wl, wc + wr)] for d in range(0,ndaysX,wc) ]
             grp_name = "dayofyear"
         case _:
             raise ValueError(f"Unknow parameters '{seas_cycle}' for 'seas_cycle', value must be 'month', 'season' or 'window'")
@@ -378,14 +395,17 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
     block_dims = [d for d in Y.dims if d not in (time_dim,) + multivariate_dims]
     
     ## Loop on groups
-    for igrps,(grpsX,grpsY) in enumerate(zip(groupsX,groupsY)):
+    _fmt  = '0>{}'.format( int(np.log10(len(groupsY))+1) )
+    _ngrp = len(groupsY)
+    for igrps,(grpsXf,grpsXp,grpsY) in enumerate(zip(groupsXf,groupsXp,groupsY)):
         
-        logger.info( f"Correction of group {igrps+1} / {len(groupsX)}" )
+        logger.info( f"Correction of group {igrps+1:{_fmt}} / {_ngrp}" )
 
         ## Sub-time axis for the group
-        timeY0s = xr.concat( [timeY0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsY], dim = time_dim ).sortby(time_dim)
-        timeX0s = xr.concat( [timeX0.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
-        timeX1s = xr.concat( [ timeX.groupby(f"{time_dim}.{grp_name}")[g] for g in grpsX], dim = time_dim ).sortby(time_dim)
+        timeY0s  = group2time( timeY0, time_dim, grpsY , grp_name )
+        timeX0s  = group2time( timeX0, time_dim, grpsXf, grp_name )
+        timeX1fs = group2time( timeX , time_dim, grpsXf, grp_name )
+        timeX1ps = group2time( timeX , time_dim, grpsXp, grp_name )
         
         ## Calibration period extraction
         Y0s = Y.zsel( **{ time_dim: timeY0s } , drop = False ).rename( { time_dim: f"{time_dim}Y0" } )
@@ -401,17 +421,17 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
         for tf0,tp0,tp1,tf1 in yearly_window( prj0 , prj1 , wl , wm , wr , bleft , bright ):
             
             ## Sub-time axis for the projection period
-            timeX1fs = timeX1s.sel( { time_dim : slice(str(tf0),str(tf1)) } ).sortby(time_dim)
-            timeX1ps = timeX1s.sel( { time_dim : slice(str(tp0),str(tp1)) } ).sortby(time_dim)
+            _timeX1fs = timeX1fs.sel( { time_dim : slice(str(tf0),str(tf1)) } ).sortby(time_dim)
+            _timeX1ps = timeX1ps.sel( { time_dim : slice(str(tp0),str(tp1)) } ).sortby(time_dim)
             
             ## Data extraction
-            X1fs = X.zsel( **{ time_dim: timeX1fs } , drop = False ).rename( { time_dim: f"{time_dim}X1f" } )
+            X1fs = X.zsel( **{ time_dim: _timeX1fs } , drop = False ).rename( { time_dim: f"{time_dim}X1f" } )
             if not X1fs.size > 0:
-                logger.warning( f"0-size for X1fs (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                logger.warning( f"0-size for X1fs (grp: {grpsXf}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
                 continue
-            X1ps = X.zsel( **{ time_dim: timeX1ps } , drop = False ).rename( { time_dim: f"{time_dim}X1p" } )
+            X1ps = X.zsel( **{ time_dim: _timeX1ps } , drop = False ).rename( { time_dim: f"{time_dim}X1p" } )
             if not X1ps.size > 0:
-                logger.warning( f"0-size for X1ps (grp: {grpsX}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
+                logger.warning( f"0-size for X1ps (grp: {grpsXp}, per: {tf0} / {tp0} / {tp1} / {tf1})" )
                 continue
             
             ## Correction
@@ -425,7 +445,7 @@ def zapply_bcm_along_time( Y: zr.ZXArray, X: zr.ZXArray,
             )
             
             ## Store correction
-            idx = tuple([timeX1ps.values] + [slice(None) for _ in range(Z.ndim - 1)])
+            idx = tuple([_timeX1ps.values] + [slice(None) for _ in range(Z.ndim - 1)])
             Z.zloc[*idx] = Z1ps.rename( { f"{time_dim}X1p": time_dim } )
 
             ## Clean

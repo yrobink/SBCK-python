@@ -165,21 +165,28 @@ class UMNAdjust(PrePostProcessing):##{{{
     univariate: bool
     _p: dict[str,MNPar]
 
-    def __init__( self , *args: Any , univariate: bool = False , **kwargs: Any ) -> None:##{{{
+    def __init__( self , *args: Any, mean_preservation: str = "relative", univariate: bool = False, **kwargs: Any ):##{{{
         """
         Arguments
         ---------
-        univariate : bool
-            Assume or not that the marginals are independent
         *args:
             All others arguments are passed to SBCK.ppp.PrePostProcessing
+        mean_preservation: str = "relative"
+            Method to preserve the mean evolution. 'relative' refers to the
+            mean evolution weighed by the standard deviation, whereas
+            'absolute' refers to a simple mean change.
+        univariate : bool
+            Assume or not that the marginals are independent
         *kwargs:
             All others arguments are passed to SBCK.ppp.PrePostProcessing
         """
         PrePostProcessing.__init__( self , *args , **kwargs )
         self._name      = "UMNAdjust"
+        self.mean_preservation = mean_preservation.lower()
         self.univariate = univariate
         self._p         = {}
+        if not mean_preservation in ["relative","absolute"]:
+            raise ValueError(f"`mean_preservation` (= `{mean_preservation}`) parameter must be one of `relative` or `absolute`")
     ##}}}
     
     def transform( self , X: _Array ) -> _Array:##{{{
@@ -203,7 +210,10 @@ class UMNAdjust(PrePostProcessing):##{{{
                     X  =   self._p['X1'].s * self._p['X0'].ivs * self._p['Y0'].s * NXt
                 else:
                     X  = ( self._p['X1'].S @ self._p['X0'].ivS @ self._p['Y0'].S @ NXt.T ).T
-                X  = X + self._p['Y0'].s * self._p['X0'].ivs * (self._p['X1'].m - self._p['X0'].m)
+                f = 1
+                if self.mean_preservation == "relative":
+                    f = self._p['Y0'].s * self._p['X0'].ivs
+                X  = X + f * (self._p['X1'].m - self._p['X0'].m)
                 X  = X + self._p['X1'].s * self._p['X0'].ivs * self._p['Y0'].s * pXt.ivs * pXt.m
                 X  = X + self._p['Y0'].m
         

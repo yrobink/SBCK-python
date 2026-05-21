@@ -185,7 +185,7 @@ class UMNAdjust(PrePostProcessing):##{{{
         self.mean_preservation = mean_preservation.lower()
         self.univariate = univariate
         self._p         = {}
-        if not mean_preservation in ["relative","absolute"]:
+        if not self.mean_preservation in ["relative","absolute"]:
             raise ValueError(f"`mean_preservation` (= `{mean_preservation}`) parameter must be one of `relative` or `absolute`")
     ##}}}
     

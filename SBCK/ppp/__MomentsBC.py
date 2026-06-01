@@ -1,5 +1,5 @@
 
-## Copyright(c) 2024, 2025 Yoann Robin
+## Copyright(c) 2024 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -88,10 +88,11 @@ class MNPar:##{{{
         self.univariate = univariate
         self._m   = X.mean(0).reshape(1,self.ndim)
         self._s   = X.std(0).reshape(1,self.ndim)
-        self._C   = np.cov( X , rowvar = False ).reshape(self.ndim,self.ndim)
-        self._S   = sqrtm(self.C)
         self._ivs = 1. / self.s
-        self._ivS = np.linalg.pinv(self.S)
+        if not self.univariate:
+            self._C   = np.cov( X , rowvar = False ).reshape(self.ndim,self.ndim)
+            self._S   = sqrtm(self.C)
+            self._ivS = np.linalg.pinv(self.S)
     ##}}}
     
     ## Normalization methods ##{{{

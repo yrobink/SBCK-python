@@ -26,6 +26,8 @@ from ..__AbstractBC import AbstractBC
 from ..__miscBC import IdBC
 from .__checkf import allfinite
 
+from ..__decorators import io_fit
+from ..__decorators import io_predict
 
 ############
 ## Typing ##
@@ -220,6 +222,7 @@ class PrePostProcessing(AbstractBC):##{{{
         return X
     ##}}}
     
+    @io_fit
     def fit( self , Y0: _Array , X0: _Array , X1: _NArray = None ) -> Self:##{{{
         """Fit the bias correction method after the pre-processing.
 
@@ -310,6 +313,7 @@ class PrePostProcessing(AbstractBC):##{{{
         return Z1
     ##}}}
     
+    @io_predict
     def predict( self , X1: _NArray = None , X0: _NArray = None , **kwargs: Any ) -> _NArray | tuple[_NArray,_NArray]:##{{{
         """Predict the bias correction method after the pre-processing, then
         apply the post-processing operation.

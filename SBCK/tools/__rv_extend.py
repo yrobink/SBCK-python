@@ -82,7 +82,7 @@ class rv_histogram:##{{{
 	
 	>>> X ## Input
 	>>> Xs = np.sort(X)
-	>>> Xr = sc.rankdata(Xs,method="max")
+	>>> Xr = sc.rankdata(Xs,method="max").astype(int)
 	>>> p  = np.unique(Xr) / X.size
 	>>> q  = Xs[np.unique(Xr)-1]
 	>>> p[0] = 0
@@ -108,7 +108,7 @@ class rv_histogram:##{{{
 	def fit( X , *args , **kwargs ):
 		
 		Xs = np.sort(X.squeeze())
-		Xr = sc.rankdata(Xs,method="max")
+		Xr = sc.rankdata(Xs,method="max").astype(int)
 		p  = np.unique(Xr) / X.size
 		q  = Xs[np.unique(Xr)-1]
 		

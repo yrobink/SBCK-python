@@ -1,5 +1,5 @@
 
-## Copyright(c) 2023 / 2025 Yoann Robin
+## Copyright(c) 2023 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -21,7 +21,7 @@
 ###############
 
 import numpy as np
-from .__PrePostProcessing import PrePostProcessing
+from .__PrePostProcessing import PrePostProcessingPerCols
 from ..misc.__sys import deprecated
 
 
@@ -29,18 +29,16 @@ from ..misc.__sys import deprecated
 ## Typing ##
 ############
 
-from typing import Sequence
 from typing import Any
 
 _Array = np.ndarray
-_Cols = Sequence[int] | int | None
 
 
 ###########
 ## Class ##
 ###########
 
-class LimitTailsRatio(PrePostProcessing):##{{{
+class LimitTailsRatio(PrePostProcessingPerCols):##{{{
     """This class is used to post-process the tails of the correction, in the
     case where too large values are produced.
     
@@ -52,26 +50,35 @@ class LimitTailsRatio(PrePostProcessing):##{{{
     
     """
     
-    _cols: _Cols
-    _ratio = float
-    _tails = float
+    ## Attributes ##{{{
+    _ratio: float
+    _tails: str
+    _norm: str
     
-    _p_r   = float
-    _p_l   = float
-    _p_c   = float
+    _p_r: float
+    _p_l: float
+    _p_c: float
     
-    _qcY0  = float | None
-    _maxY0 = float | None
-    _minY0 = float | None
-    _qrX0  = float | None
-    _qcX0  = float | None
-    _qlX0  = float | None
-    _qrX1  = float | None
-    _qcX1  = float | None
-    _qlX1  = float | None
+    _qcY0:  float | _Array = np.nan
+    _maxY0: float | _Array = np.nan
+    _minY0: float | _Array = np.nan
+    _qrX0:  float | _Array = np.nan
+    _qcX0:  float | _Array = np.nan
+    _qlX0:  float | _Array = np.nan
+    _qrX1:  float | _Array = np.nan
+    _qcX1:  float | _Array = np.nan
+    _qlX1:  float | _Array = np.nan
+    _stdY0: float | _Array = np.nan
+    _stdX0: float | _Array = np.nan
+    _stdX1: float | _Array = np.nan
+    
+    ##}}}
 
-
-    def __init__( self , *args: Any , ratio: float = 1.5 , p_r: float = 0.95 , p_l: float = 0.05 , p_c: float = 0.5 , tails: str = "both" , cols: _Cols = None , **kwargs: Any ) -> None:##{{{
+    ## __init__( self, ... ): ##{{{
+    def __init__( self, *args: Any, ratio: float = 1.5,
+                 p_r: float = 0.95, p_l: float = 0.05, p_c: float = 0.5,
+                 tails: str = "both", norm: str = "origin",
+                 **kwargs: Any ) -> None:
         """
         Arguments
         ---------
@@ -85,38 +92,24 @@ class LimitTailsRatio(PrePostProcessing):##{{{
             Center quantile to estimated the tails. 50% in the example.
         tails: str
             Tails to apply the PPP. Can be "left", "right" or "both".
-        cols: int or array of int
-            The columns to apply
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
-        PrePostProcessing.__init__( self , *args , **kwargs )
+        super().__init__( *args, **kwargs )
         self._name = "LimitTailsRatio"
-        
-        self._cols = cols
-        if cols is not None:
-            self._cols = np.array( [cols] , dtype = int ).squeeze().reshape(-1)
         
         self._ratio = ratio
         self._tails = tails
+        self._norm  = norm
         
         self._p_r   = p_r
         self._p_l   = p_l
         self._p_c   = p_c
-        
-        self._qcY0  = None
-        self._maxY0 = None
-        self._minY0 = None
-        
-        self._qrX0  = None
-        self._qcX0  = None
-        self._qlX0  = None
-        
-        self._qrX1  = None
-        self._qcX1  = None
-        self._qlX1  = None
         
     ##}}}
     
@@ -127,14 +120,17 @@ class LimitTailsRatio(PrePostProcessing):##{{{
             self._qcY0  = np.quantile( X , self._p_c , axis = 0 )
             self._maxY0 = np.max( X , axis = 0 )
             self._minY0 = np.min( X , axis = 0 )
+            self._stdY0 = np.std( X , axis = 0 )
         if self._kind == "X0":
             self._qrX0 = np.quantile( X , self._p_r , axis = 0 )
             self._qcX0 = np.quantile( X , self._p_c , axis = 0 )
             self._qlX0 = np.quantile( X , self._p_l , axis = 0 )
+            self._stdX0 = np.std( X , axis = 0 )
         if self._kind == "X1":
             self._qrX1 = np.quantile( X , self._p_r , axis = 0 )
             self._qcX1 = np.quantile( X , self._p_c , axis = 0 )
             self._qlX1 = np.quantile( X , self._p_l , axis = 0 )
+            self._stdX1 = np.std( X , axis = 0 )
         
         return X
     ##}}}
@@ -144,28 +140,27 @@ class LimitTailsRatio(PrePostProcessing):##{{{
         X  = Xt.copy()
         if self._kind == "X1":
             
-            ## Identify cols
-            cols = self._cols
-            if cols is None:
-                cols = np.array( [np.arange( 0 , Xt.shape[1] , dtype = int )] ).squeeze()
-            
+            ratio = 1
+            if self._norm == "dynamical":
+                ratio = self._stdY0 / self._stdX0
+
             ## Right tail
             if self._tails in ["right","both"]:
-                S  = (self._qrX1 - self._qcX1) / (self._qrX0 - self._qcX0)
-                S  = np.where( S > self._ratio , self._ratio , S ) * ( self._maxY0 - self._qcY0 ) + self._qcY0 + (self._qcX1 - self._qcX0)
-                M  = Xt.max( axis = 0 )
-                Q  = np.quantile( Xt , self._p_r , axis = 0 )
-                Xt = np.where( (M < S) | (Xt < Q) , Xt , (Xt - Q) / (M - Q) * (S - Q) + Q )
-                X[:,cols] = Xt[:,cols]
+                SR  = (self._qrX1 - self._qcX1) / (self._qrX0 - self._qcX0)
+                SR  = np.where( SR > self._ratio , self._ratio , SR ) * ( self._maxY0 - self._qcY0 ) + self._qcY0 + (self._qcX1 - self._qcX0) * ratio
+                MR  = Xt.max( axis = 0 )
+                QR  = np.quantile( Xt , self._p_r , axis = 0 )
+                Xt = np.where( (MR < SR) | (Xt < QR) , Xt , (Xt - QR) / (MR - QR) * (SR - QR) + QR )
+                X[:,self.cols] = Xt[:,self.cols]
             
             ## Left tail
             if self._tails in ["left","both"]:
-                S  = (self._qcX1 - self._qlX1) / (self._qcX0 - self._qlX0)
-                S  = np.where( S > self._ratio , self._ratio , S ) * (self._qcY0 - self._minY0) + self._qcY0 + (self._qcX1 - self._qcX0)
-                M  = Xt.min( axis = 0 )
-                Q  = np.quantile( Xt , self._p_l , axis = 0 )
-                Xt = np.where( (M > S) | (Xt > Q) , Xt , (Xt - Q) / (M - Q) * (S - Q) + Q )
-                X[:,cols] = Xt[:,cols]
+                SL  = (self._qcX1 - self._qlX1) / (self._qcX0 - self._qlX0)
+                SL  = np.where( SL > self._ratio , self._ratio , SL ) * ( self._minY0 - self._qcY0) + self._qcY0 + (self._qcX1 - self._qcX0) * ratio
+                ML  = Xt.min( axis = 0 )
+                QL  = np.quantile( Xt , self._p_l , axis = 0 )
+                Xt = np.where( (ML > SL) | (Xt > QL) , Xt , (Xt - QL) / (ML - QL) * (SL - QL) + QL )
+                X[:,self.cols] = Xt[:,self.cols]
             
         return X
     ##}}}

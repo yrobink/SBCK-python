@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 / 2025 Yoann Robin
+## Copyright(c) 2022 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -40,6 +40,7 @@ from typing import Self
 
 _Array = np.ndarray
 _NArray = _Array | None
+PerColumnsType = Sequence[int] | int | np.typing.NDArray[np.int_] | np.int_ | slice
 
 
 ###########
@@ -355,6 +356,30 @@ class PrePostProcessing(AbstractBC):##{{{
         return name
     
     ##}}}
+    
+##}}}
+
+class PrePostProcessingPerCols(PrePostProcessing):##{{{
+    """This class is used to manage the keyword cols, which represent the
+    column(s) to apply the ppp.
+    """
+    _cols: PerColumnsType = slice(None)
+
+    def __init__( self, *args: Any, cols: PerColumnsType = slice(None), **kwargs: Any ):
+        super().__init__( *args, **kwargs )
+        
+        self.cols = cols
+    
+    @property
+    def cols(self) -> PerColumnsType:
+        return self._cols
+
+    @cols.setter
+    def cols( self, cols: PerColumnsType ) -> None:
+        if isinstance(cols,slice):
+            self._cols = cols
+        else:
+            self._cols = np.asarray( cols, dtype = int ).reshape(-1)
     
 ##}}}
 

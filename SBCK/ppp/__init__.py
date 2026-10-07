@@ -20,6 +20,7 @@
 from .__checkf            import allfinite
 from .__checkf            import atleastonefinite
 from .__PrePostProcessing import PrePostProcessing
+from .__PrePostProcessing import PrePostProcessingPerCols
 from .__Sys               import FilterWarnings
 from .__Sys               import Xarray
 from .__Sys               import As2d

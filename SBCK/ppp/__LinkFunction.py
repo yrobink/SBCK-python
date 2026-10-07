@@ -21,7 +21,7 @@
 ###############
 
 import numpy as np
-from .__PrePostProcessing import PrePostProcessing
+from .__PrePostProcessing import PrePostProcessingPerCols
 from ..misc.__sys import deprecated
 
 
@@ -29,19 +29,17 @@ from ..misc.__sys import deprecated
 ## Typing ##
 ############
 
-from typing import Sequence
 from typing import Any
 from typing import Callable
 
 _Array = np.ndarray
-_Cols = Sequence[int] | int | None
 
 
 ###########
 ## Class ##
 ###########
 
-class LinkFunction(PrePostProcessing):##{{{
+class LinkFunction(PrePostProcessingPerCols):##{{{
     """This class is used to define pre/post processing class with a link
     function and its inverse. See also the PrePostProcessing documentation
     
@@ -66,9 +64,8 @@ class LinkFunction(PrePostProcessing):##{{{
     
     _f_transform: Callable
     _f_itransform: Callable
-    _cols: _Cols
     
-    def __init__( self , *args: Any , name: str = "LinkFunction" , transform_: Callable | None = None , itransform_: Callable | None = None , cols: _Cols = None , **kwargs: Any ) -> None:##{{{
+    def __init__( self , *args: Any , name: str = "LinkFunction" , transform_: Callable | None = None , itransform_: Callable | None = None, **kwargs: Any ) -> None:##{{{
         """
         Arguments
         ---------
@@ -78,20 +75,18 @@ class LinkFunction(PrePostProcessing):##{{{
             Function to transform the data
         itransform_: Callable
             Function to inverse the transform of the data
-        cols: Sequence[int] | int | None
-            The columns to apply
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
-        PrePostProcessing.__init__( self , *args , **kwargs )
+        super().__init__( *args , **kwargs )
         self._name         = name
         self._f_transform  = transform_
         self._f_itransform = itransform_
-        self._cols = cols
-        if cols is not None:
-            self._cols = np.array( [cols] , dtype = int ).squeeze()
     
     ##}}}
     
@@ -107,20 +102,16 @@ class LinkFunction(PrePostProcessing):##{{{
         """
         Apply the transform
         """
-        if self._cols is None:
-            return self._transform(X)
         Xt = X.copy()
-        Xt[:,self._cols] = self._transform(X[:,self._cols])
+        Xt[:,self.cols] = self._transform(X[:,self.cols])
         return Xt
     
     def itransform( self , Xt: _Array ) -> _Array:
         """
         Apply the inverse transform
         """
-        if self._cols is None:
-            return self._itransform(Xt)
         X = Xt.copy()
-        X[:,self._cols] = self._itransform(Xt[:,self._cols])
+        X[:,self.cols] = self._itransform(Xt[:,self.cols])
         return X
     ##}}}
     
@@ -129,92 +120,96 @@ class LinkFunction(PrePostProcessing):##{{{
 class LFAdd(LinkFunction):##{{{
     """Addition link transform.
     """
-    def __init__( self , m: float , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, m: float, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
         m : float
             The value to add
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         
         transform  = lambda x: x + m
         itransform = lambda x: x - m
-        LinkFunction.__init__( self , *args , name = "LFAdd" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self , *args, name = "LFAdd", transform_ = transform, itransform_ = itransform, **kwargs )
 ##}}}
 
 class LFMult(LinkFunction):##{{{
     """Multiplication link transform.
     """
     
-    def __init__( self , s: float , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, s: float, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
         s : float
             The value to multiply
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         
         transform  = lambda x: x * s
         itransform = lambda x: x / s
-        LinkFunction.__init__( self , *args , name = "LFMult" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFMult", transform_ = transform, itransform_ = itransform, **kwargs )
 ##}}}
 
 class LFMax(LinkFunction):##{{{
     """Max link.
     """
     
-    def __init__( self , M: float , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, M: float, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
         M : float
             The max
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         
         transform  = lambda x: np.where( (x < M) | ~np.isfinite(x) , x , M )
         itransform = lambda x: np.where( (x < M) | ~np.isfinite(x) , x , M )
-        LinkFunction.__init__( self , *args , name = "LFMax" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFMax", transform_ = transform, itransform_ = itransform, **kwargs )
 ##}}}
 
 class LFMin(LinkFunction):##{{{
     """Min link.
     """
     
-    def __init__( self , M: float , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, M: float, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
         M : float
             The min
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         
         transform  = lambda x: np.where( (x > M) | ~np.isfinite(x) , x , M )
         itransform = lambda x: np.where( (x > M) | ~np.isfinite(x) , x , M )
-        LinkFunction.__init__( self , *args , name = "LFMin" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFMin", transform_ = transform, itransform_ = itransform, **kwargs )
 ##}}}
 
 class LFSquare(LinkFunction):##{{{
@@ -223,20 +218,21 @@ class LFSquare(LinkFunction):##{{{
     - inverse transform is given by lambda x: sign(x) * sqrt(abs(x))
     """
     
-    def __init__( self , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         transform  = lambda x : x**2
         itransform = lambda x : np.where( x > 0 , np.sqrt(np.abs(x)) , - np.sqrt(np.abs(x)))
-        LinkFunction.__init__( self , *args , name = "LFSquare" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFSquare", transform_ = transform, itransform_ = itransform, **kwargs )
 ##}}}
 
 class LFLog(LinkFunction):##{{{
@@ -246,20 +242,21 @@ class LFLog(LinkFunction):##{{{
     
     """
     
-    def __init__( self , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         transform  = lambda x: np.log(x)
         itransform = lambda x: np.exp(x)
-        LinkFunction.__init__( self , *args , name = "LFLoglin" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFLoglin", transform_ = transform, itransform_ = itransform, **kwargs )
     
 ##}}}
 
@@ -270,25 +267,26 @@ class LFLoglin(LinkFunction):##{{{
     
     """
     
-    def __init__( self , *args: Any , s: float = 1e-5 , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, *args: Any, s: float = 1e-5, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
         s: float
             Value where the exponential is transformed to identity
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         if not s > 0:
             raise Exception( f"Parameter s = {s} must be non negative!" )
         self.s = s
         transform  = lambda x: np.where( (0 < x) & (x < s) , s * np.log( np.where( x > 0 , x , np.nan ) / s ) + s , np.where( x < 0 , np.nan , x ) )
         itransform = lambda x: np.where( x < s , s * np.exp( (x-s) / s ) , x )
-        LinkFunction.__init__( self , *args , name = "LFLoglin" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFLoglin", transform_ = transform, itransform_ = itransform, **kwargs )
     
 ##}}}
 
@@ -296,7 +294,7 @@ class LFArctan(LinkFunction):##{{{
     """Arctan link transform, to bound the correction between two values.
     """
     
-    def __init__( self , ymin: float , ymax: float , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, ymin: float, ymax: float, *args: Any, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
@@ -304,18 +302,19 @@ class LFArctan(LinkFunction):##{{{
             Minimal value
         ymax: float
             Maximal value
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         
         f = (ymax - ymin) / np.pi
         transform  = lambda x: np.where( (x > ymin) & (x < ymax) , f * np.tan( (x - ymin) / f - np.pi / 2 ) , np.nan )
         itransform = lambda x: (np.pi / 2 + np.arctan(x/f) ) * f + ymin
-        LinkFunction.__init__( self , *args , name = "LFArctan" , transform_ = transform , itransform_ = itransform , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFArctan", transform_ = transform, itransform_ = itransform, **kwargs )
 ##}}}
 
 class LFLogistic(LinkFunction):##{{{
@@ -330,7 +329,7 @@ class LFLogistic(LinkFunction):##{{{
     itransform : y |-> (ymax - ymin) / ( 1 + np.exp(-s*y) ) + ymin
     """
     
-    def __init__( self , ymin: float , ymax: float , *args: Any , s: float = 1 , tol: float = 1e-8 , cols: _Cols = None , **kwargs: Any ) -> None:
+    def __init__( self, ymin: float, ymax: float, *args: Any, s: float = 1, tol: float = 1e-8, **kwargs: Any ) -> None:
         """
         Arguments
         ---------
@@ -342,14 +341,13 @@ class LFLogistic(LinkFunction):##{{{
             The slope around 0 of the transform, default to 1
         tol: float
             Numerical tolerance
-        cols: Sequence[int] | int | None
-            The columns to apply the Link function
-        cols: [int or array of int]
-            The columns to apply the Link function
         *args:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to SBCK.ppp.PrePostProcessingPerCols
         *kwargs:
-            All others arguments are passed to SBCK.ppp.PrePostProcessing
+            All others arguments are passed to
+            SBCK.ppp.PrePostProcessingPerCols, including:
+            cols: Sequence[int] | int | np.ndarray[int] | slice = slice(None)
+                The columns to apply
         """
         
         self.ymin = ymin
@@ -357,7 +355,7 @@ class LFLogistic(LinkFunction):##{{{
         self.s    = s
         self._tol = tol
         
-        LinkFunction.__init__( self , *args , name = "LFLogistic" , cols = cols , **kwargs )
+        LinkFunction.__init__( self, *args, name = "LFLogistic", **kwargs )
     
     def _transform( self , x: _Array ) -> _Array:
         xt  = x.copy()

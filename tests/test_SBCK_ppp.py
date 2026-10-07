@@ -346,7 +346,7 @@ class Test_LinkFunction(SBCKTestParameters,unittest.TestCase):##{{{
         ##
         xlim   = (-5,5)
         ylim   = (-5,5)
-        x      = np.linspace( xlim[0] , xlim[1] , 10_000 )
+        x      = np.linspace( xlim[0] , xlim[1] , 10_000 ).reshape(-1,1)
         kwargs = [ { "m" : 3 } , {"s" : 0.5} , {"M" : 3} , {"M" : 2} , {"s" : 0.5} , {"ymin" : -1 , "ymax" : 3} , {"ymin" : -1 , "ymax" : 3 , "s" : 10 } ]
         
         ## Loop on link function
@@ -579,7 +579,7 @@ class Test_Extremes(SBCKTestParameters,unittest.TestCase):##{{{
                 ax.plot( x , rvY0.cdf(x) , color = "blue"   )
                 ax.plot( x , rvX0.cdf(x) , color = "red"    )
                 ax.plot( x , rvX1.cdf(x) , color = "purple" )
-                ax.plot( x , rvZ1.cdf(x) , color = "green"  , marker = "x" )
+                ax.plot( x , rvZ1.cdf(x) , color = "green" )
                 ax.set_title( f"{names_norm[i]} / {names_ppp[j]}" )
                 ax.set_ylim(0,1)
                 

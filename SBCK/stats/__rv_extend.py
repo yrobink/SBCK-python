@@ -398,8 +398,8 @@ class rv_empirical(rv_base):##{{{
         """
         
         Xs = np.sort(X.squeeze())
-        Xr = sc.rankdata(Xs,method="max")
-        Xu = np.unique(Xr)
+        Xr = sc.rankdata(Xs,method="max").astype(int)
+        Xu = np.unique(Xr).astype(int)
         p  = Xu / X.size
         q  = Xs[Xu - 1]
         

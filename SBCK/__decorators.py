@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2024, 2025 Yoann Robin
+## Copyright(c) 2024 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -22,6 +22,7 @@
 #############
 
 import numpy as np
+import xarray as xr
 from .misc.__linalg import as2d
 
 
@@ -47,7 +48,14 @@ def io_fit( func : Callable ) -> Callable:##{{{
         
         ## Pre
         #* Transform data in 2d
-        args2d = [as2d(X) for X in iargs]
+        args2d = []
+        for X in iargs:
+            if isinstance(X, np.ndarray) or X is None:
+                args2d.append(as2d(X))
+            elif isinstance(X, xr.DataArray):
+                args2d.append( as2d(X.values) )
+            else:
+                raise ValueError(f"Unknow input type '{type(X)}', must be np.ndarray, xr.DataArray or None")
         
         #* Number of dimensions
         ndims = set([ X.shape[1] for X in args2d if X is not None ])
@@ -81,7 +89,14 @@ def io_predict( func: Callable ) -> Callable:##{{{
         
         ## Pre
         #* Transform data in 2d
-        iargs2d = [as2d(X) for X in iargs]
+        iargs2d = []
+        for X in iargs:
+            if isinstance(X, np.ndarray):
+                iargs2d.append(as2d(X))
+            elif isinstance(X, xr.DataArray):
+                iargs2d.append( as2d(X.values) )
+            else:
+                raise ValueError(f"Unknow input type '{type(X)}', must be np.ndarray or xr.DataArray")
         
         #* Number of dimensions
         ndims = set([ X.shape[1] for X in iargs2d])
@@ -99,7 +114,12 @@ def io_predict( func: Callable ) -> Callable:##{{{
             oargs2d = [oargs2d]
         
         ## Post
-        oargs = [ Z.reshape(X.shape) for X,Z in zip(iargs,oargs2d) ]
+        oargs = []
+        for X,Z in zip(iargs,oargs2d):
+            if isinstance(X,np.ndarray):
+                oargs.append( Z.reshape(X.shape) )
+            elif isinstance(X, xr.DataArray):
+                oargs.append( X.copy( data = Z.reshape(X.shape) ) )
         
         if len(oargs) == 1:
             return oargs[0]

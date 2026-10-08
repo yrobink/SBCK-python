@@ -8,7 +8,8 @@
 - UnivariateBC: a base class for univariate BC methods
 - MultiUBC: a base class to transform a multivariate method into multivariate
     (but independent) method.
-- Decorators: io_fit and io_predict. use to transform input / output in 2d
+- Decorators: io_fit and io_predict. use to transform input / output in 2d.
+  Decorators are now handling xarray.DataArray
 - CDFt: many configurations added
 - dOTC1d: new class for dOTC in 1d, solved with quantile mapping (faster than
     simplex)

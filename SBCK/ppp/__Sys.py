@@ -83,6 +83,7 @@ class Xarray(PrePostProcessing):###{{{
         *kwargs:
             All others arguments are passed to SBCK.ppp.PrePostProcessing
         """
+        raise NotImplementedError("Don't use it: decorators do the same thing automatically")
         PrePostProcessing.__init__( self , *args , **kwargs )
         self._name = "Xarray"
         self._xcls = None
@@ -134,6 +135,7 @@ class As2d(PrePostProcessing):##{{{
         *kwargs:
             All others arguments are passed to SBCK.ppp.PrePostProcessing
         """
+        raise NotImplementedError("Don't use it: decorators do the same thing automatically")
         PrePostProcessing.__init__( self , *args , **kwargs )
         self._name  = "As2d"
         self._shape = {}

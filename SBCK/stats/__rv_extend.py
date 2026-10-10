@@ -354,6 +354,36 @@ class rv_scipy(rv_base):##{{{
 
 ##}}}
 
+class _histogram_pdf:##{{{
+    """pdf of SBCK.stats.rv_empirical, built from the histogram of the data
+    only when it is called for the first time (the cdf and the icdf are enough
+    for most of the bias correction methods, as QM or CDFt).
+    """
+    
+    def __init__( self , X: _Array , bins: _Array ) -> None:##{{{
+        """
+        Arguments
+        ---------
+        X: numpy.ndarray
+            Data
+        bins: numpy.ndarray
+            Edges of the bins of the histogram
+        """
+        self._X    = X
+        self._bins = bins
+        self._pdf  = None
+    ##}}}
+    
+    def __call__( self , x: _Array ) -> _Array:##{{{
+        if self._pdf is None:
+            h,c  = np.histogram( self._X , self._bins , density = True )
+            c    = (c[1:] + c[:-1]) / 2
+            self._pdf = sci.interp1d( c , h , bounds_error = False , fill_value = (0,0) )
+        return self._pdf(x)
+    ##}}}
+    
+##}}}
+
 class rv_empirical(rv_base):##{{{
     """Empirical histogram class. The differences with scipy.stats.rv_histogram
     are 1. the fit method and 2. the way to infer the cdf and the icdf. Here:
@@ -414,9 +444,7 @@ class rv_empirical(rv_base):##{{{
         if bins == "auto":
             bins = int(0.1 * X.size)
         bins = np.linspace( q.min() - dq , q.max() + dq , min( max( bins , bins_min ) , bins_max ) )
-        h,c  = np.histogram( X , bins , density = True )
-        c    = (c[1:] + c[:-1]) / 2
-        pdf  = sci.interp1d( c , h , bounds_error = False , fill_value = (0,0) ) 
+        pdf  = _histogram_pdf( Xs , bins )
         
         return rv_empirical( cdf , icdf , pdf )
     ##}}}

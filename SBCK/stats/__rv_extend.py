@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2021 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 

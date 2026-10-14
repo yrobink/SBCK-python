@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-## Copyright(c) 2021 / 2025 Yoann Robin
+## Copyright(c) 2021 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -193,9 +193,9 @@ class Univariate_CDFt(UnivariateBC):##{{{
         sX1 = X1.std()
         NY0 = Y0
         
-        if not sY0 > 0: sY0 = 1
-        if not sX0 > 0: sX0 = 1
-        if not sX1 > 0: sX1 = 1
+        if not sY0 > 0: sY0 = 1.
+        if not sX0 > 0: sX0 = 1.
+        if not sX1 > 0: sX1 = 1.
 
         match self.norm.lower():
             case 'none':
@@ -236,13 +236,16 @@ class Univariate_CDFt(UnivariateBC):##{{{
         rvNX1: rv_base
             Law of NX1
         """
-        rvNY0 = self.rvY0
-        if self.norm.lower() == "none":
-            rvNX0 = self.rvX0
-            rvNX1 = self.rvX1
-        else:
-            rvNX0 = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
-            rvNX1 = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+        match self.norm.lower():
+            case "none":
+                rvNX0 = self.rvX0
+                rvNX1 = self.rvX1
+                rvNY0 = self.rvY0
+            case _:
+                rvNX0 = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+                rvNX1 = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+                rvNY0 = self.rvY0
+        
         return rvNY0,rvNX0,rvNX1
     ##}}}
     

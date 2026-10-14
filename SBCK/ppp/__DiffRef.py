@@ -1,5 +1,5 @@
 
-## Copyright(c) 2022 / 2025 Yoann Robin
+## Copyright(c) 2022 / 2026 Yoann Robin
 ## 
 ## This file is part of SBCK.
 ## 
@@ -20,6 +20,7 @@
 ## Libraries ##
 ###############
 
+import warnings
 import numpy as np
 from .__PrePostProcessing import PrePostProcessing
 from ..misc.__sys import deprecated
@@ -33,7 +34,7 @@ from typing import Sequence
 from typing import Any
 
 _Array = np.ndarray
-_Cols = Sequence[int] | int | None
+_Cols = Sequence[int] | np.typing.NDArray[np.int_] | None
 
 
 ###########
@@ -46,9 +47,9 @@ class PreserveOrder(PrePostProcessing):##{{{
     corrected to ensure their order.
     """
     
-    _cols: _Cols
+    cols_order: _Cols = None
     
-    def __init__( self , *args: Any , cols: _Cols = None , **kwargs: Any ) -> None:##{{{
+    def __init__( self , *args: Any, cols_order: _Cols = None, cols: _Cols = None , **kwargs: Any ) -> None:##{{{
         """
         Parameters
         ----------
@@ -62,11 +63,23 @@ class PreserveOrder(PrePostProcessing):##{{{
         PrePostProcessing.__init__( self , *args , **kwargs )
         self._name = "PreserveOrder"
         
-        self._cols = cols
-        if cols is not None:
-            self._cols = np.array( [cols] , dtype = int ).squeeze()
+        self.cols_order = cols_order
+        if cols_order is None and cols is not None:
+            warnings.warn("cols argument is deprecated for the class SBCK.ppp.PreserveOrder, use cols_order instead")
+            self.cols_order = cols
+        if self.cols_order is not None:
+            self.cols_order = np.asarray( self.cols_order, dtype = int ).reshape(-1)
+
     ##}}}
     
+    ## Properties ##{{{
+
+    @property
+    def _cols(self) -> _Cols:
+        warnings.warn("Access to _cols is deprecated for the class SBCK.ppp.PreserveOrder, use cols_order instead")
+        return self.cols_order
+    ##}}}
+
     def transform( self , X: _Array ) -> _Array:##{{{
         """Apply the PreserveOrder transform, in fact just identity"""
         return X
@@ -79,7 +92,7 @@ class PreserveOrder(PrePostProcessing):##{{{
             return Xt
         
         X = Xt.copy()
-        X[:,self._cols] = np.sort( X[:,self._cols] , axis = 1 )
+        X[:,self.cols_order] = np.sort( X[:,self.cols_order] , axis = 1 )
         
         return X
     ##}}}

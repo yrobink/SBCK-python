@@ -212,6 +212,40 @@ class Univariate_CDFt(UnivariateBC):##{{{
     
     ## Out of Bounds method ##{{{
     
+    def _fit_normalized( self , NY0: _Array , NX0: _Array , NX1: _Array ) -> tuple[rv_base,rv_base,rv_base]:##{{{
+        """Laws of the normalized data. The normalization never modifies Y0,
+        and does not modify X0 and X1 if norm = 'None': in these cases the laws
+        fitted in the fit method are re-used instead of being fitted again on
+        the same data.
+        
+        Parameters
+        ----------
+        NY0: numpy.ndarray
+            Normalized reference in calibration period
+        NX0: numpy.ndarray
+            Normalized biased model in calibration period
+        NX1: numpy.ndarray
+            Normalized biased model in projection period
+        
+        Returns
+        -------
+        rvNY0: rv_base
+            Law of NY0
+        rvNX0: rv_base
+            Law of NX0
+        rvNX1: rv_base
+            Law of NX1
+        """
+        rvNY0 = self.rvY0
+        if self.norm.lower() == "none":
+            rvNX0 = self.rvX0
+            rvNX1 = self.rvX1
+        else:
+            rvNX0 = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
+            rvNX1 = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+        return rvNY0,rvNX0,rvNX1
+    ##}}}
+    
     def _find_support( self , rvY0: rv_base , rvX0: rv_base , rvX1: rv_base ) -> tuple[_Array,_Array]:##{{{
         """Function to find the common support of random variable
 
@@ -269,9 +303,7 @@ class Univariate_CDFt(UnivariateBC):##{{{
         rv: rv_base
             Estimated CDF of Y1
         """
-        rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
-        rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
-        rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+        rvNY0,rvNX0,rvNX1 = self._fit_normalized( NY0 , NX0 , NX1 )
         c_icdf = lambda p: rvNX1.icdf( rvNX0.cdf(  rvNY0.icdf( p ) ) )
         
         p = np.linspace( 0 , 1 , 1000 )
@@ -301,9 +333,7 @@ class Univariate_CDFt(UnivariateBC):##{{{
             Estimated CDF of Y1
         """
         
-        rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
-        rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
-        rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+        rvNY0,rvNX0,rvNX1 = self._fit_normalized( NY0 , NX0 , NX1 )
         
         q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )
         
@@ -348,9 +378,7 @@ class Univariate_CDFt(UnivariateBC):##{{{
             Estimated CDF of Y1
         """
         
-        rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
-        rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
-        rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+        rvNY0,rvNX0,rvNX1 = self._fit_normalized( NY0 , NX0 , NX1 )
         
         q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )
         
@@ -400,9 +428,7 @@ class Univariate_CDFt(UnivariateBC):##{{{
             Estimated CDF of Y1
         """
         
-        rvNY0  = self._fit( NY0 , self._typeY0 , self._freezeY0 , self.rvY0 )
-        rvNX0  = self._fit( NX0 , self._typeX0 , self._freezeX0 , self.rvX0 )
-        rvNX1  = self._fit( NX1 , self._typeX1 , self._freezeX1 , self.rvX1 )
+        rvNY0,rvNX0,rvNX1 = self._fit_normalized( NY0 , NX0 , NX1 )
         NCC    = self._oob_NCC
         
         q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )

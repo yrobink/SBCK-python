@@ -83,7 +83,7 @@ class Univariate_CDFt(UnivariateBC):##{{{
     Correct the tails of the corrections. Available methods are:
     - 'None': no change,
     - 'CCN': Apply the delta change of the mean of the N last valids values to
-      the tail.
+      the tail. N can be replaced by the value of N, default is 5.
     - 'Y0': Copy the tail of the reference.
     - 'Y0CC': Copy a scaled tail of Y0, such that the change between the tail
       of Y0 and Z1 is the change between X0 and X1.
@@ -115,7 +115,7 @@ class Univariate_CDFt(UnivariateBC):##{{{
     oob: str
     _oob_pmin: float
     _oob_pmax: float
-    _oob_NCC: int
+    _oob_CCN: int
     
     def __init__( self , rvY0: _rv_type = rv_empirical , rvX0: _rv_type = rv_empirical , rvX1: _rv_type = rv_empirical , norm: str = "dynamical" , oob: str = "Y0" , **kwargs ) -> None:##{{{
         """
@@ -138,8 +138,6 @@ class Univariate_CDFt(UnivariateBC):##{{{
             Minimal value of 'valid' quantile in oob.
         oob_pmax: float
             Maximal value of 'valid' quantile in oob.
-        oob_NCC: int
-            Value of N if CCN method is used
         """
         
         super().__init__( "Univariate_CDFt" , "NS" )
@@ -151,9 +149,10 @@ class Univariate_CDFt(UnivariateBC):##{{{
         self.oob       = oob
         self._oob_pmin = kwargs.get("oob_pmin",1e-2)
         self._oob_pmax = kwargs.get("oob_pmax",1-1e-2)
-        self._oob_NCC  = kwargs.get("oob_NCC",5)
-        if self.oob.startswith('CC') and len(self.oob) > 2 and self.oob[2:].isdigit():
-            self._oob_NCC = int(self.oob[2:])
+        self._oob_CCN  = 5
+        if self.oob.startswith('CC'):
+            if len(self.oob) > 2 and self.oob[2:].isdigit():
+                self._oob_CCN = int(self.oob[2:])
             self.oob      = 'CC'
         if self.oob.lower() not in ["none","y0","y0cc","cc"]:
             raise ValueError("Oob must be 'None', 'Y0', 'Y0CC' or 'CC'")
@@ -432,38 +431,32 @@ class Univariate_CDFt(UnivariateBC):##{{{
         """
         
         rvNY0,rvNX0,rvNX1 = self._fit_normalized( NY0 , NX0 , NX1 )
-        NCC    = self._oob_NCC
+        CCN    = self._oob_CCN
         
         q,p = self._find_support( rvNY0 , rvNX0 , rvNX1 )
+
+        ## Correct the left tail
+        if p[0] > self._oob_pmin:
+            pL = np.linspace( self._oob_pmin, p[0], 1000 )
+            dL = ( q[:CCN] - rvNX1.icdf(p[:CCN]) ).mean()
+            qL = rvNX1.icdf(pL) + dL
+            q = np.hstack((qL,q))
+            p = np.hstack((pL,p))
         
-        cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (-np.inf,np.inf) )
-        icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (-np.inf,np.inf) )
+        ## Correct the right tail
+        if p[-1] < self._oob_pmax:
+            pR = np.linspace( p[-1], self._oob_pmax, 1000 )
+            dR = ( q[-CCN:] - rvNX1.icdf(p[-CCN:]) ).mean()
+            qR = rvNX1.icdf(pR) + dR
+            q = np.hstack((q,qR))
+            p = np.hstack((p,pR))
         
-        Z1   = icdf( rvNX1.cdf(NX1) )
-        idxF = np.argsort(Z1.squeeze())
-        idxF = idxF[np.isfinite(Z1.squeeze()[idxF])]
-        idxL = idxF[:NCC]
-        idxR = idxF[-NCC:]
+        ## Interpolation
+        cdf  = sci.interp1d( q , p , bounds_error = False , fill_value = (p[0],p[-1]) )
+        icdf = sci.interp1d( p , q , bounds_error = False , fill_value = (q[0],q[-1]) )
+
+        return rv_empirical( cdf , icdf , None )
         
-        ## Left tail
-        iL = ~np.isfinite(Z1) & (Z1 < 0)
-        if np.any(iL):
-            ## Find D
-            D = np.sum( Z1[idxL] - NX1[idxL] ) / NCC
-            
-            ## Apply factor
-            Z1[iL] = NX1[iL] + D
-        
-        ## Right tail
-        iR = ~np.isfinite(Z1) & (Z1 > 0)
-        if np.any(iR):
-            ## Find D
-            D = np.sum( Z1[idxR] - NX1[idxR] ) / NCC
-            
-            ## Apply factor
-            Z1[iR] = NX1[iR] + D
-        
-        return rv_empirical.fit(Z1)
     ##}}}
     
     ##}}}
